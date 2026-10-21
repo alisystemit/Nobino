@@ -120,6 +120,8 @@ async function main() {
     { key: "email.smtp_user", value: "", group: "email", type: "string", description: "نام کاربری SMTP" },
     { key: "email.smtp_pass", value: "", group: "email", type: "secret", description: "رمز SMTP" },
     { key: "email.from", value: "noreply@nobino.ir", group: "email", type: "string", description: "آدرس فرستنده ایمیل" },
+    { key: "openai.api_key", value: "", group: "ai", type: "secret", description: "کلید OpenAI برای قابلیت‌های هوش مصنوعی" },
+    { key: "ai.enabled", value: "true", group: "ai", type: "select", options: JSON.stringify(["true", "false"]), description: "فعال‌سازی قابلیت‌های AI" },
   ];
   for (const s of defaultSettings) {
     await prisma.setting.upsert({

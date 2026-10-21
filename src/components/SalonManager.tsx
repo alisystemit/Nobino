@@ -138,10 +138,24 @@ export default function SalonManager({ salonId }: { salonId: string }) {
 
   function ReportView() {
     const [report, setReport] = useState<any>(null);
+    const [aiAnalysis, setAiAnalysis] = useState<string | null>(null);
+    const [aiLoading, setAiLoading] = useState(false);
     useEffect(() => {
       (async () => { const r = await fetch(`${base}/report`); const d = await r.json(); if (d.success) setReport(d.report); })();
       // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);
+    async function analyze() {
+      setAiLoading(true);
+      try {
+        const r = await fetch("/api/ai/analyze", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ salonId }) });
+        const d = await r.json();
+        setAiAnalysis(d.summary ?? d.error);
+      } catch {
+        setAiAnalysis("خطا در تحلیل");
+      } finally {
+        setAiLoading(false);
+      }
+    }
     if (!report) return <p className="py-6 text-center text-neutral-400">در حال محاسبه گزارش...</p>;
     const cards = [
       { label: "کل نوبت‌ها", value: String(report.total), icon: "📋" },
@@ -153,6 +167,14 @@ export default function SalonManager({ salonId }: { salonId: string }) {
     ];
     return (
       <div>
+        <button onClick={analyze} disabled={aiLoading} className="mb-4 rounded-xl bg-purple-600 px-5 py-2.5 text-sm font-bold text-white transition hover:bg-purple-700 disabled:opacity-50">
+          {aiLoading ? "در حال تحلیل..." : "🤖 تحلیل با هوش مصنوعی"}
+        </button>
+        {aiAnalysis && (
+          <div className="mb-4 rounded-2xl border border-purple-200 bg-purple-50 p-4 text-sm leading-relaxed text-purple-900">
+            {aiAnalysis}
+          </div>
+        )}
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
           {cards.map((c) => (
             <div key={c.label} className="rounded-2xl border border-neutral-200 p-4">

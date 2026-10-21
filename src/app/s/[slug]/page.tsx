@@ -2,6 +2,7 @@ import { notFound } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import { toPersianDigits, formatToman } from "@/lib/utils";
 import SalonBooking from "@/components/SalonBooking";
+import AssistantChat from "@/components/AssistantChat";
 import type { Metadata } from "next";
 
 export const instant = false;
@@ -34,6 +35,7 @@ export default async function SalonPage({ params }: { params: Promise<{ slug: st
 
   return (
     <main>
+      <AssistantChat salonId={salon.id} />
       {/* Header */}
       <header className="relative h-72 w-full">
         <div
