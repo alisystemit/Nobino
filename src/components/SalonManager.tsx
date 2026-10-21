@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+import RevenueChart from "@/components/RevenueChart";
 
 type Service = { id: string; name: string; durationMin: number; price: number; description?: string | null; isActive: boolean };
 type StaffItem = { id: string; name: string; title?: string | null; role: string; commissionPercent: number; branchId?: string | null; specialties: string[]; isActive: boolean };
@@ -140,6 +141,7 @@ export default function SalonManager({ salonId, salonSlug }: { salonId: string; 
     const [report, setReport] = useState<any>(null);
     const [aiAnalysis, setAiAnalysis] = useState<string | null>(null);
     const [aiLoading, setAiLoading] = useState(false);
+    const [showRevenue, setShowRevenue] = useState(false);
     useEffect(() => {
       (async () => { const r = await fetch(`${base}/report`); const d = await r.json(); if (d.success) setReport(d.report); })();
       // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -167,9 +169,15 @@ export default function SalonManager({ salonId, salonSlug }: { salonId: string; 
     ];
     return (
       <div>
-        <button onClick={analyze} disabled={aiLoading} className="mb-4 rounded-xl bg-purple-600 px-5 py-2.5 text-sm font-bold text-white transition hover:bg-purple-700 disabled:opacity-50">
-          {aiLoading ? "در حال تحلیل..." : "🤖 تحلیل با هوش مصنوعی"}
-        </button>
+        <div className="mb-4 flex flex-wrap gap-2">
+          <button onClick={analyze} disabled={aiLoading} className="rounded-xl bg-purple-600 px-5 py-2.5 text-sm font-bold text-white transition hover:bg-purple-700 disabled:opacity-50">
+            {aiLoading ? "در حال تحلیل..." : "🤖 تحلیل با هوش مصنوعی"}
+          </button>
+          <button onClick={() => setShowRevenue((s) => !s)} className="rounded-xl bg-pink-600 px-5 py-2.5 text-sm font-bold text-white transition hover:bg-pink-700">
+            {showRevenue ? "پنهان‌سازی نمودار" : "📊 نمودار درآمد"}
+          </button>
+        </div>
+        {showRevenue && <div className="mb-4"><RevenueChart salonId={salonId} /></div>}
         {aiAnalysis && (
           <div className="mb-4 rounded-2xl border border-purple-200 bg-purple-50 p-4 text-sm leading-relaxed text-purple-900">
             {aiAnalysis}
