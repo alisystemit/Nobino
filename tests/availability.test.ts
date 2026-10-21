@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { localMidnightUTC } from "../src/lib/bookings/availability";
+import { localMidnightUTC } from "../src/lib/timezone.ts";
 
 test("localMidnightUTC maps Tehran midnight to expected UTC", () => {
   const utc = localMidnightUTC("2026-10-23", "Asia/Tehran");

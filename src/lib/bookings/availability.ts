@@ -1,4 +1,5 @@
 import { prisma } from "@/lib/prisma";
+import { localMidnightUTC } from "@/lib/timezone";
 import type { Salon, Service, Staff, Appointment } from "@prisma/client";
 
 export type Slot = { startAt: Date; endAt: Date };
@@ -7,20 +8,6 @@ const SLOT_STEP_MIN = 30;
 
 function toMin(d: Date) {
   return d.getHours() * 60 + d.getMinutes();
-}
-
-/** پنجره کاری سالن برای یک روز (دقیقه از نیمه‌شب) */
-function tzOffsetMinutes(timeZone: string, date: Date): number {
-  const utcStr = date.toLocaleString("en-US", { timeZone: "UTC" });
-  const tzStr = date.toLocaleString("en-US", { timeZone });
-  return (new Date(tzStr).getTime() - new Date(utcStr).getTime()) / 60000;
-}
-
-export function localMidnightUTC(dayISO: string, timeZone: string): Date {
-  const [y, mo, d] = dayISO.split("-").map(Number);
-  const approx = new Date(Date.UTC(y, (mo ?? 1) - 1, d ?? 1, 12, 0, 0));
-  const offset = tzOffsetMinutes(timeZone, approx);
-  return new Date(Date.UTC(y, (mo ?? 1) - 1, d ?? 1, 0, 0, 0) - offset * 60 * 1000);
 }
 
 export async function getSalonWindow(salonId: string, dayISO: string): Promise<{ open: number; close: number }> {
