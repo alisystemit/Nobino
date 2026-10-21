@@ -6,6 +6,7 @@ import { toPersianDigits } from "@/lib/utils";
 import SalonSettings from "@/components/SalonSettings";
 import CreateSalon from "@/components/CreateSalon";
 import SalonManager from "@/components/SalonManager";
+import DailyStats from "@/components/DailyStats";
 
 export const instant = false;
 
@@ -30,6 +31,7 @@ export default async function SalonDashboardPage() {
 
   return (
     <main className="mx-auto max-w-6xl px-6 py-12">
+      <DailyStats role={user.role} />
       <div className="flex flex-wrap items-center justify-between gap-4">
         <div>
           <h1 className="text-2xl font-black text-neutral-900">سالن من</h1>
@@ -78,7 +80,7 @@ export default async function SalonDashboardPage() {
       <div className="mt-10 rounded-3xl border border-neutral-200 bg-white p-6 shadow-sm">
         <h2 className="text-lg font-extrabold text-neutral-900">مدیریت سالن</h2>
         <div className="mt-6">
-          <SalonManager salonId={salon.id} />
+          <SalonManager salonId={salon.id} salonSlug={salon.slug} />
         </div>
       </div>
     </main>

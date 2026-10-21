@@ -6,20 +6,24 @@ type Service = { id: string; name: string; durationMin: number; price: number };
 type Staff = { id: string; name: string; title?: string | null };
 type Extracted = { name?: string; phone?: string; service?: string; time?: string; note?: string };
 type Slot = { startAt: string; endAt: string };
+type Branch = { id: string; name: string; city?: string | null; address?: string | null };
 
 export default function SalonBooking({
   salonId,
   slug,
   services,
   staff,
+  branches = [],
 }: {
   salonId: string;
   slug: string;
   services: Service[];
   staff: Staff[];
+  branches?: Branch[];
 }) {
   const [serviceId, setServiceId] = useState("");
   const [employeeId, setEmployeeId] = useState("");
+  const [branchId, setBranchId] = useState("");
   const [name, setName] = useState("");
   const [phone, setPhone] = useState("");
   const [date, setDate] = useState("");
@@ -49,6 +53,7 @@ export default function SalonBooking({
       try {
         const q = new URLSearchParams({ serviceId, date });
         if (employeeId) q.set("employeeId", employeeId);
+        if (branchId) q.set("branchId", branchId);
         const res = await fetch(`/api/salons/${slug}/availability?${q}`);
         const data = await res.json();
         if (!cancelled) setSlots(data.success ? data.slots : []);
@@ -61,7 +66,7 @@ export default function SalonBooking({
     return () => {
       cancelled = true;
     };
-  }, [serviceId, date, employeeId, slug]);
+  }, [serviceId, date, employeeId, branchId, slug]);
 
   async function startRecording() {
     setMsg(null);
@@ -133,6 +138,7 @@ export default function SalonBooking({
           salonId,
           serviceId: serviceId || undefined,
           employeeId: employeeId || undefined,
+          branchId: branchId || undefined,
           customerName: name,
           customerPhone: phone,
           startAt,
@@ -181,6 +187,17 @@ export default function SalonBooking({
 
       {/* Form */}
       <div className="mt-5 space-y-4">
+        {branches.length > 1 && (
+          <select value={branchId} onChange={(e) => setBranchId(e.target.value)} className={input}>
+            <option value="">انتخاب شعبه</option>
+            {branches.map((b) => (
+              <option key={b.id} value={b.id}>
+                {b.name} {b.city ? `— ${b.city}` : ""}
+              </option>
+            ))}
+          </select>
+        )}
+
         <select value={serviceId} onChange={(e) => setServiceId(e.target.value)} className={input}>
           <option value="">انتخاب خدمت</option>
           {services.map((s) => (

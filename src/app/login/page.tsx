@@ -6,8 +6,9 @@ import Link from "next/link";
 
 export default function LoginPage() {
   const router = useRouter();
-  const [step, setStep] = useState<"phone" | "code">("phone");
+  const [step, setStep] = useState<"phone" | "email" | "code">("phone");
   const [phone, setPhone] = useState("");
+  const [email, setEmail] = useState("");
   const [code, setCode] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
@@ -29,13 +30,32 @@ export default function LoginPage() {
     setStep("code");
   }
 
+  async function requestEmailOtp() {
+    setLoading(true);
+    setError("");
+    setMsg("");
+    const res = await fetch("/api/auth/email/request", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ email }),
+    });
+    const data = await res.json();
+    setLoading(false);
+    if (!data.success) return setError(data.error || "خطا در ارسال کد");
+    setMsg("کد تأیید به ایمیل شما ارسال شد.");
+    setStep("code");
+  }
+
   async function verifyCode() {
     setLoading(true);
     setError("");
-    const res = await fetch("/api/auth/otp/verify", {
+    const isEmail = email.includes("@");
+    const endpoint = isEmail ? "/api/auth/email/verify" : "/api/auth/otp/verify";
+    const payload = isEmail ? { email, code } : { phone, code };
+    const res = await fetch(endpoint, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ phone, code }),
+      body: JSON.stringify(payload),
     });
     const data = await res.json();
     setLoading(false);
@@ -53,15 +73,15 @@ export default function LoginPage() {
               نوبینو
             </Link>
             <h1 className="mt-4 text-xl font-extrabold text-neutral-900">
-              {step === "phone" ? "ورود با شماره موبایل" : "ورود کد تأیید"}
+              {step === "phone" ? "ورود با شماره موبایل" : step === "email" ? "ورود با ایمیل" : "ورود کد تأیید"}
             </h1>
             <p className="mt-1 text-sm text-neutral-500">
-              {step === "phone" ? "کد تأیید برای شما پیامک می‌شود." : "کد ۴ رقمی را وارد کنید."}
+              {step === "phone" ? "کد تأیید برای شما پیامک می‌شود." : step === "email" ? "کد تأیید به ایمیل شما ارسال می‌شود." : "کد ۴ رقمی را وارد کنید."}
             </p>
           </div>
 
           <div className="mt-8 space-y-4">
-            {step === "phone" ? (
+            {step === "phone" && (
               <>
                 <input
                   type="tel"
@@ -78,8 +98,36 @@ export default function LoginPage() {
                 >
                   {loading ? "در حال ارسال..." : "دریافت کد"}
                 </button>
+                <button onClick={() => setStep("email")} className="w-full text-sm font-medium text-neutral-500 hover:text-neutral-700">
+                  ورود با ایمیل به‌جای شماره
+                </button>
               </>
-            ) : (
+            )}
+
+            {step === "email" && (
+              <>
+                <input
+                  type="email"
+                  dir="ltr"
+                  placeholder="you@example.com"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  className="w-full rounded-xl border border-neutral-300 px-4 py-3 text-center text-lg font-semibold outline-none focus:border-pink-500 focus:ring-2 focus:ring-pink-200"
+                />
+                <button
+                  onClick={requestEmailOtp}
+                  disabled={loading || !email.includes("@")}
+                  className="w-full rounded-xl bg-pink-600 py-3.5 font-bold text-white transition hover:bg-pink-700 disabled:opacity-50"
+                >
+                  {loading ? "در حال ارسال..." : "دریافت کد"}
+                </button>
+                <button onClick={() => setStep("phone")} className="w-full text-sm font-medium text-neutral-500 hover:text-neutral-700">
+                  ورود با شماره موبایل
+                </button>
+              </>
+            )}
+
+            {step === "code" && (
               <>
                 <input
                   type="tel"
@@ -97,10 +145,10 @@ export default function LoginPage() {
                   {loading ? "در حال بررسی..." : "تأیید و ورود"}
                 </button>
                 <button
-                  onClick={() => setStep("phone")}
+                  onClick={() => setStep(email.includes("@") ? "email" : "phone")}
                   className="w-full text-sm font-medium text-neutral-500 hover:text-neutral-700"
                 >
-                  تغییر شماره
+                  تغییر شماره/ایمیل
                 </button>
               </>
             )}

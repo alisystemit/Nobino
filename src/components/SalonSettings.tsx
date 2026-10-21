@@ -29,6 +29,7 @@ export default function SalonSettings({ salon }: { salon: Salon }) {
     timezone: (salon as { timezone?: string }).timezone ?? "Asia/Tehran",
     latitude: (salon as { latitude?: number | null }).latitude ?? "",
     longitude: (salon as { longitude?: number | null }).longitude ?? "",
+    customDomain: (salon as { customDomain?: string | null }).customDomain ?? "",
     minNoticeMinutes: 60,
     maxAdvanceDays: 30,
     cancelDeadlineHours: 24,
@@ -70,6 +71,7 @@ export default function SalonSettings({ salon }: { salon: Salon }) {
           timezone: form.timezone,
           latitude: form.latitude === "" ? null : Number(form.latitude),
           longitude: form.longitude === "" ? null : Number(form.longitude),
+          customDomain: form.customDomain || null,
           minNoticeMinutes: Number(form.minNoticeMinutes),
           maxAdvanceDays: Number(form.maxAdvanceDays),
           cancelDeadlineHours: Number(form.cancelDeadlineHours),
@@ -124,6 +126,25 @@ export default function SalonSettings({ salon }: { salon: Salon }) {
       <div>
         <label className="text-xs font-medium text-neutral-500">رنگ زمینه</label>
         <input type="color" className="h-11 w-full cursor-pointer rounded-xl border border-neutral-300" value={form.coverColor} onChange={set("coverColor")} />
+      </div>
+      <div>
+        <label className="text-xs font-medium text-neutral-500">منطقه زمانی</label>
+        <input className={input} value={form.timezone} onChange={set("timezone")} />
+      </div>
+      <div className="grid grid-cols-2 gap-3">
+        <div>
+          <label className="text-xs font-medium text-neutral-500">عرض جغرافیایی</label>
+          <input className={input} dir="ltr" value={form.latitude} onChange={set("latitude")} />
+        </div>
+        <div>
+          <label className="text-xs font-medium text-neutral-500">طول جغرافیایی</label>
+          <input className={input} dir="ltr" value={form.longitude} onChange={set("longitude")} />
+        </div>
+      </div>
+      <div>
+        <label className="text-xs font-medium text-neutral-500">دامنه اختصاصی (برای پلن سازمانی)</label>
+        <input className={input} dir="ltr" placeholder="salon.com" value={form.customDomain} onChange={set("customDomain")} />
+        <p className="mt-1 text-[11px] text-neutral-400">باید DNS دامنه به این سرویس اشاره کند.</p>
       </div>
 
       {/* قوانین رزرو */}

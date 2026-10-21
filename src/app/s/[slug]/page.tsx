@@ -25,7 +25,8 @@ export default async function SalonPage({ params }: { params: Promise<{ slug: st
       services: { where: { isActive: true } },
       galleryItems: { orderBy: { sortOrder: "asc" } },
       openingHours: true,
-      staff: { where: { isActive: true }, select: { id: true, name: true, title: true, bio: true, avatarUrl: true, specialties: true } },
+      staff: { where: { isActive: true }, select: { id: true, name: true, title: true, bio: true, avatarUrl: true, specialties: true, branchId: true } },
+      branches: { where: { isActive: true }, select: { id: true, name: true, city: true, address: true } },
     },
   });
 
@@ -184,6 +185,7 @@ export default async function SalonPage({ params }: { params: Promise<{ slug: st
             slug={salon.slug}
             services={salon.services}
             staff={salon.staff}
+            branches={salon.branches}
           />
         </aside>
       </div>

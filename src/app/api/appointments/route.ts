@@ -56,6 +56,7 @@ const schema = z.object({
   serviceId: z.string().optional(),
   serviceIds: z.array(z.string()).max(8).optional(), // رزرو چند خدمت
   employeeId: z.string().optional(),
+  branchId: z.string().optional(),
   customerName: z.string().min(1),
   customerPhone: z.string().regex(/^0?9\d{9}$/),
   startAt: z.string().datetime(), // ISO
@@ -93,6 +94,7 @@ export async function POST(req: Request) {
       salonId: salon.id,
       serviceId: primaryServiceId,
       employeeId: body.employeeId,
+      branchId: body.branchId,
       customerName: body.customerName,
       customerPhone: body.customerPhone,
       startAt: new Date(body.startAt),

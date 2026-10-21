@@ -14,18 +14,23 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
   try {
     await requireRole(["SALON_OWNER", "ADMIN"]);
     const { id } = await params;
+    const url = new URL(_req.url);
+    const branchId = url.searchParams.get("branchId") || undefined;
+
+    const baseWhere: any = { salonId: id };
+    if (branchId) baseWhere.branchId = branchId;
 
     const [total, completed, cancelled, appointments, distinctCustomers, employees] = await Promise.all([
-      prisma.appointment.count({ where: { salonId: id } }),
-      prisma.appointment.count({ where: { salonId: id, status: "COMPLETED" } }),
-      prisma.appointment.count({ where: { salonId: id, status: "CANCELLED" } }),
+      prisma.appointment.count({ where: baseWhere }),
+      prisma.appointment.count({ where: { ...baseWhere, status: "COMPLETED" } }),
+      prisma.appointment.count({ where: { ...baseWhere, status: "CANCELLED" } }),
       prisma.appointment.findMany({
-        where: { salonId: id },
+        where: baseWhere,
         select: { startAt: true, status: true, customerPhone: true, employeeId: true, serviceId: true },
         take: 5000,
       }),
-      prisma.appointment.groupBy({ by: ["customerPhone"], where: { salonId: id }, _count: { _all: true } }),
-      prisma.staff.findMany({ where: { salonId: id }, select: { id: true, name: true } }),
+      prisma.appointment.groupBy({ by: ["customerPhone"], where: baseWhere, _count: { _all: true } }),
+      prisma.staff.findMany({ where: branchId ? { salonId: id, branchId } : { salonId: id }, select: { id: true, name: true } }),
     ]);
 
     // نرخ مراجعه مجدد: مشتریانی که بیش از یک نوبت داشته‌اند
@@ -53,7 +58,9 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
 
     // امروز
     const todayStart = new Date(); todayStart.setHours(0, 0, 0, 0);
-    const newToday = await prisma.appointment.count({ where: { salonId: id, createdAt: { gte: todayStart } } });
+    const newTodayWhere: any = { salonId: id, createdAt: { gte: todayStart } };
+    if (branchId) newTodayWhere.branchId = branchId;
+    const newToday = await prisma.appointment.count({ where: newTodayWhere });
 
     return json({
       success: true,

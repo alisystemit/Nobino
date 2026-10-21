@@ -19,6 +19,7 @@ export default async function WaSalonPage({ params }: { params: Promise<{ slug: 
     include: {
       services: { where: { isActive: true } },
       staff: { where: { isActive: true }, select: { id: true, name: true, title: true } },
+      branches: { where: { isActive: true }, select: { id: true, name: true, city: true } },
     },
   });
   if (!salon || !salon.isActive) notFound();
@@ -41,7 +42,7 @@ export default async function WaSalonPage({ params }: { params: Promise<{ slug: 
         </div>
       </div>
 
-      <SalonBooking salonId={salon.id} slug={salon.slug} services={salon.services} staff={salon.staff} />
+      <SalonBooking salonId={salon.id} slug={salon.slug} services={salon.services} staff={salon.staff} branches={salon.branches} />
 
       <p className="mt-6 text-center text-xs text-neutral-400">
         نوبینو — برای استفاده در تلگرام، ایتا و بله

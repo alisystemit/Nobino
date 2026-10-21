@@ -12,6 +12,7 @@ export async function GET(_req: Request, { params }: { params: Promise<{ slug: s
   const dayISO = url.searchParams.get("date") ?? "";
   const serviceId = url.searchParams.get("serviceId") ?? "";
   const employeeId = url.searchParams.get("employeeId") ?? undefined;
+  const branchId = url.searchParams.get("branchId") ?? undefined;
 
   if (!dayISO || !/^\d{4}-\d{2}-\d{2}$/.test(dayISO)) {
     return json({ success: false, error: "پارامتر تاریخ (date=YYYY-MM-DD) الزامی است" }, { status: 400 });
@@ -28,7 +29,7 @@ export async function GET(_req: Request, { params }: { params: Promise<{ slug: s
     return json({ success: false, error: "خدمت یافت نشد" }, { status: 404 });
   }
 
-  const slots = await computeFreeSlots({ salon, service, employeeId, dayISO });
+  const slots = await computeFreeSlots({ salon, service, employeeId, branchId, dayISO });
 
   return json({
     success: true,

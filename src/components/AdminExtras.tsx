@@ -7,7 +7,7 @@ type Salon = { id: string; name: string; slug: string; owner: { phone: string } 
 type Audit = { id: string; action: string; entityType: string; actorPhone: string | null; createdAt: string };
 
 export default function AdminExtras() {
-  const [tab, setTab] = useState<"metrics" | "salons" | "subscriptions" | "users" | "packages" | "discounts" | "sms" | "audit">("metrics");
+  const [tab, setTab] = useState<"metrics" | "salons" | "reviews" | "subscriptions" | "users" | "packages" | "discounts" | "sms" | "audit">("metrics");
 
   const [discounts, setDiscounts] = useState<Discount[]>([]);
   const [salons, setSalons] = useState<Salon[]>([]);
@@ -163,6 +163,34 @@ export default function AdminExtras() {
     );
   }
 
+  function ReviewManager() {
+    const [reviews, setReviews] = useState<any[]>([]);
+    useEffect(() => {
+      (async () => { const r = await fetch("/api/admin/reviews"); const d = await r.json(); if (d.success) setReviews(d.reviews); })();
+    }, []);
+    async function remove(id: string) {
+      await api("/api/admin/reviews", "DELETE", { id });
+      setReviews((prev) => prev.filter((r) => r.id !== id));
+    }
+    return (
+      <div className="space-y-2">
+        {reviews.length === 0 && <p className="py-6 text-center text-neutral-400">نظری ثبت نشده است.</p>}
+        {reviews.map((r) => (
+          <div key={r.id} className="flex flex-wrap items-center justify-between gap-2 rounded-2xl border border-neutral-200 px-4 py-3">
+            <div>
+              <div className="font-bold text-neutral-800">{r.salon?.name} — ★ {r.rating}</div>
+              <div className="text-xs text-neutral-500">{r.customer?.name ?? r.customer?.phone}{r.staff ? ` — ${r.staff.name}` : ""}</div>
+              {r.comment && <div className="mt-1 text-sm text-neutral-600">{r.comment}</div>}
+            </div>
+            <button onClick={() => remove(r.id)} className="rounded-lg bg-red-50 px-3 py-1.5 text-xs font-bold text-red-600 hover:bg-red-100">
+              حذف نظر
+            </button>
+          </div>
+        ))}
+      </div>
+    );
+  }
+
   function SubscriptionManager() {
     const [subs, setSubs] = useState<any[]>([]);
     useEffect(() => {
@@ -251,6 +279,7 @@ export default function AdminExtras() {
   const tabs = [
     { id: "metrics", label: "درآمد SaaS" },
     { id: "salons", label: "سالن‌ها" },
+    { id: "reviews", label: "نظرات" },
     { id: "subscriptions", label: "اشتراک‌ها" },
     { id: "users", label: "کاربران" },
     { id: "packages", label: "پکیج‌ها" },
@@ -274,6 +303,7 @@ export default function AdminExtras() {
       <div className="mt-6">
         {tab === "metrics" && <MetricsManager />}
         {tab === "salons" && <SalonManagerList />}
+        {tab === "reviews" && <ReviewManager />}
         {tab === "subscriptions" && <SubscriptionManager />}
         {tab === "users" && <UserManager />}
         {tab === "packages" && <PackageManager />}

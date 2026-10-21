@@ -133,6 +133,7 @@ model Salon {
   timezone    String  @default("Asia/Tehran")
   latitude    Float?
   longitude   Float?
+  customDomain String? @unique
   isApproved  Boolean  @default(false)
   isActive    Boolean  @default(true)
   subscriptionEndsAt DateTime?
@@ -163,6 +164,7 @@ model Salon {
   staff         Staff[]
   timeBlocks    TimeBlock[]
   reviews       Review[]
+  holidays      Holiday[]
   favorites     Favorite[]
   waitlist      WaitlistEntry[] @relation("WaitlistSalon")
   webhooks      WebhookConfig[] @relation("WebhookSalon")
@@ -188,6 +190,7 @@ model Branch {
   appointments Appointment[]
   timeBlocks TimeBlock[]
   cashEntries CashRegisterEntry[]
+  holidays    Holiday[]
 
   @@index([salonId])
 }
@@ -253,6 +256,22 @@ model OpeningHour {
   isClosed  Boolean @default(false)
 
   @@unique([salonId, dayOfWeek])
+}
+
+model Holiday {
+  id        String   @id @default(cuid())
+  salonId   String
+  salon     Salon    @relation(fields: [salonId], references: [id], onDelete: Cascade)
+  branchId  String?
+  branch    Branch?  @relation(fields: [branchId], references: [id])
+  date      DateTime
+  isClosed  Boolean  @default(true)
+  openTime  String?
+  closeTime String?
+  reason    String?
+  createdAt DateTime @default(now())
+
+  @@index([salonId, date])
 }
 
 // ─── Appointments & Voice AI ──────────────────────────────────────────

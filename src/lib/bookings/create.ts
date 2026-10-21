@@ -22,6 +22,7 @@ export async function createAppointmentSafe(input: {
   salonId: string;
   serviceId?: string;
   employeeId?: string;
+  branchId?: string;
   customerName: string;
   customerPhone: string;
   startAt: Date;
@@ -65,6 +66,10 @@ export async function createAppointmentSafe(input: {
     if (input.employeeId) {
       clashWhere.OR = [{ employeeId: input.employeeId }, { employeeId: null }];
     }
+    if (input.branchId) {
+      if (clashWhere.OR) clashWhere.OR.push({ branchId: input.branchId }, { branchId: null });
+      else clashWhere.OR = [{ branchId: input.branchId }, { branchId: null }];
+    }
     const existingAppts = await tx.appointment.findMany({ where: clashWhere });
     const candidateEffectiveEnd = new Date(end.getTime() + buffer * 60 * 1000);
     const clash = existingAppts.find((a) => {
@@ -82,6 +87,10 @@ export async function createAppointmentSafe(input: {
     if (input.employeeId) {
       blockWhere.OR = [{ staffId: input.employeeId }, { staffId: null }];
     }
+    if (input.branchId) {
+      if (blockWhere.OR) blockWhere.OR.push({ branchId: input.branchId }, { branchId: null });
+      else blockWhere.OR = [{ branchId: input.branchId }, { branchId: null }];
+    }
     const blockClash = await tx.timeBlock.findFirst({ where: blockWhere });
     if (blockClash) throw new BookingConflictError("این بازه زمانی مسدود شده است.");
 
@@ -91,6 +100,7 @@ export async function createAppointmentSafe(input: {
         salonId: salon.id,
         serviceId: input.serviceId,
         employeeId: input.employeeId,
+        branchId: input.branchId,
         customerId: input.customerId,
         customerName: input.customerName,
         customerPhone: input.customerPhone,

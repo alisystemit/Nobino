@@ -8,9 +8,9 @@ type Block = { id: string; startAt: string; endAt: string; reason?: string | nul
 type Branch = { id: string; name: string; city?: string | null; address?: string | null; phone?: string | null; isActive: boolean };
 type CashEntry = { id: string; branch?: { name: string } | null; cashAmount: number; cardAmount: number; onlineAmount: number; expenseAmount: number; note?: string | null; createdAt: string };
 
-type Tab = "services" | "staff" | "blocks" | "booking" | "branches" | "cash" | "report";
+type Tab = "services" | "staff" | "blocks" | "booking" | "branches" | "cash" | "report" | "waitlist" | "calendar";
 
-export default function SalonManager({ salonId }: { salonId: string }) {
+export default function SalonManager({ salonId, salonSlug }: { salonId: string; salonSlug?: string }) {
   const [tab, setTab] = useState<Tab>("services");
   const [services, setServices] = useState<Service[]>([]);
   const [staff, setStaff] = useState<StaffItem[]>([]);
@@ -231,6 +231,118 @@ export default function SalonManager({ salonId }: { salonId: string }) {
     );
   }
 
+  function WaitlistView() {
+    const [entries, setEntries] = useState<any[]>([]);
+    useEffect(() => {
+      (async () => {
+        const r = await fetch(`/api/salons/${salonSlug}/waitlist`);
+        const d = await r.json();
+        if (d.success) setEntries(d.entries);
+      })();
+      // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, []);
+    const statusColor: Record<string, string> = {
+      WAITING: "bg-amber-50 text-amber-700",
+      NOTIFIED: "bg-sky-50 text-sky-700",
+      BOOKED: "bg-emerald-50 text-emerald-700",
+      EXPIRED: "bg-neutral-100 text-neutral-500",
+    };
+    return (
+      <div className="space-y-2">
+        {entries.length === 0 && <p className="py-6 text-center text-neutral-400">مشتری در صف انتظار نیست.</p>}
+        {entries.map((e) => (
+          <div key={e.id} className="flex flex-wrap items-center justify-between gap-2 rounded-2xl border border-neutral-200 px-4 py-3">
+            <div>
+              <div className="font-bold text-neutral-800">{e.customerName} <span className="text-xs text-neutral-400" dir="ltr">{e.customerPhone}</span></div>
+              <div className="text-xs text-neutral-500">{e.note ?? "بدون توضیح"}</div>
+            </div>
+            <div className="flex items-center gap-2">
+              <span className={`rounded-full px-3 py-1 text-xs font-semibold ${statusColor[e.status] ?? "bg-neutral-100 text-neutral-500"}`}>{e.status}</span>
+              {e.status === "WAITING" && (
+                <button onClick={() => api(`/api/salons/${salonSlug}/waitlist/${e.id}`, "PATCH", { status: "NOTIFIED" }).then(() => {
+                  setEntries((prev) => prev.map((x) => (x.id === e.id ? { ...x, status: "NOTIFIED" } : x)));
+                })} className="rounded-lg bg-sky-500 px-3 py-1.5 text-xs font-bold text-white hover:bg-sky-600">
+                  اطلاع‌رسانی شد
+                </button>
+              )}
+            </div>
+          </div>
+        ))}
+      </div>
+    );
+  }
+
+  function CalendarView() {
+    const [week, setWeek] = useState<string[]>([]);
+    const [appts, setAppts] = useState<any[]>([]);
+    const [staffFilter, setStaffFilter] = useState("");
+    const [statusFilter, setStatusFilter] = useState("");
+
+    useEffect(() => {
+      // هفته جاری (شروع از شنبه)
+      const monday = new Date();
+      const day = (monday.getDay() + 1) % 7; // شنبه=0
+      monday.setDate(monday.getDate() - day);
+      const days = Array.from({ length: 7 }, (_, i) => {
+        const d = new Date(monday);
+        d.setDate(d.getDate() + i);
+        return d.toISOString().slice(0, 10);
+      });
+      setWeek(days);
+    }, []);
+
+    useEffect(() => {
+      (async () => {
+        try {
+          const res = await fetch("/api/appointments");
+          const data = await res.json();
+          if (data.success) setAppts(data.appointments);
+        } catch {}
+      })();
+    }, []);
+
+    const dayNames = ["شنبه", "یکشنبه", "دوشنبه", "سه‌شنبه", "چهارشنبه", "پنجشنبه", "جمعه"];
+    const filtered = appts.filter((a) => {
+      const d = a.startAt.slice(0, 10);
+      if (!week.includes(d)) return false;
+      if (staffFilter && a.employee !== staffFilter) return false;
+      if (statusFilter && a.status !== statusFilter) return false;
+      return true;
+    });
+
+    return (
+      <div>
+        <div className="mb-4 flex flex-wrap gap-2">
+          <input className={input} placeholder="فیلتر آرایشگر" value={staffFilter} onChange={(e) => setStaffFilter(e.target.value)} />
+          <select className={input} value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)}>
+            <option value="">همه وضعیت‌ها</option>
+            {["REQUESTED", "CONFIRMED", "COMPLETED", "CANCELLED", "NO_SHOW"].map((s) => <option key={s} value={s}>{s}</option>)}
+          </select>
+        </div>
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
+          {week.map((day, i) => {
+            const dayAppts = filtered.filter((a) => a.startAt.slice(0, 10) === day).sort((a, b) => a.startAt.localeCompare(b.startAt));
+            return (
+              <div key={day} className="rounded-2xl border border-neutral-200 p-3">
+                <div className="mb-2 text-sm font-extrabold text-neutral-800">{dayNames[i]} <span className="text-xs font-normal text-neutral-400" dir="ltr">{day}</span></div>
+                <div className="space-y-1.5">
+                  {dayAppts.length === 0 && <p className="text-xs text-neutral-400">نوبتی نیست</p>}
+                  {dayAppts.map((a) => (
+                    <div key={a.id} className="rounded-lg bg-neutral-50 px-2.5 py-1.5 text-xs">
+                      <div className="font-bold text-neutral-700" dir="ltr">{a.startAt.slice(11, 16)}</div>
+                      <div className="text-neutral-600">{a.customerName} {a.employee ? `— ${a.employee}` : ""}</div>
+                      <div className="text-neutral-400">{a.service ?? ""} · {a.status}</div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+    );
+  }
+
   function CashForm() {
     const [branchId, setBranchId] = useState("");
     const [cashAmount, setCashAmount] = useState(0);
@@ -344,10 +456,12 @@ export default function SalonManager({ salonId }: { salonId: string }) {
 
   const tabs: { id: Tab; label: string }[] = [
     { id: "services", label: "خدمات" },
+    { id: "calendar", label: "تقویم نوبت" },
     { id: "staff", label: "کارکنان" },
     { id: "branches", label: "شعبه‌ها" },
     { id: "cash", label: "صندوق" },
     { id: "report", label: "گزارش عملکرد" },
+    { id: "waitlist", label: "صف انتظار" },
     { id: "blocks", label: "مسدودسازی" },
     { id: "booking", label: "ثبت نوبت" },
   ];
@@ -453,6 +567,8 @@ export default function SalonManager({ salonId }: { salonId: string }) {
         )}
 
         {tab === "report" && <ReportView />}
+        {tab === "waitlist" && <WaitlistView />}
+        {tab === "calendar" && <CalendarView />}
 
         {tab === "blocks" && (
           <>

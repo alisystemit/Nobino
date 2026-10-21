@@ -24,6 +24,19 @@ export function localMidnightUTC(dayISO: string, timeZone: string): Date {
 }
 
 export async function getSalonWindow(salonId: string, dayISO: string): Promise<{ open: number; close: number }> {
+  // تعطیلات استثنایی (Holiday)
+  const dayStart = new Date(dayISO + "T00:00:00Z");
+  const dayEnd = new Date(dayISO + "T23:59:59.999Z");
+  const holiday = await prisma.holiday.findFirst({
+    where: { salonId, date: { gte: dayStart, lte: dayEnd } },
+  });
+  if (holiday) {
+    if (holiday.isClosed || !holiday.openTime || !holiday.closeTime) return { open: 0, close: 0 };
+    const [oh, om] = holiday.openTime.split(":").map(Number);
+    const [ch, cm] = holiday.closeTime.split(":").map(Number);
+    return { open: oh * 60 + om, close: ch * 60 + cm };
+  }
+
   const date = new Date(dayISO + "T00:00:00Z");
   const day = date.getUTCDay(); // 0=Sun ... 6=Sat
   const hour = await prisma.openingHour.findUnique({
@@ -50,7 +63,7 @@ export async function getStaffWindow(salonId: string, staffId: string, dayISO: s
 }
 
 /** بازه‌های اشغال (نوبت‌ها) در یک روز */
-export async function getOccupiedIntervals(salonId: string, dayISO: string, employeeId?: string) {
+export async function getOccupiedIntervals(salonId: string, dayISO: string, employeeId?: string, branchId?: string) {
   const start = new Date(dayISO + "T00:00:00");
   const end = new Date(dayISO + "T23:59:59.999");
   const where: any = {
@@ -62,18 +75,28 @@ export async function getOccupiedIntervals(salonId: string, dayISO: string, empl
   if (employeeId) {
     where.OR = [{ employeeId }, { employeeId: null }];
   }
+  if (branchId) {
+    const branchCond = { branchId };
+    if (where.OR) where.OR.push(branchCond, { branchId: null });
+    else where.OR = [branchCond, { branchId: null }];
+  }
   const rows = await prisma.appointment.findMany({ where, select: { startAt: true, endAt: true, employeeId: true } });
   return rows.map((r) => ({ start: r.startAt, end: r.endAt }));
 }
 
 /** بازه‌های مسدود (TimeBlock) در یک روز */
-export async function getBlockedIntervals(salonId: string, dayISO: string, employeeId?: string) {
+export async function getBlockedIntervals(salonId: string, dayISO: string, employeeId?: string, branchId?: string) {
   const start = new Date(dayISO + "T00:00:00");
   const end = new Date(dayISO + "T23:59:59.999");
   const where: any = { salonId, startAt: { lt: end }, endAt: { gt: start } };
   if (employeeId) {
     where.OR = [{ staffId: employeeId }, { staffId: null }];
     delete where.staffId;
+  }
+  if (branchId) {
+    const branchCond = { branchId };
+    if (where.OR) where.OR.push(branchCond, { branchId: null });
+    else where.OR = [branchCond, { branchId: null }];
   }
   const rows = await prisma.timeBlock.findMany({ where, select: { startAt: true, endAt: true } });
   return rows.map((r) => ({ start: r.startAt, end: r.endAt }));
@@ -94,6 +117,7 @@ export async function computeFreeSlots(params: {
   salon: Salon;
   service: Service;
   employeeId?: string;
+  branchId?: string;
   dayISO: string;
   now?: Date;
 }): Promise<Slot[]> {
@@ -106,10 +130,9 @@ export async function computeFreeSlots(params: {
     ? await getStaffWindow(salon.id, params.employeeId, params.dayISO)
     : await getSalonWindow(salon.id, params.dayISO);
 
-  const rawOccupied = await getOccupiedIntervals(salon.id, params.dayISO, params.employeeId);
-  // O�U.OU+ buffer OO� U+U^O"O� O�O�OO_ O�O�OUOO'U_O�: OO�O�OU, U+U^O"O��?OU�OUO effective end O�O endAt + buffer
+  const rawOccupied = await getOccupiedIntervals(salon.id, params.dayISO, params.employeeId, params.branchId);
   const occupied = rawOccupied.map((o) => ({ start: o.start, end: new Date(o.end.getTime() + buffer * 60 * 1000) }));
-  const blocked = await getBlockedIntervals(salon.id, params.dayISO, params.employeeId);
+  const blocked = await getBlockedIntervals(salon.id, params.dayISO, params.employeeId, params.branchId);
 
   // حداکثر بازه رزرو آینده
   const maxAdvance = new Date(now.getTime() + salon.maxAdvanceDays * 24 * 60 * 60 * 1000);
