@@ -24,6 +24,7 @@ export default async function SalonPage({ params }: { params: Promise<{ slug: st
       services: { where: { isActive: true } },
       galleryItems: { orderBy: { sortOrder: "asc" } },
       openingHours: true,
+      staff: { where: { isActive: true }, select: { id: true, name: true, title: true, bio: true, avatarUrl: true, specialties: true } },
     },
   });
 
@@ -89,6 +90,40 @@ export default async function SalonPage({ params }: { params: Promise<{ slug: st
             </div>
           </section>
 
+          {salon.staff.length > 0 && (
+            <section>
+              <h2 className="text-xl font-extrabold text-neutral-900">تیم آرایشگران</h2>
+              <div className="mt-4 grid gap-4 sm:grid-cols-2">
+                {salon.staff.map((st) => (
+                  <div key={st.id} className="flex items-start gap-4 rounded-2xl border border-neutral-200 bg-white p-5">
+                    <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-full bg-pink-100 text-2xl">
+                      {st.avatarUrl ? (
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img src={st.avatarUrl} alt={st.name} className="h-full w-full rounded-full object-cover" />
+                      ) : (
+                        "💇‍♀️"
+                      )}
+                    </div>
+                    <div>
+                      <h3 className="font-bold text-neutral-900">{st.name}</h3>
+                      {st.title && <p className="text-xs text-pink-600">{st.title}</p>}
+                      {st.specialties.length > 0 && (
+                        <div className="mt-2 flex flex-wrap gap-1.5">
+                          {st.specialties.map((sp) => (
+                            <span key={sp} className="rounded-full bg-neutral-100 px-2.5 py-0.5 text-[11px] text-neutral-600">
+                              {sp}
+                            </span>
+                          ))}
+                        </div>
+                      )}
+                      {st.bio && <p className="mt-2 text-sm text-neutral-500">{st.bio}</p>}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </section>
+          )}
+
           {salon.galleryItems.length > 0 && (
             <section>
               <h2 className="text-xl font-extrabold text-neutral-900">گالری</h2>
@@ -127,7 +162,12 @@ export default async function SalonPage({ params }: { params: Promise<{ slug: st
 
         {/* Booking widget */}
         <aside className="lg:sticky lg:top-6 lg:self-start">
-          <SalonBooking salonId={salon.id} services={salon.services} />
+          <SalonBooking
+            salonId={salon.id}
+            slug={salon.slug}
+            services={salon.services}
+            staff={salon.staff}
+          />
         </aside>
       </div>
     </main>

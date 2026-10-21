@@ -5,6 +5,7 @@ import { requireRole } from "@/lib/auth/guards";
 import { toPersianDigits } from "@/lib/utils";
 import SalonSettings from "@/components/SalonSettings";
 import CreateSalon from "@/components/CreateSalon";
+import SalonManager from "@/components/SalonManager";
 
 export const instant = false;
 
@@ -70,6 +71,14 @@ export default async function SalonDashboardPage() {
               }}
             />
           </div>
+        </div>
+      </div>
+
+      {/* مدیریت (خدمات/کارکنان/مسدودسازی/نوبت دستی) */}
+      <div className="mt-10 rounded-3xl border border-neutral-200 bg-white p-6 shadow-sm">
+        <h2 className="text-lg font-extrabold text-neutral-900">مدیریت سالن</h2>
+        <div className="mt-6">
+          <SalonManager salonId={salon.id} />
         </div>
       </div>
     </main>

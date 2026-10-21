@@ -2,6 +2,7 @@ import { prisma } from "@/lib/prisma";
 import { requireRole } from "@/lib/auth/guards";
 import { formatToman, toPersianDigits } from "@/lib/utils";
 import SystemSettings from "@/components/SystemSettings";
+import AdminExtras from "@/components/AdminExtras";
 
 export const instant = false;
 
@@ -81,6 +82,14 @@ export default async function AdminDashboardPage() {
               ))}
             </tbody>
           </table>
+        </div>
+      </div>
+
+      {/* مدیریت (سالن‌ها / تخفیف / تست پیامک / حسابرسی) */}
+      <div className="mt-10 rounded-3xl border border-neutral-200 bg-white p-6 shadow-sm">
+        <h2 className="text-xl font-extrabold text-neutral-900">مدیریت پلتفرم</h2>
+        <div className="mt-6">
+          <AdminExtras />
         </div>
       </div>
 

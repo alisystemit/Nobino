@@ -12,6 +12,7 @@ export default function PackagesPage() {
   const [packages, setPackages] = useState<Pkg[]>([]);
   const [gateways, setGateways] = useState<Gateway[]>([]);
   const [gateway, setGateway] = useState("");
+  const [discountCode, setDiscountCode] = useState("");
   const [loading, setLoading] = useState(true);
   const [buying, setBuying] = useState<string | null>(null);
   const [error, setError] = useState("");
@@ -44,7 +45,7 @@ export default function PackagesPage() {
       const res = await fetch("/api/payments/create", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ packageId: pkgId, gateway }),
+        body: JSON.stringify({ packageId: pkgId, gateway, discountCode: discountCode || undefined }),
       });
       const data = await res.json();
       if (!data.success) {
@@ -115,6 +116,17 @@ export default function PackagesPage() {
                 </button>
               </div>
             ))}
+          </div>
+
+          <div className="mx-auto mt-8 max-w-md">
+            <label className="text-xs font-medium text-neutral-500">کد تخفیف (اختیاری)</label>
+            <input
+              dir="ltr"
+              value={discountCode}
+              onChange={(e) => setDiscountCode(e.target.value)}
+              placeholder="مثلاً NOBINO20"
+              className="mt-1 w-full rounded-xl border border-neutral-300 px-4 py-3 text-center text-sm outline-none focus:border-pink-500"
+            />
           </div>
 
           {error && <p className="mt-6 rounded-lg bg-red-50 px-4 py-3 text-center text-sm text-red-600">{error}</p>}

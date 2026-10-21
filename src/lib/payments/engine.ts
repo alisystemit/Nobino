@@ -105,6 +105,10 @@ export async function handlePaymentCallback(params: {
         where: { id: payment?.id ?? "" },
         data: { status: "PAID", refId: result.refId, cardPan: result.cardPan, payload: { verified: result.raw } as never },
       }),
+      // اگر تخفیف به‌کار رفته، شمارنده استفاده را یک واحد افزایش بده
+      ...(order.discountId
+        ? [prisma.discount.update({ where: { id: order.discountId }, data: { usedCount: { increment: 1 } } })]
+        : []),
     ]);
 
     // فعال‌سازی اشتراک پکیج برای سالن

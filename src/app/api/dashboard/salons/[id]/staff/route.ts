@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { requireRole } from "@/lib/auth/guards";
 import { prisma } from "@/lib/prisma";
+import { withinLimit } from "@/lib/plans/limits";
 import { json, apiError } from "@/lib/utils";
 
 const createSchema = z.object({
@@ -46,6 +47,11 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
     if (!salon) return json({ success: false, error: "دسترسی غیرمجاز" }, { status: 403 });
 
     const body = createSchema.parse(await req.json());
+
+    // رعایت محدودیت پلن (تعداد آرایشگران)
+    if (!(await withinLimit(id, "staff"))) {
+      return json({ success: false, error: "به سقف تعداد کارکنان پلن فعلی رسیده‌اید" }, { status: 402 });
+    }
 
     const staff = await prisma.staff.create({
       data: {

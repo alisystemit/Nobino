@@ -1,5 +1,6 @@
 import { prisma } from "@/lib/prisma";
 import type { Setting } from "@prisma/client";
+import { encryptSecret, decryptSecret } from "@/lib/crypto";
 
 /**
  * سیستم تنظیمات پویا (قابل ویرایش از پنل سوپرادمین).
@@ -16,7 +17,16 @@ export async function getSetting(key: string): Promise<string | undefined> {
   if (hit && Date.now() - hit.t < TTL) return hit.row?.value ?? undefined;
   const row = await prisma.setting.findUnique({ where: { key } });
   cache.set(key, { t: Date.now(), row });
-  return row?.value ?? undefined;
+  if (!row) return undefined;
+  // رمزگشایی مقادیر محرمانه
+  if (row.isSecret && row.value) {
+    try {
+      return decryptSecret(row.value);
+    } catch {
+      return row.value;
+    }
+  }
+  return row.value ?? undefined;
 }
 
 export async function getSettingGroup(prefix: string): Promise<Record<string, string>> {
@@ -35,10 +45,12 @@ export async function getAllSettings(): Promise<Setting[]> {
 
 export async function updateSetting(key: string, value: string, extra?: Partial<Setting>) {
   cache.delete(key);
+  const isSecret = extra?.isSecret ?? false;
+  const storedValue = isSecret && value ? encryptSecret(value) : value;
   const row = await prisma.setting.upsert({
     where: { key },
-    update: { value, ...extra },
-    create: { key, value, group: extra?.group ?? "general", type: extra?.type ?? "string", isSecret: extra?.isSecret ?? false, ...extra },
+    update: { value: storedValue, ...extra },
+    create: { key, value: storedValue, group: extra?.group ?? "general", type: extra?.type ?? "string", isSecret, ...extra },
   });
   return row;
 }
