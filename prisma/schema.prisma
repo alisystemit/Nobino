@@ -130,6 +130,9 @@ model Salon {
   logoUrl     String?
   bannerUrl   String?
   coverColor  String  @default("#f472b6")
+  timezone    String  @default("Asia/Tehran")
+  latitude    Float?
+  longitude   Float?
   isApproved  Boolean  @default(false)
   isActive    Boolean  @default(true)
   subscriptionEndsAt DateTime?
@@ -285,6 +288,7 @@ model Appointment {
   rescheduledFrom String? // id نوبت قبلی هنگام جابه‌جایی
   voiceCallId   String?  @unique
   voiceCall     VoiceCall? @relation(fields: [voiceCallId], references: [id])
+  review        Review?
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -618,6 +622,8 @@ model Review {
   staff     Staff?   @relation(fields: [staffId], references: [id])
   customerId String
   customer   User    @relation("ReviewCustomer", fields: [customerId], references: [id], onDelete: Cascade)
+  appointmentId String? @unique
+  appointment   Appointment? @relation(fields: [appointmentId], references: [id], onDelete: SetNull)
   rating    Int // 1..5
   comment   String?
   createdAt DateTime @default(now())

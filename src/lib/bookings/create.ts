@@ -56,14 +56,21 @@ export async function createAppointmentSafe(input: {
     }
 
     // تداخل با نوبت‌های موجود (پوشش بافر)
-    const where: any = {
+    const clashWhere: any = {
       salonId: salon.id,
       status: { in: ["REQUESTED", "CONFIRMED"] },
       startAt: { lt: serviceEnd },
-      endAt: { gt: start },
+      endAt: { gt: new Date(start.getTime() - buffer * 60 * 1000) },
     };
-    if (input.employeeId) where.employeeId = input.employeeId;
-    const clash = await tx.appointment.findFirst({ where });
+    if (input.employeeId) {
+      clashWhere.OR = [{ employeeId: input.employeeId }, { employeeId: null }];
+    }
+    const existingAppts = await tx.appointment.findMany({ where: clashWhere });
+    const candidateEffectiveEnd = new Date(end.getTime() + buffer * 60 * 1000);
+    const clash = existingAppts.find((a) => {
+      const existingEffectiveEnd = new Date(a.endAt.getTime() + buffer * 60 * 1000);
+      return start < existingEffectiveEnd && candidateEffectiveEnd > a.startAt;
+    });
     if (clash) throw new BookingConflictError();
 
     // تداخل با بازه‌های مسدود
@@ -72,7 +79,9 @@ export async function createAppointmentSafe(input: {
       startAt: { lt: serviceEnd },
       endAt: { gt: start },
     };
-    if (input.employeeId) blockWhere.staffId = input.employeeId;
+    if (input.employeeId) {
+      blockWhere.OR = [{ staffId: input.employeeId }, { staffId: null }];
+    }
     const blockClash = await tx.timeBlock.findFirst({ where: blockWhere });
     if (blockClash) throw new BookingConflictError("این بازه زمانی مسدود شده است.");
 

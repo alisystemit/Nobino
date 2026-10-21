@@ -24,17 +24,44 @@ export async function rescheduleAppointmentSafe(appointmentId: string, newStartA
     const end = new Date(start.getTime() + duration * 60 * 1000);
     const serviceEnd = new Date(end.getTime() + buffer * 60 * 1000);
 
-    const where: any = {
+    const clashWhere: any = {
       salonId: prev.salonId,
       status: { in: ["REQUESTED", "CONFIRMED"] },
       startAt: { lt: serviceEnd },
-      endAt: { gt: start },
+      endAt: { gt: new Date(start.getTime() - buffer * 60 * 1000) },
       id: { not: appointmentId },
     };
-    if (prev.employeeId) where.employeeId = prev.employeeId;
+    if (prev.employeeId) {
+      clashWhere.OR = [{ employeeId: prev.employeeId }, { employeeId: null }];
+    }
 
-    const clash = await tx.appointment.findFirst({ where });
+    const existing = await tx.appointment.findMany({ where: clashWhere });
+    const candidateEffectiveEnd = new Date(end.getTime() + buffer * 60 * 1000);
+    const clash = existing.find((a) => {
+      const existingEffectiveEnd = new Date(a.endAt.getTime() + buffer * 60 * 1000);
+      return start < existingEffectiveEnd && candidateEffectiveEnd > a.startAt;
+    });
     if (clash) throw new RescheduleConflictError();
+
+    // O�O_OOrU, O"O U.O3O_U^O_ (TimeBlock)
+    const blockWhere: any = {
+      salonId: prev.salonId,
+      startAt: { lt: serviceEnd },
+      endAt: { gt: start },
+    };
+    if (prev.employeeId) {
+      blockWhere.OR = [{ staffId: prev.employeeId }, { staffId: null }];
+    }
+    const blockClash = await tx.timeBlock.findFirst({ where: blockWhere });
+    if (blockClash) throw new RescheduleConflictError("time block conflict");
+
+    // U,U^OU+UOU+ / O-O_OUcO�O� O"OO�U� O�UOU+O_U�
+    if (start.getTime() < new Date().getTime() + prev.salon.minNoticeMinutes * 60 * 1000) {
+      throw new RescheduleConflictError("min notice violation");
+    }
+    if (start.getTime() > new Date().getTime() + prev.salon.maxAdvanceDays * 86400 * 1000) {
+      throw new RescheduleConflictError("max advance violation");
+    }
 
     return tx.appointment.update({
       where: { id: appointmentId },

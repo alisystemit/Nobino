@@ -10,9 +10,22 @@ function toMin(d: Date) {
 }
 
 /** پنجره کاری سالن برای یک روز (دقیقه از نیمه‌شب) */
+function tzOffsetMinutes(timeZone: string, date: Date): number {
+  const utcStr = date.toLocaleString("en-US", { timeZone: "UTC" });
+  const tzStr = date.toLocaleString("en-US", { timeZone });
+  return (new Date(tzStr).getTime() - new Date(utcStr).getTime()) / 60000;
+}
+
+export function localMidnightUTC(dayISO: string, timeZone: string): Date {
+  const [y, mo, d] = dayISO.split("-").map(Number);
+  const approx = new Date(Date.UTC(y, (mo ?? 1) - 1, d ?? 1, 12, 0, 0));
+  const offset = tzOffsetMinutes(timeZone, approx);
+  return new Date(Date.UTC(y, (mo ?? 1) - 1, d ?? 1, 0, 0, 0) - offset * 60 * 1000);
+}
+
 export async function getSalonWindow(salonId: string, dayISO: string): Promise<{ open: number; close: number }> {
-  const date = new Date(dayISO + "T00:00:00");
-  const day = date.getDay(); // 0=Sun ... 6=Sat
+  const date = new Date(dayISO + "T00:00:00Z");
+  const day = date.getUTCDay(); // 0=Sun ... 6=Sat
   const hour = await prisma.openingHour.findUnique({
     where: { salonId_dayOfWeek: { salonId, dayOfWeek: day } },
   });
@@ -27,7 +40,7 @@ export async function getStaffWindow(salonId: string, staffId: string, dayISO: s
   const salonWindow = await getSalonWindow(salonId, dayISO);
   const staff = await prisma.staff.findUnique({ where: { id: staffId } });
   const schedule = (staff?.schedule as { day: number; open: string; close: string; isClosed?: boolean }[] | null) ?? null;
-  const day = new Date(dayISO + "T00:00:00").getDay();
+  const day = new Date(dayISO + "T00:00:00Z").getUTCDay();
   const entry = schedule?.find((s) => s.day === day);
   if (!schedule || !entry) return salonWindow;
   if (entry.isClosed) return { open: 0, close: 0 };
@@ -45,7 +58,10 @@ export async function getOccupiedIntervals(salonId: string, dayISO: string, empl
     startAt: { gte: start, lt: end },
     status: { in: ["REQUESTED", "CONFIRMED"] },
   };
-  if (employeeId) where.employeeId = employeeId;
+  // U,U?U,�?OU�OUO U.O�O3O_U^O_ O�O O3OU,U+ (employeeId = null) OO� U.O�O3O_U^O_ O�O O�O�OUOO'U_O� O�U.OU+ U.O3O_U^O_O3OO�UO U.O�O3O_U^O_ OO3O�.
+  if (employeeId) {
+    where.OR = [{ employeeId }, { employeeId: null }];
+  }
   const rows = await prisma.appointment.findMany({ where, select: { startAt: true, endAt: true, employeeId: true } });
   return rows.map((r) => ({ start: r.startAt, end: r.endAt }));
 }
@@ -55,7 +71,10 @@ export async function getBlockedIntervals(salonId: string, dayISO: string, emplo
   const start = new Date(dayISO + "T00:00:00");
   const end = new Date(dayISO + "T23:59:59.999");
   const where: any = { salonId, startAt: { lt: end }, endAt: { gt: start } };
-  if (employeeId) where.staffId = employeeId;
+  if (employeeId) {
+    where.OR = [{ staffId: employeeId }, { staffId: null }];
+    delete where.staffId;
+  }
   const rows = await prisma.timeBlock.findMany({ where, select: { startAt: true, endAt: true } });
   return rows.map((r) => ({ start: r.startAt, end: r.endAt }));
 }
@@ -87,15 +106,18 @@ export async function computeFreeSlots(params: {
     ? await getStaffWindow(salon.id, params.employeeId, params.dayISO)
     : await getSalonWindow(salon.id, params.dayISO);
 
-  const occupied = await getOccupiedIntervals(salon.id, params.dayISO, params.employeeId);
+  const rawOccupied = await getOccupiedIntervals(salon.id, params.dayISO, params.employeeId);
+  // O�U.OU+ buffer OO� U+U^O"O� O�O�OO_ O�O�OUOO'U_O�: OO�O�OU, U+U^O"O��?OU�OUO effective end O�O endAt + buffer
+  const occupied = rawOccupied.map((o) => ({ start: o.start, end: new Date(o.end.getTime() + buffer * 60 * 1000) }));
   const blocked = await getBlockedIntervals(salon.id, params.dayISO, params.employeeId);
 
   // حداکثر بازه رزرو آینده
   const maxAdvance = new Date(now.getTime() + salon.maxAdvanceDays * 24 * 60 * 60 * 1000);
   const minNotice = new Date(now.getTime() + salon.minNoticeMinutes * 60 * 1000);
 
-  const dateStart = new Date(params.dayISO + "T00:00:00");
-  const dayEnd = new Date(params.dayISO + "T23:59:59.999");
+  const tz = (salon as { timezone?: string }).timezone ?? "Asia/Tehran";
+  const dateStart = localMidnightUTC(params.dayISO, tz);
+  const dayEnd = new Date(dateStart.getTime() + 24 * 60 * 60 * 1000);
 
   const slots: Slot[] = [];
   for (let t = win.open; t + duration <= win.close; t += SLOT_STEP_MIN) {
