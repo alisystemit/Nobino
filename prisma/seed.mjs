@@ -55,6 +55,13 @@ async function main() {
     });
   }
 
+  // شعبه پیش‌فرض
+  await prisma.branch.upsert({
+    where: { id: `${salon.id}-branch-main` },
+    update: {},
+    create: { id: `${salon.id}-branch-main`, salonId: salon.id, name: "شعبه اصلی", city: "تهران", address: salon.address },
+  });
+
   for (let d = 0; d < 7; d++) {
     await prisma.openingHour.upsert({
       where: { salonId_dayOfWeek: { salonId: salon.id, dayOfWeek: d } },

@@ -6,6 +6,10 @@ import { json, apiError } from "@/lib/utils";
 const patchSchema = z.object({
   name: z.string().min(1).optional(),
   title: z.string().optional().nullable(),
+  role: z.enum(["OWNER", "MANAGER", "RECEPTION", "STYLIST"]).optional(),
+  commissionPercent: z.number().int().min(0).max(100).optional(),
+  branchId: z.string().optional().nullable(),
+  userId: z.string().optional().nullable(),
   bio: z.string().optional().nullable(),
   avatarUrl: z.string().optional().nullable(),
   specialties: z.array(z.string()).optional(),

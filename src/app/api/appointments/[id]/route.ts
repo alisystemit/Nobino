@@ -3,6 +3,7 @@ import { prisma } from "@/lib/prisma";
 import { requireRole } from "@/lib/auth/guards";
 import { dispatchWebhook } from "@/lib/webhooks";
 import { enqueueSms } from "@/lib/notifications/queue";
+import { credit } from "@/lib/financial/wallet";
 import { json, apiError } from "@/lib/utils";
 
 const schema = z.object({
@@ -33,6 +34,22 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
     // امتیاز وفاداری در صورت مراجعه واقعی
     if (body.status === "COMPLETED" && prev.customerId) {
       await prisma.user.update({ where: { id: prev.customerId }, data: { loyaltyPoints: { increment: LOYALTY_POINTS } } });
+    }
+
+    // کمیسیون آرایشگر (درصدی از قیمت خدمت) در صورت تکمیل
+    if (body.status === "COMPLETED" && prev.employeeId && prev.serviceId) {
+      const employee = await prisma.staff.findUnique({ where: { id: prev.employeeId } });
+      const service = await prisma.service.findUnique({ where: { id: prev.serviceId } });
+      if (employee && service && employee.commissionPercent > 0 && employee.userId) {
+        const amount = Math.round((service.price * employee.commissionPercent) / 100);
+        if (amount > 0) {
+          await credit(employee.userId, amount, "COMMISSION_EARNING", {
+            refType: "Appointment",
+            refId: id,
+            description: `کمیسیون ${employee.commissionPercent}٪ از «${service.name}»`,
+          }).catch(() => {});
+        }
+      }
     }
 
     // وب‌هوک برای تأیید/لغو

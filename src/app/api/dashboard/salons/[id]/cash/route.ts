@@ -1,0 +1,64 @@
+import { z } from "zod";
+import { requireRole } from "@/lib/auth/guards";
+import { prisma } from "@/lib/prisma";
+import { json, apiError } from "@/lib/utils";
+
+const createSchema = z.object({
+  branchId: z.string().optional(),
+  cashAmount: z.number().int().min(0).default(0),
+  cardAmount: z.number().int().min(0).default(0),
+  onlineAmount: z.number().int().min(0).default(0),
+  expenseAmount: z.number().int().min(0).default(0),
+  note: z.string().optional(),
+});
+
+export async function GET(_req: Request, { params }: { params: Promise<{ id: string }> }) {
+  try {
+    await requireRole(["SALON_OWNER", "ADMIN"]);
+    const { id } = await params;
+
+    const entries = await prisma.cashRegisterEntry.findMany({
+      where: { salonId: id },
+      include: { branch: { select: { name: true } } },
+      orderBy: { createdAt: "desc" },
+      take: 200,
+    });
+
+    const todayStart = new Date(); todayStart.setHours(0, 0, 0, 0);
+    const today = entries.filter((e) => e.createdAt >= todayStart);
+    const sum = (arr: typeof today, key: "cashAmount" | "cardAmount" | "onlineAmount" | "expenseAmount") =>
+      arr.reduce((s, e) => s + e[key], 0);
+
+    return json({
+      success: true,
+      entries,
+      todayTotals: {
+        cash: sum(today, "cashAmount"),
+        card: sum(today, "cardAmount"),
+        online: sum(today, "onlineAmount"),
+        expense: sum(today, "expenseAmount"),
+        net: sum(today, "cashAmount") + sum(today, "cardAmount") + sum(today, "onlineAmount") - sum(today, "expenseAmount"),
+      },
+    });
+  } catch (err) {
+    return apiError(err);
+  }
+}
+
+export async function POST(req: Request, { params }: { params: Promise<{ id: string }> }) {
+  try {
+    const user = await requireRole(["SALON_OWNER", "ADMIN"]);
+    const { id } = await params;
+    const salon = await prisma.salon.findUnique({ where: { id } });
+    if (!salon) return json({ success: false, error: "سالن یافت نشد" }, { status: 404 });
+    if (user.role !== "ADMIN" && salon.ownerId !== user.id) {
+      return json({ success: false, error: "دسترسی غیرمجاز" }, { status: 403 });
+    }
+
+    const body = createSchema.parse(await req.json());
+    const entry = await prisma.cashRegisterEntry.create({ data: { salonId: id, createdById: user.id, ...body } });
+    return json({ success: true, entry }, { status: 201 });
+  } catch (err) {
+    return apiError(err);
+  }
+}

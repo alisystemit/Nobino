@@ -7,6 +7,10 @@ import { json, apiError } from "@/lib/utils";
 const createSchema = z.object({
   name: z.string().min(1),
   title: z.string().optional(),
+  role: z.enum(["OWNER", "MANAGER", "RECEPTION", "STYLIST"]).default("STYLIST"),
+  commissionPercent: z.number().int().min(0).max(100).default(0),
+  branchId: z.string().optional(),
+  userId: z.string().optional(),
   bio: z.string().optional(),
   avatarUrl: z.string().optional(),
   specialties: z.array(z.string()).default([]),
@@ -58,13 +62,17 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
         salonId: id,
         name: body.name,
         title: body.title,
+        role: body.role,
+        commissionPercent: body.commissionPercent,
+        branchId: body.branchId,
+        userId: body.userId,
         bio: body.bio,
         avatarUrl: body.avatarUrl,
         specialties: body.specialties,
         schedule: body.schedule,
         services: body.serviceIds ? { connect: body.serviceIds.map((sid) => ({ id: sid })) } : undefined,
       },
-      include: { services: true },
+      include: { services: true, branch: true },
     });
 
     return json({ success: true, staff }, { status: 201 });

@@ -89,6 +89,7 @@ model User {
   favorites       Favorite[]
   reviews         Review[] @relation("ReviewCustomer")
   giftCards       GiftCard[]
+  staffAccounts   Staff[] @relation("StaffUser")
 }
 
 model Otp {
@@ -162,12 +163,57 @@ model Salon {
   favorites     Favorite[]
   waitlist      WaitlistEntry[] @relation("WaitlistSalon")
   webhooks      WebhookConfig[] @relation("WebhookSalon")
+  branches      Branch[]
+  cashEntries   CashRegisterEntry[]
+}
+
+// ─── شعبه (چند شعبه برای یک سالن/برند) ─────────────────────────────────────
+model Branch {
+  id        String   @id @default(cuid())
+  salonId   String
+  salon     Salon    @relation(fields: [salonId], references: [id], onDelete: Cascade)
+  name      String
+  city      String?
+  address   String?
+  phone     String?
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  staff      Staff[]
+  services   Service[]
+  appointments Appointment[]
+  timeBlocks TimeBlock[]
+  cashEntries CashRegisterEntry[]
+
+  @@index([salonId])
+}
+
+// ─── صندوق / تسویه روزانه ────────────────────────────────────────────────
+model CashRegisterEntry {
+  id        String   @id @default(cuid())
+  salonId   String
+  salon     Salon    @relation(fields: [salonId], references: [id], onDelete: Cascade)
+  branchId  String?
+  branch    Branch?  @relation(fields: [branchId], references: [id])
+  date      DateTime @default(now())
+  cashAmount Int    @default(0) // نقدی
+  cardAmount Int    @default(0) // کارت‌خوان
+  onlineAmount Int  @default(0) // آنلاین
+  expenseAmount Int @default(0) // هزینه
+  note      String?
+  createdById String?
+  createdAt DateTime @default(now())
+
+  @@index([salonId, date])
 }
 
 model Service {
   id          String   @id @default(cuid())
   salonId     String
   salon       Salon    @relation(fields: [salonId], references: [id], onDelete: Cascade)
+  branchId    String?
+  branch      Branch?  @relation(fields: [branchId], references: [id])
   name        String
   durationMin Int
   price       Int // تومان
@@ -221,6 +267,8 @@ model Appointment {
   // آرایشگر انتخاب‌شده (اختیاری)
   employeeId  String?
   employee    Staff?   @relation(fields: [employeeId], references: [id])
+  branchId    String?
+  branch      Branch?  @relation(fields: [branchId], references: [id])
 
   customerName  String
   customerPhone String
@@ -515,9 +563,15 @@ model Staff {
   id        String   @id @default(cuid())
   salonId   String
   salon     Salon    @relation(fields: [salonId], references: [id], onDelete: Cascade)
+  branchId  String?
+  branch    Branch?  @relation(fields: [branchId], references: [id])
 
   name      String
   title     String? // مثل «آرایشگر ارشد»
+  role      String   @default("STYLIST") // OWNER | MANAGER | RECEPTION | STYLIST
+  commissionPercent Int @default(0) // سهم آرایشگر از هر خدمت (٪)
+  userId    String? // حساب کاربری مرتبط برای پرداخت کمیسیون
+  user      User?    @relation("StaffUser", fields: [userId], references: [id])
   bio       String?
   avatarUrl String?
   specialties String[] // لیست تخصص‌ها
@@ -542,6 +596,8 @@ model TimeBlock {
   id        String   @id @default(cuid())
   salonId   String
   salon     Salon    @relation(fields: [salonId], references: [id], onDelete: Cascade)
+  branchId  String?
+  branch    Branch?  @relation(fields: [branchId], references: [id])
   staffId   String?
   staff     Staff?   @relation(fields: [staffId], references: [id])
   startAt   DateTime

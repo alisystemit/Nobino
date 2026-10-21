@@ -16,7 +16,7 @@ export type PlanLimits = {
 
 const DEFAULTS: Record<string, number | boolean> = {
   staff: 100,
-  branches: 1,
+  branches: 50,
   webapp: true,
   voiceBooking: true,
   csvExport: true,
@@ -51,7 +51,7 @@ export async function withinLimit(salonId: string, key: keyof PlanLimits): Promi
 
   let count = 0;
   if (key === "staff") count = await prisma.staff.count({ where: { salonId, isActive: true } });
-  else if (key === "branches") count = 1; // در حال حاضر فقط یک شعبه
+  else if (key === "branches") count = await prisma.branch.count({ where: { salonId, isActive: true } });
 
   return count < limit;
 }
