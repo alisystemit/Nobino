@@ -1,0 +1,359 @@
+// Nobino — Prisma Schema
+// PostgreSQL database. Model covers multi-tenant salons, voice AI,
+// OTP auth, finance (wallet/commission/payout) and payments.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ─── Enums ────────────────────────────────────────────────────────────
+
+enum Role {
+  CUSTOMER // مشتری
+  SALON_OWNER // آرایشگر / صاحب سالن
+  AGENT // نماینده (کمیسیون درصدی)
+  ADMIN // سوپرادمین
+}
+
+enum AppointmentStatus {
+  REQUESTED // در انتظار تأیید
+  CONFIRMED // تأیید شده
+  COMPLETED // انجام شده
+  CANCELLED // لغو شده
+  NO_SHOW // مراجعه نکرد
+}
+
+enum CreationChannel {
+  VOICE // ضبط صوتی/هوش مصنوعی
+  MANUAL // ثبت دستی
+  WEBAPP // وب‌اپ پیام‌رسان
+}
+
+enum PaymentStatus {
+  PENDING
+  PAID
+  FAILED
+  REFUNDED
+  CANCELLED
+}
+
+enum TransactionKind {
+  CREDIT // افزایش موجودی
+  DEBIT // کاهش موجودی
+}
+
+enum TransactionReason {
+  PACKAGE_PURCHASE
+  COMMISSION_EARNING
+  COMMISSION_PAYOUT
+  PAYOUT
+  REFUND
+  ADMIN_ADJUSTMENT
+}
+
+enum PayoutStatus {
+  REQUESTED
+  PROCESSING
+  PAID
+  REJECTED
+}
+
+// ─── User & Auth ──────────────────────────────────────────────────────
+
+model User {
+  id           String   @id @default(cuid())
+  phone        String   @unique
+  name         String?
+  email        String?  @unique
+  avatarUrl    String?
+  role         Role     @default(CUSTOMER)
+  passwordHash String?
+  verifiedAt   DateTime?
+  isActive     Boolean  @default(true)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  // relations
+  ownedSalon   Salon?        @relation("SalonOwner")
+  votes       Appointment[]  @relation("AppointmentCustomer")
+  wallets       Wallet[]
+  orders        Order[]
+  sessions      Session[]
+  commissionPlans CommissionPlan[] @relation("AgentPlan")
+}
+
+model Otp {
+  id        String   @id @default(cuid())
+  phone     String
+  code      String
+  purpose   String   @default("LOGIN") // LOGIN | VERIFY
+  expiresAt DateTime
+  usedAt    DateTime?
+  createdAt DateTime @default(now())
+
+  @@index([phone, purpose])
+}
+
+model Session {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  tokenHash String
+  expiresAt DateTime
+  device    String?
+  ip        String?
+  createdAt DateTime @default(now())
+
+  @@index([userId])
+}
+
+// ─── Salon (multi-tenant) ─────────────────────────────────────────────
+
+model Salon {
+  id          String   @id @default(cuid())
+  slug        String   @unique // ساب‌دامین
+  name        String
+  phone       String
+  city        String?
+  address     String?
+  description String?
+  logoUrl     String?
+  bannerUrl   String?
+  coverColor  String  @default("#f472b6")
+  isApproved  Boolean  @default(false)
+  isActive    Boolean  @default(true)
+  subscriptionEndsAt DateTime?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  ownerId  String   @unique
+  owner    User     @relation("SalonOwner", fields: [ownerId], references: [id], onDelete: Cascade)
+
+  services      Service[]
+  appointments  Appointment[]
+  voiceCalls    VoiceCall[]
+  galleryItems  GalleryItem[]
+  openingHours  OpeningHour[]
+  subscriptions Subscription[]
+  commissionPlans CommissionPlan[]
+  orders        Order[]
+}
+
+model Service {
+  id          String   @id @default(cuid())
+  salonId     String
+  salon       Salon    @relation(fields: [salonId], references: [id], onDelete: Cascade)
+  name        String
+  durationMin Int
+  price       Int // تومان
+  description String?
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+
+  appointments Appointment[]
+
+  @@index([salonId])
+}
+
+model GalleryItem {
+  id       String  @id @default(cuid())
+  salonId  String
+  salon    Salon   @relation(fields: [salonId], references: [id], onDelete: Cascade)
+  title    String?
+  imageUrl String
+  type     String  @default("image") // image | video
+  sortOrder Int   @default(0)
+  createdAt DateTime @default(now())
+
+  @@index([salonId])
+}
+
+model OpeningHour {
+  id        String  @id @default(cuid())
+  salonId   String
+  salon     Salon   @relation(fields: [salonId], references: [id], onDelete: Cascade)
+  dayOfWeek Int // 0..6 (شنبه = 0)
+  openTime  String  // "09:00"
+  closeTime String  // "21:00"
+  isClosed  Boolean @default(false)
+
+  @@unique([salonId, dayOfWeek])
+}
+
+// ─── Appointments & Voice AI ──────────────────────────────────────────
+
+model Appointment {
+  id           String   @id @default(cuid())
+  salonId      String
+  salon        Salon    @relation(fields: [salonId], references: [id], onDelete: Cascade)
+  serviceId    String?
+  service      Service? @relation(fields: [serviceId], references: [id])
+
+  customerId   String?
+  customer     User?    @relation("AppointmentCustomer", fields: [customerId], references: [id])
+
+  customerName  String
+  customerPhone String
+  startAt       DateTime
+  endAt         DateTime
+  status        AppointmentStatus @default(REQUESTED)
+  channel       CreationChannel   @default(MANUAL)
+  note          String?
+  voiceCallId   String?  @unique
+  voiceCall     VoiceCall? @relation(fields: [voiceCallId], references: [id])
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([salonId, startAt])
+  @@index([customerPhone])
+}
+
+model VoiceCall {
+  id        String   @id @default(cuid())
+  salonId   String
+  salon     Salon    @relation(fields: [salonId], references: [id], onDelete: Cascade)
+  audioUrl  String?
+  durationSec Int?
+  transcript String? // متن استخراج‌شده
+  rawText    String? // متن خام پیش از پردازش
+  extracted  Json?   // اطلاعات نوبت استخراج‌شده
+  status    String   @default("PROCESSING") // PROCESSING | DONE | FAILED | CONFIRMED
+  error     String?
+  appointment Appointment?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([salonId])
+}
+
+// ─── Financial: Wallet / Transaction / Commission / Payout ────────────
+
+model Wallet {
+  id      String  @id @default(cuid())
+  ownerId String
+  owner   User    @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  balance Int     @default(0) // تومان
+  currency String @default("IRR")
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  transactions Transaction[]
+  payouts   Payout[]
+
+  @@unique([ownerId])
+}
+
+model Transaction {
+  id          String  @id @default(cuid())
+  walletId    String
+  wallet      Wallet  @relation(fields: [walletId], references: [id], onDelete: Cascade)
+  kind        TransactionKind
+  reason      TransactionReason
+  amount      Int // همیشه مثبت؛ جهت توسط kind مشخص می‌شود
+  balanceAfter Int
+  refType     String? // Order | Appointment | Payout
+  refId       String?
+  description String?
+  createdAt   DateTime @default(now())
+
+  @@index([walletId])
+}
+
+model CommissionPlan {
+  id       String  @id @default(cuid())
+  agentId  String
+  agent    User    @relation("AgentPlan", fields: [agentId], references: [id], onDelete: Cascade)
+  salonId  String
+  salon    Salon   @relation(fields: [salonId], references: [id], onDelete: Cascade)
+  percent  Float // 0..100
+  isActive Boolean @default(true)
+  createdAt DateTime @default(now())
+
+  @@unique([agentId, salonId])
+}
+
+model Payout {
+  id        String  @id @default(cuid())
+  walletId  String
+  wallet    Wallet  @relation(fields: [walletId], references: [id], onDelete: Cascade)
+  amount    Int
+  method    String @default("BANK") // BANK | CARD | SMS
+  bankInfo  String?
+  status    PayoutStatus @default(REQUESTED)
+  requestedAt DateTime @default(now())
+  processedAt DateTime?
+  createdAt DateTime @default(now())
+
+  @@index([walletId])
+}
+
+// ─── Packages, Subscriptions, Orders & Payments ───────────────────────
+
+model Package {
+  id          String   @id @default(cuid())
+  name        String
+  description String?
+  price       Int // تومان
+  durationDays Int
+  features    Json? // آرایه‌ای از امکانات
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+
+  subscriptions Subscription[]
+  orders        Order[]
+}
+
+model Subscription {
+  id        String   @id @default(cuid())
+  salonId   String
+  salon     Salon    @relation(fields: [salonId], references: [id], onDelete: Cascade)
+  packageId String
+  package   Package  @relation(fields: [packageId], references: [id])
+  startsAt  DateTime
+  endsAt    DateTime
+  status    String @default("ACTIVE")
+  createdAt DateTime @default(now())
+
+  @@index([salonId])
+}
+
+model Order {
+  id       String   @id @default(cuid())
+  userId   String
+  user     User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  salonId  String?
+  salon    Salon?   @relation(fields: [salonId], references: [id])
+  packageId String
+  package  Package  @relation(fields: [packageId], references: [id])
+  amount   Int
+  status   PaymentStatus @default(PENDING)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  payments Payment[]
+}
+
+model Payment {
+  id        String  @id @default(cuid())
+  orderId   String
+  order     Order   @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  gateway   String  // zarinpal | mellat | ...
+  amount    Int
+  status    PaymentStatus @default(PENDING)
+  authority String? // کد مرجع درگاه
+  refId     String? // کد پیگیری تراکنش
+  cardPan   String?
+  payload   Json?
+  callbackUrl String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([orderId])
+  @@index([gateway])
+}
