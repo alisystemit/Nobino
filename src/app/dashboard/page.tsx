@@ -2,6 +2,7 @@ import { redirect } from "next/navigation";
 import Link from "next/link";
 import { getCurrentUser } from "@/lib/auth/guards";
 import { toPersianDigits } from "@/lib/utils";
+import DashboardNav from "@/components/DashboardNav";
 
 // دسترسی به cookies و دیتابیس در هنگام درخواست (نه در prerender)
 export const instant = false;
@@ -33,7 +34,9 @@ export default async function DashboardPage() {
 
   return (
     <main className="mx-auto max-w-6xl px-6 py-12">
-      <div className="rounded-3xl bg-gradient-to-bl from-pink-500 to-purple-600 p-8 text-white">
+      <DashboardNav role={user.role} />
+
+      <div className="mt-8 rounded-3xl bg-gradient-to-bl from-pink-500 to-purple-600 p-8 text-white">
         <h1 className="text-2xl font-black">سلام، {user.name ?? user.phone} 👋</h1>
         <p className="mt-1 text-white/80">
           نقش: {roleLabels[user.role] ?? user.role} — شماره: {toPersianDigits(user.phone)}
@@ -52,10 +55,6 @@ export default async function DashboardPage() {
             <p className="mt-1 text-sm text-neutral-500">{c.desc}</p>
           </Link>
         ))}
-      </div>
-
-      <div className="mt-8 rounded-2xl border border-dashed border-neutral-300 p-6 text-center text-sm text-neutral-400">
-        پنل‌های تخصصی (سالن، نوبت، مالی، کمیسیون) در فازهای بعدی تکمیل می‌شوند.
       </div>
     </main>
   );

@@ -1,7 +1,47 @@
 import { z } from "zod";
 import { prisma } from "@/lib/prisma";
+import { requireAuth } from "@/lib/auth/guards";
 import { getSmsProvider } from "@/lib/sms/provider";
 import { json, apiError } from "@/lib/utils";
+
+/** فهرست نوبت‌های سالنِ آرایشگر (یا همه برای ادمین) */
+export async function GET() {
+  try {
+    const user = await requireAuth();
+
+    let salonId: string | undefined;
+    if (user.role === "SALON_OWNER") {
+      const salon = await prisma.salon.findUnique({ where: { ownerId: user.id }, select: { id: true } });
+      salonId = salon?.id;
+    } else if (user.role === "CUSTOMER") {
+      return json({ success: true, appointments: [] });
+    }
+
+    const appointments = await prisma.appointment.findMany({
+      where: { ...(salonId ? { salonId } : {}) },
+      include: { service: { select: { name: true, price: true } }, salon: { select: { name: true } } },
+      orderBy: { startAt: "desc" },
+      take: 200,
+    });
+
+    return json({
+      success: true,
+      appointments: appointments.map((a) => ({
+        id: a.id,
+        customerName: a.customerName,
+        customerPhone: a.customerPhone,
+        startAt: a.startAt,
+        endAt: a.endAt,
+        status: a.status,
+        channel: a.channel,
+        service: a.service?.name,
+        salonName: a.salon?.name,
+      })),
+    });
+  } catch (err) {
+    return apiError(err);
+  }
+}
 
 const schema = z.object({
   salonId: z.string(),
