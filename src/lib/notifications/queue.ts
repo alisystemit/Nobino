@@ -1,5 +1,6 @@
 import { prisma } from "@/lib/prisma";
 import { getSmsProvider } from "@/lib/sms/provider";
+import { getEmailSender } from "@/lib/email/provider";
 
 const MAX_ATTEMPTS = 5;
 
@@ -16,7 +17,6 @@ export async function enqueueSms(params: {
       where: { uniqueKey: params.uniqueKey },
       select: { status: true },
     });
-    // اگر قبلاً ارسال شده یا در صف است، دوباره اضافه نمی‌کنیم
     if (existing && existing.status !== "FAILED") return;
   }
 
@@ -33,7 +33,36 @@ export async function enqueueSms(params: {
   });
 }
 
-/** پردازش پیامک‌های در انتظار با تلاش مجدد و پشتیبان‌گیری */
+/** قرار دادن ایمیل در صف (با حذف تکراری) */
+export async function enqueueEmail(params: {
+  type: string;
+  recipient: string;
+  subject: string;
+  html: string;
+  uniqueKey?: string;
+}) {
+  if (params.uniqueKey) {
+    const existing = await prisma.notification.findUnique({
+      where: { uniqueKey: params.uniqueKey },
+      select: { status: true },
+    });
+    if (existing && existing.status !== "FAILED") return;
+  }
+
+  await prisma.notification.create({
+    data: {
+      type: params.type,
+      channel: "EMAIL",
+      recipient: params.recipient,
+      payload: { subject: params.subject, html: params.html },
+      uniqueKey: params.uniqueKey,
+      status: "PENDING",
+      nextAttemptAt: new Date(),
+    },
+  });
+}
+
+/** پردازش اعلان‌های در انتظار (SMS + ایمیل) با تلاش مجدد */
 export async function processPendingNotifications(limit = 50) {
   const pending = await prisma.notification.findMany({
     where: { status: "PENDING", nextAttemptAt: { lte: new Date() } },
@@ -41,7 +70,8 @@ export async function processPendingNotifications(limit = 50) {
     take: limit,
   });
 
-  const provider = await getSmsProvider();
+  const smsProvider = await getSmsProvider();
+  const emailSender = await getEmailSender();
   let sent = 0;
   let failed = 0;
 
@@ -51,8 +81,13 @@ export async function processPendingNotifications(limit = 50) {
       continue;
     }
     try {
-      const message = (n.payload as { message?: string } | null)?.message ?? "";
-      await provider.sendText(n.recipient, message);
+      if (n.channel === "EMAIL") {
+        const { subject, html } = (n.payload as { subject?: string; html?: string } | null) ?? {};
+        await emailSender.sendEmail(n.recipient, subject ?? "نوبینو", html ?? "");
+      } else {
+        const message = (n.payload as { message?: string } | null)?.message ?? "";
+        await smsProvider.sendText(n.recipient, message);
+      }
       await prisma.notification.update({
         where: { id: n.id },
         data: { status: "SENT", sentAt: new Date() },
@@ -61,7 +96,7 @@ export async function processPendingNotifications(limit = 50) {
     } catch (e) {
       failed++;
       const attempts = n.attempts + 1;
-      const backoffMs = 60_000 * Math.pow(2, attempts - 1); // ۱د، ۲د، ۴د...
+      const backoffMs = 60_000 * Math.pow(2, attempts - 1);
       await prisma.notification.update({
         where: { id: n.id },
         data: {

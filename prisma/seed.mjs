@@ -112,6 +112,14 @@ async function main() {
     { key: "payments.default_gateway", value: "sandbox", group: "payments", type: "select", options: JSON.stringify(["sandbox", "zarinpal", "mellat", "saman", "parsian", "pasargad", "asanpardakht", "irankish", "sadad", "maban", "cetab", "pardakhtnet", "psp", "nextpay", "vanak", "behpardakht", "payir", "zibal", "idpay", "amanat"]), description: "درگاه پرداخت پیش‌فرض" },
     { key: "voice.provider", value: "mock", group: "voice", type: "select", options: JSON.stringify(["mock", "openai"]), description: "موتور تبدیل گفتار به متن" },
     { key: "general.announcement", value: "", group: "general", type: "string", description: "اعلان سراسری (در صفحه اصلی نمایش داده می‌شود)" },
+    { key: "sms.template.confirm", value: "نوبت شما در «{salon}» برای ساعت {time} ثبت شد. (تأیید: {code})", group: "sms", type: "string", description: "قالب پیامک تأیید نوبت" },
+    { key: "sms.template.reminder", value: "یادآوری: نوبت شما در «{salon}» رأس ساعت {time} است.", group: "sms", type: "string", description: "قالب پیامک یادآوری" },
+    { key: "sms.template.cancel", value: "نوبت شما در «{salon}» لغو شد.", group: "sms", type: "string", description: "قالب پیامک لغو نوبت" },
+    { key: "email.smtp_host", value: "", group: "email", type: "string", description: "هاست SMTP (ایمیل)" },
+    { key: "email.smtp_port", value: "587", group: "email", type: "string", description: "پورت SMTP" },
+    { key: "email.smtp_user", value: "", group: "email", type: "string", description: "نام کاربری SMTP" },
+    { key: "email.smtp_pass", value: "", group: "email", type: "secret", description: "رمز SMTP" },
+    { key: "email.from", value: "noreply@nobino.ir", group: "email", type: "string", description: "آدرس فرستنده ایمیل" },
   ];
   for (const s of defaultSettings) {
     await prisma.setting.upsert({

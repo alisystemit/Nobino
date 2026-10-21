@@ -8,7 +8,7 @@ type Block = { id: string; startAt: string; endAt: string; reason?: string | nul
 type Branch = { id: string; name: string; city?: string | null; address?: string | null; phone?: string | null; isActive: boolean };
 type CashEntry = { id: string; branch?: { name: string } | null; cashAmount: number; cardAmount: number; onlineAmount: number; expenseAmount: number; note?: string | null; createdAt: string };
 
-type Tab = "services" | "staff" | "blocks" | "booking" | "branches" | "cash";
+type Tab = "services" | "staff" | "blocks" | "booking" | "branches" | "cash" | "report";
 
 export default function SalonManager({ salonId }: { salonId: string }) {
   const [tab, setTab] = useState<Tab>("services");
@@ -131,6 +131,60 @@ export default function SalonManager({ salonId }: { salonId: string }) {
         </div>
         <div className="sm:col-span-5">
           <input className={input} placeholder="تخصص‌ها (با ویرگول)" value={specialties} onChange={(e) => setSpecialties(e.target.value)} />
+        </div>
+      </div>
+    );
+  }
+
+  function ReportView() {
+    const [report, setReport] = useState<any>(null);
+    useEffect(() => {
+      (async () => { const r = await fetch(`${base}/report`); const d = await r.json(); if (d.success) setReport(d.report); })();
+      // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, []);
+    if (!report) return <p className="py-6 text-center text-neutral-400">در حال محاسبه گزارش...</p>;
+    const cards = [
+      { label: "کل نوبت‌ها", value: String(report.total), icon: "📋" },
+      { label: "انجام‌شده", value: String(report.completed), icon: "✅" },
+      { label: "نرخ لغو", value: `${report.cancelRate}٪`, icon: "❌" },
+      { label: "مشتریان متمایز", value: String(report.distinctCustomers), icon: "👥" },
+      { label: "نرخ مراجعه مجدد", value: `${report.returnRate}٪`, icon: "🔁" },
+      { label: "مشتری جدید امروز", value: String(report.newCustomersToday), icon: "🆕" },
+    ];
+    return (
+      <div>
+        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+          {cards.map((c) => (
+            <div key={c.label} className="rounded-2xl border border-neutral-200 p-4">
+              <div className="text-2xl">{c.icon}</div>
+              <div className="mt-2 text-xl font-black text-neutral-900">{c.value}</div>
+              <div className="mt-1 text-xs text-neutral-500">{c.label}</div>
+            </div>
+          ))}
+        </div>
+        {report.peakHours.length > 0 && (
+          <div className="mt-4 rounded-2xl border border-neutral-200 p-4">
+            <h4 className="text-sm font-extrabold text-neutral-800">ساعات پرتقاضا</h4>
+            <div className="mt-2 flex flex-wrap gap-2">
+              {report.peakHours.map((p: any) => (
+                <span key={p.hour} className="rounded-full bg-pink-50 px-3 py-1 text-xs font-bold text-pink-700">
+                  {p.hour}:00 — {p.count} نوبت
+                </span>
+              ))}
+            </div>
+          </div>
+        )}
+        <div className="mt-4 rounded-2xl border border-neutral-200 p-4">
+          <h4 className="text-sm font-extrabold text-neutral-800">بهره‌وری کارکنان</h4>
+          <div className="mt-2 space-y-2">
+            {report.staffPerformance.map((s: any) => (
+              <div key={s.id} className="flex justify-between rounded-xl bg-neutral-50 px-4 py-2 text-sm">
+                <span className="font-bold text-neutral-700">{s.name}</span>
+                <span className="text-neutral-500">{s.completed} انجام‌شده از {s.total}</span>
+              </div>
+            ))}
+            {report.staffPerformance.length === 0 && <p className="text-xs text-neutral-400">کارمندی یافت نشد.</p>}
+          </div>
         </div>
       </div>
     );
@@ -271,6 +325,7 @@ export default function SalonManager({ salonId }: { salonId: string }) {
     { id: "staff", label: "کارکنان" },
     { id: "branches", label: "شعبه‌ها" },
     { id: "cash", label: "صندوق" },
+    { id: "report", label: "گزارش عملکرد" },
     { id: "blocks", label: "مسدودسازی" },
     { id: "booking", label: "ثبت نوبت" },
   ];
@@ -374,6 +429,8 @@ export default function SalonManager({ salonId }: { salonId: string }) {
             </div>
           </>
         )}
+
+        {tab === "report" && <ReportView />}
 
         {tab === "blocks" && (
           <>

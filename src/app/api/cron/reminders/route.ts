@@ -1,5 +1,6 @@
 import { prisma } from "@/lib/prisma";
 import { enqueueSms, processPendingNotifications } from "@/lib/notifications/queue";
+import { renderSmsTemplate } from "@/lib/notifications/templates";
 import { json } from "@/lib/utils";
 
 const CRON_SECRET = process.env.CRON_SECRET ?? "";
@@ -26,10 +27,16 @@ export async function GET(req: Request) {
   let queued = 0;
   for (const a of appointments) {
     const time = new Intl.DateTimeFormat("fa-IR", { timeStyle: "short" }).format(a.startAt);
+    const msg = await renderSmsTemplate("sms.template.reminder", {
+      salon: a.salon.name,
+      customer: a.customerName,
+      time,
+      date: a.startAt.toLocaleDateString("fa-IR"),
+    });
     await enqueueSms({
       type: "REMINDER",
       recipient: a.customerPhone,
-      message: `یادآوری: نوبت شما در «${a.salon.name}» رأس ساعت ${time} است.`,
+      message: msg,
       uniqueKey: `reminder:${a.id}`,
     });
     queued++;

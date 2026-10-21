@@ -4,6 +4,7 @@ import { requireAuth } from "@/lib/auth/guards";
 import { json, apiError } from "@/lib/utils";
 import { createAppointmentSafe } from "@/lib/bookings/create";
 import { enqueueSms, processPendingNotifications } from "@/lib/notifications/queue";
+import { renderSmsTemplate } from "@/lib/notifications/templates";
 
 /** فهرست نوبت‌های سالنِ آرایشگر (یا همه برای ادمین) */
 export async function GET() {
@@ -104,10 +105,17 @@ export async function POST(req: Request) {
 
     // ارسال پیامک تأیید از طریق صف (با حذف تکراری و تلاش مجدد)
     const time = new Intl.DateTimeFormat("fa-IR", { timeStyle: "short" }).format(appointment.startAt);
+    const confirmMsg = await renderSmsTemplate("sms.template.confirm", {
+      salon: salon.name,
+      customer: body.customerName,
+      time,
+      date: appointment.startAt.toLocaleDateString("fa-IR"),
+      code: appointment.id.slice(0, 8),
+    });
     await enqueueSms({
       type: "APPOINTMENT_CONFIRM",
       recipient: body.customerPhone,
-      message: `نوبت شما در «${salon.name}» برای ساعت ${time} ثبت شد. (تأیید: ${appointment.id.slice(0, 8)})`,
+      message: confirmMsg,
       uniqueKey: `confirm:${appointment.id}`,
     });
     await processPendingNotifications(5).catch(() => {});
