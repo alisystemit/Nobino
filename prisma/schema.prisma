@@ -75,6 +75,7 @@ model User {
   passwordHash String?
   verifiedAt   DateTime?
   isActive     Boolean  @default(true)
+  loyaltyPoints Int     @default(0)
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
 
@@ -87,6 +88,7 @@ model User {
   commissionPlans CommissionPlan[] @relation("AgentPlan")
   favorites       Favorite[]
   reviews         Review[] @relation("ReviewCustomer")
+  giftCards       GiftCard[]
 }
 
 model Otp {
@@ -155,6 +157,8 @@ model Salon {
   timeBlocks    TimeBlock[]
   reviews       Review[]
   favorites     Favorite[]
+  waitlist      WaitlistEntry[] @relation("WaitlistSalon")
+  webhooks      WebhookConfig[] @relation("WebhookSalon")
 }
 
 model Service {
@@ -224,6 +228,8 @@ model Appointment {
   note          String?
   cancelReason  String?
   cancelledAt   DateTime?
+  depositAmount Int? // پیش‌پرداخت/بیعانه (تومان)
+  depositPaid   Boolean  @default(false)
   voiceCallId   String?  @unique
   voiceCall     VoiceCall? @relation(fields: [voiceCallId], references: [id])
 
@@ -380,6 +386,70 @@ model Payment {
 
   @@index([orderId])
   @@index([gateway])
+}
+
+// ─── کارت هدیه / بسته خدمات ───────────────────────────────────────────────
+model GiftCard {
+  id        String   @id @default(cuid())
+  code      String   @unique
+  balance   Int // تومان
+  currency  String   @default("IRR")
+  ownerId   String
+  owner     User     @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  salonId   String? // اگر فقط برای یک سالن معتبر است
+  expiresAt DateTime?
+  isActive Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([ownerId])
+}
+
+// ─── لیست انتظار ────────────────────────────────────────────────────────────
+model WaitlistEntry {
+  id          String    @id @default(cuid())
+  salonId     String
+  salon       Salon     @relation("WaitlistSalon", fields: [salonId], references: [id], onDelete: Cascade)
+  employeeId  String?
+  serviceId   String?
+  customerName String
+  customerPhone String
+  note        String?
+  status      String    @default("WAITING") // WAITING | NOTIFIED | BOOKED | EXPIRED
+  notifiedAt  DateTime?
+  createdAt   DateTime @default(now())
+
+  @@index([salonId, status])
+}
+
+// ─── وب‌هوک (ارسال رویداد به URL مشتری) ────────────────────────────────────
+model WebhookConfig {
+  id        String   @id @default(cuid())
+  salonId   String
+  salon     Salon    @relation("WebhookSalon", fields: [salonId], references: [id], onDelete: Cascade)
+  url       String
+  secret    String?
+  events    String[] // ["appointment.confirmed","appointment.cancelled",...]
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+
+  deliveries WebhookDelivery[]
+  @@index([salonId])
+}
+
+model WebhookDelivery {
+  id        String   @id @default(cuid())
+  configId  String
+  config    WebhookConfig @relation(fields: [configId], references: [id], onDelete: Cascade)
+  event     String
+  payload   Json?
+  status    String   @default("PENDING") // PENDING | SUCCESS | FAILED
+  responseStatus Int?
+  attempts  Int     @default(0)
+  lastError String?
+  createdAt DateTime @default(now())
+
+  @@index([status])
 }
 
 // ─── کد تخفیف ────────────────────────────────────────────────────────────

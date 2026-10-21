@@ -225,9 +225,28 @@ export default function SalonBooking({
         </div>
 
         {date && serviceId && slots.length === 0 && !loadingSlots && (
-          <p className="rounded-lg bg-amber-50 px-3 py-2 text-xs text-amber-700">
-            برای این خدمت در این روز زمانی آزاد نیست؛ تاریخ دیگری را امتحان کنید.
-          </p>
+          <div className="rounded-lg bg-amber-50 p-3">
+            <p className="text-xs text-amber-700">
+              برای این خدمت در این روز زمانی آزاد نیست؛ تاریخ دیگری را امتحان کنید
+              {name && phone && " یا در لیست انتظار قرار بگیرید."}
+            </p>
+            {name && phone && (
+              <button
+                onClick={async () => {
+                  const res = await fetch(`/api/salons/${slug}/waitlist`, {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ customerName: name, customerPhone: phone, serviceId, employeeId: employeeId || undefined }),
+                  });
+                  const data = await res.json();
+                  setMsg({ ok: data.success, text: data.success ? "در لیست انتظار ثبت شدید؛ در صورت آزادشدن زمان پیامک می‌گیرید ✅" : data.error || "خطا" });
+                }}
+                className="mt-2 rounded-lg bg-amber-600 px-4 py-2 text-xs font-bold text-white hover:bg-amber-700"
+              >
+                ثبت در لیست انتظار
+              </button>
+            )}
+          </div>
         )}
 
         <button
