@@ -113,19 +113,8 @@ export async function handlePaymentCallback(params: {
 
     // فعال‌سازی اشتراک پکیج برای سالن
     if (order.salonId && order.packageId) {
-      await prisma.subscription.create({
-        data: {
-          salonId: order.salonId,
-          packageId: order.packageId,
-          startsAt: new Date(),
-          endsAt: new Date(Date.now() + order.package.durationDays * 24 * 60 * 60 * 1000),
-          status: "ACTIVE",
-        },
-      });
-      await prisma.salon.update({
-        where: { id: order.salonId },
-        data: { subscriptionEndsAt: new Date(Date.now() + order.package.durationDays * 24 * 60 * 60 * 1000) },
-      });
+      const { activateSubscription } = await import("@/lib/subscriptions");
+      await activateSubscription({ salonId: order.salonId, packageId: order.packageId, period: order.period, autoRenew: order.autoRenew });
     }
 
     return { success: true, companyId: result.refId };

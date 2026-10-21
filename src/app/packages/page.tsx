@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 
-type Pkg = { id: string; name: string; description?: string; price: number; durationDays: number; features: string[] };
+type Pkg = { id: string; name: string; description?: string; price: number; yearlyPrice?: number | null; durationDays: number; features: string[] };
 type Gateway = { id: string; name: string; sandbox: boolean };
 
 export default function PackagesPage() {
@@ -13,6 +13,8 @@ export default function PackagesPage() {
   const [gateways, setGateways] = useState<Gateway[]>([]);
   const [gateway, setGateway] = useState("");
   const [discountCode, setDiscountCode] = useState("");
+  const [period, setPeriod] = useState<"MONTHLY" | "YEARLY">("MONTHLY");
+  const [autoRenew, setAutoRenew] = useState(false);
   const [loading, setLoading] = useState(true);
   const [buying, setBuying] = useState<string | null>(null);
   const [error, setError] = useState("");
@@ -45,7 +47,7 @@ export default function PackagesPage() {
       const res = await fetch("/api/payments/create", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ packageId: pkgId, gateway, discountCode: discountCode || undefined }),
+        body: JSON.stringify({ packageId: pkgId, gateway, discountCode: discountCode || undefined, period, autoRenew }),
       });
       const data = await res.json();
       if (!data.success) {
@@ -81,10 +83,14 @@ export default function PackagesPage() {
               <div key={p.id} className="flex flex-col rounded-3xl border border-neutral-200 bg-white p-8 shadow-sm">
                 <h3 className="text-xl font-extrabold text-neutral-900">{p.name}</h3>
                 <div className="mt-4 flex items-baseline gap-1">
-                  <span className="text-3xl font-black text-pink-600">{p.price.toLocaleString("fa-IR")}</span>
+                  <span className="text-3xl font-black text-pink-600">
+                    {(period === "YEARLY" ? (p.yearlyPrice ?? p.price * 10) : p.price).toLocaleString("fa-IR")}
+                  </span>
                   <span className="text-sm text-neutral-500">تومان</span>
                 </div>
-                <p className="mt-1 text-xs text-neutral-400">به مدت {p.durationDays.toLocaleString("fa-IR")} روز</p>
+                <p className="mt-1 text-xs text-neutral-400">
+                  {period === "YEARLY" ? "سالانه (۱۰ ماه با ۲ ماه تخفیف)" : "ماهانه"}
+                </p>
                 <ul className="mt-6 flex-1 space-y-2">
                   {(p.features ?? []).map((f, i) => (
                     <li key={i} className="flex items-center gap-2 text-sm text-neutral-600">
@@ -118,15 +124,25 @@ export default function PackagesPage() {
             ))}
           </div>
 
-          <div className="mx-auto mt-8 max-w-md">
-            <label className="text-xs font-medium text-neutral-500">کد تخفیف (اختیاری)</label>
-            <input
-              dir="ltr"
-              value={discountCode}
-              onChange={(e) => setDiscountCode(e.target.value)}
-              placeholder="مثلاً NOBINO20"
-              className="mt-1 w-full rounded-xl border border-neutral-300 px-4 py-3 text-center text-sm outline-none focus:border-pink-500"
-            />
+          <div className="mx-auto mt-8 max-w-md space-y-3">
+            <div className="flex gap-2">
+              <button onClick={() => setPeriod("MONTHLY")} className={`flex-1 rounded-xl py-3 text-sm font-bold transition ${period === "MONTHLY" ? "bg-neutral-900 text-white" : "bg-neutral-100 text-neutral-600"}`}>ماهانه</button>
+              <button onClick={() => setPeriod("YEARLY")} className={`flex-1 rounded-xl py-3 text-sm font-bold transition ${period === "YEARLY" ? "bg-neutral-900 text-white" : "bg-neutral-100 text-neutral-600"}`}>سالانه</button>
+            </div>
+            <label className="flex items-center gap-2 text-sm text-neutral-600">
+              <input type="checkbox" checked={autoRenew} onChange={(e) => setAutoRenew(e.target.checked)} />
+              تمدید خودکار اشتراک
+            </label>
+            <div>
+              <label className="text-xs font-medium text-neutral-500">کد تخفیف (اختیاری)</label>
+              <input
+                dir="ltr"
+                value={discountCode}
+                onChange={(e) => setDiscountCode(e.target.value)}
+                placeholder="مثلاً NOBINO20"
+                className="mt-1 w-full rounded-xl border border-neutral-300 px-4 py-3 text-center text-sm outline-none focus:border-pink-500"
+              />
+            </div>
           </div>
 
           {error && <p className="mt-6 rounded-lg bg-red-50 px-4 py-3 text-center text-sm text-red-600">{error}</p>}

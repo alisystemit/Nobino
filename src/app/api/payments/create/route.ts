@@ -9,6 +9,8 @@ const schema = z.object({
   salonId: z.string().optional(),
   gateway: z.string().optional(),
   discountCode: z.string().optional(),
+  period: z.enum(["MONTHLY", "YEARLY"]).default("MONTHLY"),
+  autoRenew: z.boolean().default(false),
 });
 
 export async function POST(req: Request) {
@@ -19,8 +21,11 @@ export async function POST(req: Request) {
     const pkg = await prisma.package.findUnique({ where: { id: body.packageId } });
     if (!pkg || !pkg.isActive) return json({ success: false, error: "پکیج یافت نشد" }, { status: 404 });
 
-    let amount = pkg.price;
-    let originalAmount = pkg.price;
+    // قیمت بر اساس دوره: سالانه = price*10 (یا yearlyPrice اگر تنظیم شده باشد)
+    const unitPrice = body.period === "YEARLY" ? (pkg.yearlyPrice ?? pkg.price * 10) : pkg.price;
+
+    let amount = unitPrice;
+    let originalAmount = unitPrice;
     let discountId: string | undefined;
 
     // اعمال کد تخفیف
@@ -35,8 +40,8 @@ export async function POST(req: Request) {
       if (discount.maxUses > 0 && discount.usedCount >= discount.maxUses) {
         return json({ success: false, error: "کد تخفیف استفاده شده است" }, { status: 400 });
       }
-      const discountAmount = Math.round((pkg.price * discount.percent) / 100);
-      amount = Math.max(0, pkg.price - discountAmount);
+      const discountAmount = Math.round((unitPrice * discount.percent) / 100);
+      amount = Math.max(0, unitPrice - discountAmount);
       discountId = discount.id;
       originalAmount = pkg.price;
       // افزایش شمارنده استفاده در صورت پرداخت موفق بعداً انجام می‌شود
@@ -50,6 +55,8 @@ export async function POST(req: Request) {
         discountId,
         amount,
         originalAmount,
+        period: body.period,
+        autoRenew: body.autoRenew,
         status: "PENDING",
       },
     });

@@ -15,6 +15,10 @@
     {
       "path": "/api/cron/holds",
       "schedule": "*/10 * * * *"
+    },
+    {
+      "path": "/api/cron/subscriptions",
+      "schedule": "0 2 * * *"
     }
   ]
 }

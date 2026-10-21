@@ -77,15 +77,15 @@ async function main() {
   }
 
   const packages = [
-    { id: "pkg-0", name: "پکیج پایه", durationDays: 90, price: 990000, features: ["۱ سالن", "نوبت صوتی", "۱۰ پیامک/ماه"] },
-    { id: "pkg-1", name: "پکیج حرفه‌ای", durationDays: 180, price: 1890000, features: ["۱ سالن", "نوبت صوتی", "پیامک نامحدود", "گالری نامحدود"] },
-    { id: "pkg-2", name: "پکیج طلایی", durationDays: 365, price: 3290000, features: ["۱ سالن", "نوبت صوتی", "پیامک نامحدود", "گالری + ویدیو", "پشتیبانی اختصاصی"] },
+    { id: "pkg-0", name: "پلن پایه", plan: "BASIC", durationDays: 30, price: 990000, yearlyPrice: 9900000, features: ["۱ سالن", "نوبت صوتی", "۱۰ پیامک/ماه", "۵ کارمند"] },
+    { id: "pkg-1", name: "پلن حرفه‌ای", plan: "PRO", durationDays: 30, price: 1890000, yearlyPrice: 18900000, features: ["۱ سالن", "نوبت صوتی", "پیامک نامحدود", "گالری نامحدود", "۲۰ کارمند", "وب‌هوک"] },
+    { id: "pkg-2", name: "پلن سازمانی", plan: "ENTERPRISE", durationDays: 30, price: 3290000, yearlyPrice: 32900000, features: ["چند شعبه", "نوبت صوتی", "پیامک نامحدود", "کارکنان نامحدود", "دامنه اختصاصی", "پشتیبانی اختصاصی"] },
   ];
   for (const p of packages) {
     await prisma.package.upsert({
       where: { id: p.id },
-      update: {},
-      create: { id: p.id, name: p.name, durationDays: p.durationDays, price: p.price, features: p.features },
+      update: { plan: p.plan, durationDays: p.durationDays, price: p.price, yearlyPrice: p.yearlyPrice, features: p.features },
+      create: { id: p.id, name: p.name, plan: p.plan, durationDays: p.durationDays, price: p.price, yearlyPrice: p.yearlyPrice, features: p.features },
     });
   }
 

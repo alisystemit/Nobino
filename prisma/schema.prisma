@@ -134,6 +134,7 @@ model Salon {
   subscriptionEndsAt DateTime?
   trialEndsAt DateTime?
   autoRenew   Boolean  @default(false)
+  plan        String   @default("FREE") // FREE | BASIC | PRO | ENTERPRISE
 
   // قوانین رزرو
   minNoticeMinutes Int @default(60)
@@ -330,7 +331,9 @@ model Package {
   id          String   @id @default(cuid())
   name        String
   description String?
-  price       Int // تومان
+  plan        String   @default("BASIC") // FREE | BASIC | PRO | ENTERPRISE
+  price       Int // تومان (ماهانه)
+  yearlyPrice Int? // تومان در سال (اگر خالی باشد = price * 10)
   durationDays Int
   features    Json? // آرایه‌ای از امکانات
   isActive    Boolean  @default(true)
@@ -348,8 +351,12 @@ model Subscription {
   package   Package  @relation(fields: [packageId], references: [id])
   startsAt  DateTime
   endsAt    DateTime
-  status    String @default("ACTIVE")
+  period    String   @default("MONTHLY") // MONTHLY | YEARLY
+  autoRenew Boolean  @default(false)
+  status    String @default("ACTIVE") // ACTIVE | SUSPENDED | CANCELLED | EXPIRED
+  cancelledAt DateTime?
   createdAt DateTime @default(now())
+  updatedAt DateTime @default(now()) @updatedAt
 
   @@index([salonId])
 }
@@ -366,6 +373,8 @@ model Order {
   discount Discount? @relation(fields: [discountId], references: [id])
   amount   Int // مبلغ نهایی پس از تخفیف
   originalAmount Int? // پیش از تخفیف
+  period   String   @default("MONTHLY") // MONTHLY | YEARLY
+  autoRenew Boolean @default(false)
   status   PaymentStatus @default(PENDING)
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt

@@ -7,7 +7,7 @@ type Salon = { id: string; name: string; slug: string; owner: { phone: string } 
 type Audit = { id: string; action: string; entityType: string; actorPhone: string | null; createdAt: string };
 
 export default function AdminExtras() {
-  const [tab, setTab] = useState<"discounts" | "salons" | "audit" | "sms">("salons");
+  const [tab, setTab] = useState<"salons" | "subscriptions" | "users" | "packages" | "discounts" | "sms" | "audit">("salons");
 
   const [discounts, setDiscounts] = useState<Discount[]>([]);
   const [salons, setSalons] = useState<Salon[]>([]);
@@ -122,8 +122,96 @@ export default function AdminExtras() {
     );
   }
 
+  function SubscriptionManager() {
+    const [subs, setSubs] = useState<any[]>([]);
+    useEffect(() => {
+      (async () => { const r = await fetch("/api/admin/subscriptions"); const d = await r.json(); if (d.success) setSubs(d.subscriptions); })();
+    }, []);
+    async function setStatus(id: string, status: string) {
+      await api("/api/admin/subscriptions", "PATCH", { subscriptionId: id, status });
+      const r = await fetch("/api/admin/subscriptions"); const d = await r.json(); if (d.success) setSubs(d.subscriptions);
+    }
+    return (
+      <div className="space-y-2">
+        {subs.length === 0 && <p className="py-6 text-center text-neutral-400">اشتراکی ثبت نشده است.</p>}
+        {subs.map((s) => (
+          <div key={s.id} className="flex flex-wrap items-center justify-between gap-2 rounded-2xl border border-neutral-200 px-4 py-3">
+            <div>
+              <div className="font-bold text-neutral-800">{s.salon?.name} <span className="text-xs text-neutral-400">({s.package?.name})</span></div>
+              <div className="text-xs text-neutral-500" dir="ltr">{new Date(s.endsAt).toLocaleDateString("fa-IR")} — {s.period}</div>
+            </div>
+            <div className="flex items-center gap-2">
+              <span className={`rounded-full px-3 py-1 text-xs font-semibold ${s.status === "ACTIVE" ? "bg-emerald-50 text-emerald-700" : s.status === "EXPIRED" ? "bg-neutral-100 text-neutral-500" : "bg-red-50 text-red-600"}`}>
+                {s.status}
+              </span>
+              {s.status === "ACTIVE" && (
+                <button onClick={() => setStatus(s.id, "CANCELLED")} className="rounded-lg bg-red-50 px-3 py-1.5 text-xs font-bold text-red-600 hover:bg-red-100">
+                  لغو
+                </button>
+              )}
+            </div>
+          </div>
+        ))}
+      </div>
+    );
+  }
+
+  function UserManager() {
+    const [users, setUsers] = useState<any[]>([]);
+    useEffect(() => {
+      (async () => { const r = await fetch("/api/admin/users"); const d = await r.json(); if (d.success) setUsers(d.users); })();
+    }, []);
+    async function changeRole(id: string, role: string) {
+      await api("/api/admin/users", "PATCH", { userId: id, role });
+      const r = await fetch("/api/admin/users"); const d = await r.json(); if (d.success) setUsers(d.users);
+    }
+    return (
+      <div className="space-y-2">
+        {users.length === 0 && <p className="py-6 text-center text-neutral-400">کاربری یافت نشد.</p>}
+        {users.map((u) => (
+          <div key={u.id} className="flex flex-wrap items-center justify-between gap-2 rounded-2xl border border-neutral-200 px-4 py-3">
+            <div>
+              <div className="font-bold text-neutral-800">{u.name ?? u.phone} <span className="text-xs text-neutral-400" dir="ltr">{u.phone}</span></div>
+              <div className="text-xs text-neutral-500">امتیاز وفاداری: {u.loyaltyPoints}</div>
+            </div>
+            <select value={u.role} onChange={(e) => changeRole(u.id, e.target.value)} className="rounded-xl border border-neutral-300 px-3 py-1.5 text-xs font-bold outline-none">
+              {["CUSTOMER", "SALON_OWNER", "AGENT", "ADMIN"].map((r) => <option key={r} value={r}>{r}</option>)}
+            </select>
+          </div>
+        ))}
+      </div>
+    );
+  }
+
+  function PackageManager() {
+    const [pkgs, setPkgs] = useState<any[]>([]);
+    useEffect(() => {
+      (async () => { const r = await fetch("/api/admin/packages"); const d = await r.json(); if (d.success) setPkgs(d.packages); })();
+    }, []);
+    async function setPrice(id: string, price: number) {
+      await api("/api/admin/packages", "PATCH", { id, price });
+      const r = await fetch("/api/admin/packages"); const d = await r.json(); if (d.success) setPkgs(d.packages);
+    }
+    return (
+      <div className="space-y-2">
+        {pkgs.map((p) => (
+          <div key={p.id} className="flex flex-wrap items-center justify-between gap-2 rounded-2xl border border-neutral-200 px-4 py-3">
+            <div>
+              <div className="font-bold text-neutral-800">{p.name} <span className="text-xs text-neutral-400">({p.plan})</span></div>
+              <div className="text-xs text-neutral-500">ماهانه: {p.price.toLocaleString("fa-IR")} — سالانه: {(p.yearlyPrice ?? p.price * 10).toLocaleString("fa-IR")}</div>
+            </div>
+            <input type="number" defaultValue={p.price} onBlur={(e) => setPrice(p.id, Number(e.target.value))} className="w-28 rounded-xl border border-neutral-300 px-3 py-1.5 text-xs outline-none" />
+          </div>
+        ))}
+      </div>
+    );
+  }
+
   const tabs = [
     { id: "salons", label: "سالن‌ها" },
+    { id: "subscriptions", label: "اشتراک‌ها" },
+    { id: "users", label: "کاربران" },
+    { id: "packages", label: "پکیج‌ها" },
     { id: "discounts", label: "کد تخفیف" },
     { id: "sms", label: "تست پیامک" },
     { id: "audit", label: "لاگ حسابرسی" },
@@ -143,6 +231,9 @@ export default function AdminExtras() {
 
       <div className="mt-6">
         {tab === "salons" && <SalonManagerList />}
+        {tab === "subscriptions" && <SubscriptionManager />}
+        {tab === "users" && <UserManager />}
+        {tab === "packages" && <PackageManager />}
         {tab === "discounts" && <DiscountManager />}
         {tab === "sms" && <SmsTest />}
         {tab === "audit" && (
