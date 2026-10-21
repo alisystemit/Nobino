@@ -1,0 +1,97 @@
+import { prisma } from "@/lib/prisma";
+import type { CreationChannel } from "@prisma/client";
+
+/**
+ * ثبت نوبت با حفظ قطعیت در برابر رزرو هم‌زمان.
+ *
+ * نحوه محافظت:
+ * ۱) در یک تراکنش، ردیف «سالن» قفل می‌شود (SELECT ... FOR UPDATE)
+ *     تا همه درخواست‌های نوبت همان سالن سری‌سازی شوند.
+ * ۲) سپس تداخل با نوبت‌های موجود (و بافر) بررسی می‌شود.
+ * ۳) اگر تداخلی نبود، نوبت درج می‌شود.
+ */
+
+export class BookingConflictError extends Error {
+  status = 409;
+  constructor(message = "این بازه زمانی در حال حاضر قابل رزرو نیست") {
+    super(message);
+  }
+}
+
+export async function createAppointmentSafe(input: {
+  salonId: string;
+  serviceId?: string;
+  employeeId?: string;
+  customerName: string;
+  customerPhone: string;
+  startAt: Date;
+  durationMin: number;
+  channel: CreationChannel;
+  note?: string;
+  customerId?: string;
+  voiceCallId?: string;
+}) {
+  return prisma.$transaction(async (tx) => {
+    // قفل سالن برای سری‌سازی رزروها
+    await tx.$queryRaw`SELECT id FROM "Salon" WHERE id = ${input.salonId}::text FOR UPDATE`;
+
+    const salon = await tx.salon.findUnique({ where: { id: input.salonId } });
+    if (!salon) throw new Error("سالن یافت نشد");
+
+    const start = new Date(input.startAt);
+    const duration = input.durationMin;
+    const buffer = salon.bufferMinutes;
+    const end = new Date(start.getTime() + duration * 60 * 1000);
+    const serviceEnd = new Date(end.getTime() + buffer * 60 * 1000);
+
+    const now = new Date();
+
+    // قوانین: حداقل فاصله تا رزرو
+    if (start.getTime() < now.getTime() + salon.minNoticeMinutes * 60 * 1000) {
+      throw new BookingConflictError("رزرو بسیار نزدیک به زمان حال است.");
+    }
+    // حداکثر بازه آینده
+    if (start.getTime() > now.getTime() + salon.maxAdvanceDays * 86400 * 1000) {
+      throw new BookingConflictError("این تاریخ خارج از بازه مجاز رزرو است.");
+    }
+
+    // تداخل با نوبت‌های موجود (پوشش بافر)
+    const where: any = {
+      salonId: salon.id,
+      status: { in: ["REQUESTED", "CONFIRMED"] },
+      startAt: { lt: serviceEnd },
+      endAt: { gt: start },
+    };
+    if (input.employeeId) where.employeeId = input.employeeId;
+    const clash = await tx.appointment.findFirst({ where });
+    if (clash) throw new BookingConflictError();
+
+    // تداخل با بازه‌های مسدود
+    const blockWhere: any = {
+      salonId: salon.id,
+      startAt: { lt: serviceEnd },
+      endAt: { gt: start },
+    };
+    if (input.employeeId) blockWhere.staffId = input.employeeId;
+    const blockClash = await tx.timeBlock.findFirst({ where: blockWhere });
+    if (blockClash) throw new BookingConflictError("این بازه زمانی مسدود شده است.");
+
+    // درج نوبت
+    return tx.appointment.create({
+      data: {
+        salonId: salon.id,
+        serviceId: input.serviceId,
+        employeeId: input.employeeId,
+        customerId: input.customerId,
+        customerName: input.customerName,
+        customerPhone: input.customerPhone,
+        startAt: start,
+        endAt: end,
+        channel: input.channel,
+        note: input.note,
+        voiceCallId: input.voiceCallId,
+        status: "REQUESTED",
+      },
+    });
+  });
+}
