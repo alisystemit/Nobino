@@ -132,6 +132,8 @@ model Salon {
   isApproved  Boolean  @default(false)
   isActive    Boolean  @default(true)
   subscriptionEndsAt DateTime?
+  trialEndsAt DateTime?
+  autoRenew   Boolean  @default(false)
 
   // قوانین رزرو
   minNoticeMinutes Int @default(60)
@@ -230,6 +232,8 @@ model Appointment {
   cancelledAt   DateTime?
   depositAmount Int? // پیش‌پرداخت/بیعانه (تومان)
   depositPaid   Boolean  @default(false)
+  tempLockExpiresAt DateTime? // قفل موقت هنگام پرداخت
+  rescheduledFrom String? // id نوبت قبلی هنگام جابه‌جایی
   voiceCallId   String?  @unique
   voiceCall     VoiceCall? @relation(fields: [voiceCallId], references: [id])
 

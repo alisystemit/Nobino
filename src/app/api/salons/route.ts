@@ -34,6 +34,7 @@ export async function POST(req: Request) {
     const existing = await prisma.salon.findUnique({ where: { slug: body.slug } });
     if (existing) return json({ success: false, error: "این اسلاگ قبلاً استفاده شده است" }, { status: 409 });
 
+    const existingCount = await prisma.salon.count({ where: { ownerId: user.id } });
     const salon = await prisma.salon.create({
       data: {
         name: body.name,
@@ -45,6 +46,8 @@ export async function POST(req: Request) {
         coverColor: body.coverColor,
         ownerId: user.id,
         isApproved: user.role === "ADMIN",
+        // دوره آزمایشی ۱۴ روزه برای اولین سالن
+        trialEndsAt: existingCount === 0 ? new Date(Date.now() + 14 * 864e5) : null,
       },
     });
 

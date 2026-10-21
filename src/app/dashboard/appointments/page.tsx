@@ -12,6 +12,7 @@ type Appointment = {
   channel: string;
   service?: string;
   salonName?: string;
+  salonSlug?: string;
 };
 
 const statusLabel: Record<string, string> = {
@@ -33,6 +34,7 @@ export default function AppointmentsPage() {
   const [appointments, setAppointments] = useState<Appointment[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [role, setRole] = useState("");
 
   async function load() {
     try {
@@ -48,6 +50,11 @@ export default function AppointmentsPage() {
   }
 
   useEffect(() => {
+    (async () => {
+      const me = await fetch("/api/auth/me");
+      const meData = await me.json();
+      setRole(meData.user?.role ?? "");
+    })();
     load();
   }, []);
 
@@ -56,6 +63,30 @@ export default function AppointmentsPage() {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ status }),
+    });
+    const data = await res.json();
+    if (data.success) load();
+    else setError(data.error || "خطا");
+  }
+
+  async function cancelMine(id: string) {
+    const res = await fetch(`/api/appointments/${id}/cancel`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({}),
+    });
+    const data = await res.json();
+    if (data.success) load();
+    else setError(data.error || "خطا");
+  }
+
+  async function rescheduleMine(id: string) {
+    const raw = prompt("زمان جدید را وارد کنید (مثال: 2026-10-25T16:00)"); 
+    if (!raw) return;
+    const res = await fetch(`/api/appointments/${id}/reschedule`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ startAt: new Date(raw).toISOString() }),
     });
     const data = await res.json();
     if (data.success) load();
@@ -104,32 +135,54 @@ export default function AppointmentsPage() {
                   </span>
                 </td>
                 <td className="px-5 py-4">
-                  <div className="flex gap-1.5">
-                    {a.status === "REQUESTED" && (
-                      <button
-                        onClick={() => updateStatus(a.id, "CONFIRMED")}
-                        className="rounded-lg bg-emerald-600 px-3 py-1.5 text-xs font-bold text-white hover:bg-emerald-700"
-                      >
-                        تأیید
-                      </button>
-                    )}
-                    {(a.status === "REQUESTED" || a.status === "CONFIRMED") && (
-                      <>
+                  {role === "CUSTOMER" ? (
+                    a.salonSlug ? (
+                      <div className="flex flex-col gap-1.5">
+                        {a.status === "REQUESTED" && (
+                          <button onClick={() => rescheduleMine(a.id)} className="rounded-lg bg-amber-500 px-3 py-1.5 text-xs font-bold text-white hover:bg-amber-600">
+                            تغییر زمان
+                          </button>
+                        )}
+                        {(a.status === "REQUESTED" || a.status === "CONFIRMED") && (
+                          <button onClick={() => cancelMine(a.id)} className="rounded-lg bg-neutral-200 px-3 py-1.5 text-xs font-bold text-neutral-700 hover:bg-neutral-300">
+                            لغو نوبت
+                          </button>
+                        )}
+                        <a href={`/s/${a.salonSlug}`} className="rounded-lg bg-neutral-100 px-3 py-1.5 text-center text-xs font-bold text-pink-600 hover:bg-pink-50">
+                          رزرو مجدد
+                        </a>
+                      </div>
+                    ) : (
+                      <span className="text-xs text-neutral-400">—</span>
+                    )
+                  ) : (
+                    <div className="flex gap-1.5">
+                      {a.status === "REQUESTED" && (
                         <button
-                          onClick={() => updateStatus(a.id, "COMPLETED")}
-                          className="rounded-lg bg-sky-600 px-3 py-1.5 text-xs font-bold text-white hover:bg-sky-700"
+                          onClick={() => updateStatus(a.id, "CONFIRMED")}
+                          className="rounded-lg bg-emerald-600 px-3 py-1.5 text-xs font-bold text-white hover:bg-emerald-700"
                         >
-                          انجام شد
+                          تأیید
                         </button>
-                        <button
-                          onClick={() => updateStatus(a.id, "CANCELLED")}
-                          className="rounded-lg bg-neutral-200 px-3 py-1.5 text-xs font-bold text-neutral-700 hover:bg-neutral-300"
-                        >
-                          لغو
-                        </button>
-                      </>
-                    )}
-                  </div>
+                      )}
+                      {(a.status === "REQUESTED" || a.status === "CONFIRMED") && (
+                        <>
+                          <button
+                            onClick={() => updateStatus(a.id, "COMPLETED")}
+                            className="rounded-lg bg-sky-600 px-3 py-1.5 text-xs font-bold text-white hover:bg-sky-700"
+                          >
+                            انجام شد
+                          </button>
+                          <button
+                            onClick={() => updateStatus(a.id, "CANCELLED")}
+                            className="rounded-lg bg-neutral-200 px-3 py-1.5 text-xs font-bold text-neutral-700 hover:bg-neutral-300"
+                          >
+                            لغو
+                          </button>
+                        </>
+                      )}
+                    </div>
+                  )}
                 </td>
               </tr>
             ))}

@@ -72,6 +72,21 @@ export default async function SalonPage({ params }: { params: Promise<{ slug: st
             <p className="mt-3 leading-relaxed text-neutral-600">{salon.description ?? "توضیحی ثبت نشده است."}</p>
           </section>
 
+          {salon.address && (
+            <section>
+              <h2 className="text-xl font-extrabold text-neutral-900">موقعیت روی نقشه</h2>
+              <div className="mt-4 overflow-hidden rounded-2xl border border-neutral-200">
+                <iframe
+                  title="موقعیت سالن"
+                  className="h-64 w-full"
+                  loading="lazy"
+                  referrerPolicy="no-referrer-when-downgrade"
+                  src={`https://maps.google.com/maps?q=${encodeURIComponent(`${salon.address} ${salon.city ?? ""}`)}&z=15&output=embed`}
+                />
+              </div>
+            </section>
+          )}
+
           <section>
             <h2 className="text-xl font-extrabold text-neutral-900">خدمات</h2>
             <div className="mt-4 grid gap-4 sm:grid-cols-2">

@@ -10,19 +10,19 @@ export async function GET() {
   try {
     const user = await requireAuth();
 
-    let salonId: string | undefined;
+    let where: any = {};
     if (user.role === "SALON_OWNER") {
       const salon = await prisma.salon.findUnique({ where: { ownerId: user.id }, select: { id: true } });
-      salonId = salon?.id;
+      where = salon ? { salonId: salon.id } : {};
     } else if (user.role === "CUSTOMER") {
-      return json({ success: true, appointments: [] });
+      where = { customerId: user.id };
     }
 
     const appointments = await prisma.appointment.findMany({
-      where: { ...(salonId ? { salonId } : {}) },
+      where,
       include: {
         service: { select: { name: true, price: true } },
-        salon: { select: { name: true } },
+        salon: { select: { name: true, slug: true } },
         employee: { select: { name: true } },
       },
       orderBy: { startAt: "desc" },
@@ -41,6 +41,7 @@ export async function GET() {
         channel: a.channel,
         service: a.service?.name,
         salonName: a.salon?.name,
+        salonSlug: a.salon?.slug,
         employee: a.employee?.name,
       })),
     });
@@ -52,6 +53,7 @@ export async function GET() {
 const schema = z.object({
   salonId: z.string(),
   serviceId: z.string().optional(),
+  serviceIds: z.array(z.string()).max(8).optional(), // رزرو چند خدمت
   employeeId: z.string().optional(),
   customerName: z.string().min(1),
   customerPhone: z.string().regex(/^0?9\d{9}$/),
@@ -69,14 +71,26 @@ export async function POST(req: Request) {
     const salon = await prisma.salon.findUnique({ where: { id: body.salonId } });
     if (!salon) return json({ success: false, error: "سالن یافت نشد" }, { status: 404 });
 
-    const duration = body.durationMin ?? (body.serviceId ? (await prisma.service.findUnique({ where: { id: body.serviceId } }))?.durationMin ?? 60 : 60);
+    // رزرو چند خدمت: مجموع زمان خدمت‌ها
+    let primaryServiceId = body.serviceId;
+    let duration = body.durationMin ?? 60;
+    let combinedNote = body.note;
+    if (body.serviceIds && body.serviceIds.length > 0) {
+      const services = await prisma.service.findMany({ where: { id: { in: body.serviceIds }, salonId: salon.id } });
+      if (services.length !== body.serviceIds.length) {
+        return json({ success: false, error: "یکی از خدمت‌ها یافت نشد" }, { status: 400 });
+      }
+      duration = services.reduce((sum, s) => sum + s.durationMin, 0);
+      primaryServiceId = services[0].id;
+      combinedNote = [body.note, services.map((s) => s.name).join("، ")].filter(Boolean).join(" — ");
+    }
 
     const user = await requireAuth().catch(() => null);
 
     // ثبت نوبت با محافظت از رزرو هم‌زمان (تراکنش + قفل)
     const appointment = await createAppointmentSafe({
       salonId: salon.id,
-      serviceId: body.serviceId,
+      serviceId: primaryServiceId,
       employeeId: body.employeeId,
       customerName: body.customerName,
       customerPhone: body.customerPhone,
@@ -84,7 +98,7 @@ export async function POST(req: Request) {
       durationMin: duration,
       channel: body.channel,
       voiceCallId: body.voiceCallId,
-      note: body.note,
+      note: combinedNote,
       customerId: user?.id ?? undefined,
     });
 

@@ -11,6 +11,10 @@ const patchSchema = z.object({
   description: z.string().optional(),
   coverColor: z.string().optional(),
   isActive: z.boolean().optional(),
+  minNoticeMinutes: z.number().int().min(0).optional(),
+  maxAdvanceDays: z.number().int().min(1).optional(),
+  cancelDeadlineHours: z.number().int().min(0).optional(),
+  bufferMinutes: z.number().int().min(0).optional(),
 });
 
 export async function PATCH(req: Request, { params }: { params: Promise<{ id: string }> }) {
