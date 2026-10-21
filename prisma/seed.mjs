@@ -99,6 +99,20 @@ async function main() {
     await prisma.wallet.upsert({ where: { ownerId }, update: {}, create: { ownerId } });
   }
 
+  // ─── تنظیمات پیش‌فرض سیستم (پویا) ─────────────────────────────────────
+  const defaultSettings = [
+    { key: "sms.active_provider", value: "kavenegar", group: "sms", type: "select", options: JSON.stringify(["kavenegar", "smsdotir", "farazsms", "ghasedak", "melipayamak", "iransms", "payamresan", "nakalaya", "mobilesms", "arpano"]), description: "سرویس پیامک فعال" },
+    { key: "payments.default_gateway", value: "sandbox", group: "payments", type: "select", options: JSON.stringify(["sandbox", "zarinpal", "mellat", "saman", "parsian", "pasargad", "asanpardakht", "irankish", "sadad", "maban", "cetab", "pardakhtnet", "psp", "nextpay", "vanak", "behpardakht", "payir", "zibal", "idpay", "amanat"]), description: "درگاه پرداخت پیش‌فرض" },
+    { key: "voice.provider", value: "mock", group: "voice", type: "select", options: JSON.stringify(["mock", "openai"]), description: "موتور تبدیل گفتار به متن" },
+  ];
+  for (const s of defaultSettings) {
+    await prisma.setting.upsert({
+      where: { key: s.key },
+      update: {},
+      create: s,
+    });
+  }
+
   console.log("✅ Seed کامل شد");
   console.log("   ادمین   : 09120000000");
   console.log("   آرایشگر : 09120000001");

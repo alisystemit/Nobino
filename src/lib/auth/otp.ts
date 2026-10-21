@@ -19,7 +19,7 @@ export async function requestOtp(phone: string) {
     data: { phone, code, purpose: "LOGIN", expiresAt: new Date(Date.now() + OTP_TTL_MS) },
   });
 
-  await getSmsProvider().sendOtp(phone, code);
+  await (await getSmsProvider()).sendOtp(phone, code);
   return { expiresIn: OTP_TTL_MS / 1000 };
 }
 

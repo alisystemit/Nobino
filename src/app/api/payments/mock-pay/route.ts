@@ -16,5 +16,6 @@ export async function GET(req: Request) {
   await simulateSandboxPay({ orderId: order, authority });
 
   const callback = `/api/payments/callback/${gateway}?order=${order}&authority=${authority}&Status=0&RefId=SB-REF-${Date.now()}&ResNum=${order}`;
-  return Response.redirect(callback);
+  const origin = new URL(req.url).origin;
+  return Response.redirect(new URL(callback, origin).toString());
 }

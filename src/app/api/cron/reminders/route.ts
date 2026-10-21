@@ -30,7 +30,7 @@ export async function GET(req: Request) {
   for (const a of appointments) {
     const time = new Intl.DateTimeFormat("fa-IR", { timeStyle: "short" }).format(a.startAt);
     try {
-      await getSmsProvider().sendAppointmentReminder(a.customerPhone, a.salon.name, time);
+      await (await getSmsProvider()).sendAppointmentReminder(a.customerPhone, a.salon.name, time);
       sent++;
     } catch {
       // خطای پیامک را نادیده بگیر تا بقیه ارسال شوند

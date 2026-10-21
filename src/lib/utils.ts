@@ -11,8 +11,19 @@ export function json(data: unknown, init?: ResponseInit) {
 }
 
 export function apiError(error: unknown) {
-  const status = (error as { status?: number })?.status ?? 500;
-  const message = error instanceof Error ? error.message : "خطای ناشناخته";
+  // خطاهای اعتبارسنجی Zod را به 400 نگاشت می‌کنیم
+  let status = (error as { status?: number })?.status ?? 500;
+  let message = error instanceof Error ? error.message : "خطای ناشناخته";
+  const zod = (error as { name?: string; issues?: unknown }).name;
+  if (zod === "ZodError") {
+    status = 400;
+    try {
+      const issues = (error as { issues: { message: string }[] }).issues;
+      message = issues.map((i) => i.message).join("؛ ");
+    } catch {
+      /* ignore */
+    }
+  }
   return json({ success: false, error: message }, { status });
 }
 

@@ -357,3 +357,18 @@ model Payment {
   @@index([orderId])
   @@index([gateway])
 }
+
+// ─── System Settings (پویا، قابل ویرایش توسط سوپرادمین) ────────────────
+// برای ذخیره API_KEYها، انتخاب سرویس‌دهنده فعال و هر تنظیم دیگر.
+model Setting {
+  id          String   @id @default(cuid())
+  key         String   @unique // مثل sms.active_provider
+  value       String?  // مقدار (برای secret با isSecret=true)
+  group       String   @default("general")
+  type        String   @default("string") // string | secret | number | boolean | select
+  options     String?  // برای type=select: لیست JSON
+  description  String?
+  isSecret    Boolean  @default(false)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}

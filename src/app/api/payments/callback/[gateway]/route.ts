@@ -11,6 +11,10 @@ function collectParams(url: string, body?: Record<string, string>): Record<strin
   return params;
 }
 
+function redirectTo(origin: string, path: string) {
+  return Response.redirect(new URL(path, origin).toString());
+}
+
 export async function GET(req: Request, { params }: { params: Promise<{ gateway: string }> }) {
   const { gateway } = await params;
   const gw = getGateway(gateway);
@@ -20,11 +24,12 @@ export async function GET(req: Request, { params }: { params: Promise<{ gateway:
 
   const result = await handlePaymentCallback({ gatewayId: gateway, orderId, authority, searchParams: search });
 
-  const base = `${search.redirect ?? "/payment/result"}`;
+  const base = search.redirect ?? "/payment/result";
+  const origin = new URL(req.url).origin;
   if (result.success) {
-    return Response.redirect(`${base}?status=success&ref=${result.companyId}`);
+    return redirectTo(origin, `${base}?status=success&ref=${result.companyId}`);
   }
-  return Response.redirect(`${base}?status=failed&reason=${encodeURIComponent(result.message ?? "")}`);
+  return redirectTo(origin, `${base}?status=failed&reason=${encodeURIComponent(result.message ?? "")}`);
 }
 
 export async function POST(req: Request, { params }: { params: Promise<{ gateway: string }> }) {
@@ -52,9 +57,10 @@ export async function POST(req: Request, { params }: { params: Promise<{ gateway
 
   const result = await handlePaymentCallback({ gatewayId: gateway, orderId, authority, searchParams: search });
 
-  const base = `${search.redirect ?? "/payment/result"}`;
+  const base = search.redirect ?? "/payment/result";
+  const origin = new URL(req.url).origin;
   if (result.success) {
-    return Response.redirect(`${base}?status=success&ref=${result.companyId}`);
+    return redirectTo(origin, `${base}?status=success&ref=${result.companyId}`);
   }
-  return Response.redirect(`${base}?status=failed&reason=${encodeURIComponent(result.message ?? "")}`);
+  return redirectTo(origin, `${base}?status=failed&reason=${encodeURIComponent(result.message ?? "")}`);
 }

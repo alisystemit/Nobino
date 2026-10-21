@@ -1,6 +1,7 @@
 import { prisma } from "@/lib/prisma";
 import { transcribeAudio } from "@/lib/ai/whisper";
 import { extractAppointment } from "@/lib/ai/parser";
+import { storeFile } from "@/lib/storage";
 import { json, apiError } from "@/lib/utils";
 
 /**
@@ -20,14 +21,16 @@ export async function POST(req: Request) {
     const salon = await prisma.salon.findUnique({ where: { id: salonId } });
     if (!salon) return json({ success: false, error: "سالن یافت نشد" }, { status: 404 });
 
-    const arrBuf = await audio.arrayBuffer();
-    const buffer = Buffer.from(arrBuf);
+    // ذخیره فایل صوتی (Blob در پروداکشن، محلی در توسعه)
+    const stored = await storeFile(audio, { dir: "voice" });
+
+    const buffer = Buffer.from(await audio.arrayBuffer());
 
     // ثبت رکورد تماس صوتی
     const voiceCall = await prisma.voiceCall.create({
       data: {
         salonId,
-        audioUrl: null, // برای ذخیره واقعی از Blob استفاده کنید
+        audioUrl: stored.url,
         durationSec: Math.round(audio.size / 8000),
         status: "PROCESSING",
         extracted: { salonSlug: salon.slug, phone: userPhone } as never,

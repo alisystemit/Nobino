@@ -96,7 +96,7 @@ export async function POST(req: Request) {
     // ارسال پیامک تأیید
     const time = new Intl.DateTimeFormat("fa-IR", { timeStyle: "short" }).format(startAt);
     try {
-      await getSmsProvider().sendAppointmentReminder(body.customerPhone, salon.name, time);
+      await (await getSmsProvider()).sendAppointmentReminder(body.customerPhone, salon.name, time);
     } catch {
       // اگر پیامک خطا داشت، خود نوبت ثبت شده است
     }

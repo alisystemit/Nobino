@@ -1,6 +1,7 @@
 import { prisma } from "@/lib/prisma";
 import { requireRole } from "@/lib/auth/guards";
 import { formatToman, toPersianDigits } from "@/lib/utils";
+import SystemSettings from "@/components/SystemSettings";
 
 export const instant = false;
 
@@ -80,6 +81,17 @@ export default async function AdminDashboardPage() {
               ))}
             </tbody>
           </table>
+        </div>
+      </div>
+
+      {/* تنظیمات پویا سیستم (فقط سوپرادمین) */}
+      <div className="mt-10">
+        <h2 className="text-xl font-extrabold text-neutral-900">تنظیمات سیستم</h2>
+        <p className="mt-1 text-sm text-neutral-500">
+          مدیریت پویای کلیدهای API، انتخاب سرویس پیامک فعال و سایر پیکربندی‌ها (بدون نیاز به تغییر کد/استقرار مجدد).
+        </p>
+        <div className="mt-6">
+          <SystemSettings />
         </div>
       </div>
     </main>
