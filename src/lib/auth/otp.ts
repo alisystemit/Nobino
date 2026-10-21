@@ -5,7 +5,7 @@ const OTP_TTL_MS = 5 * 60 * 1000; // ۵ دقیقه
 const MAX_ATTEMPTS = 5;
 
 export async function requestOtp(phone: string) {
-  const code = String(Math.floor(10000 + Math.random() * 90000)); // ۴ رقم
+  const code = String(Math.floor(1000 + Math.random() * 9000)); // ۴ رقم
 
   // محدودیت تعداد درخواست (ضد اسپم ساده)
   const recentCount = await prisma.otp.count({
