@@ -7,7 +7,7 @@ type Salon = { id: string; name: string; slug: string; owner: { phone: string } 
 type Audit = { id: string; action: string; entityType: string; actorPhone: string | null; createdAt: string };
 
 export default function AdminExtras() {
-  const [tab, setTab] = useState<"salons" | "subscriptions" | "users" | "packages" | "discounts" | "sms" | "audit">("salons");
+  const [tab, setTab] = useState<"metrics" | "salons" | "subscriptions" | "users" | "packages" | "discounts" | "sms" | "audit">("metrics");
 
   const [discounts, setDiscounts] = useState<Discount[]>([]);
   const [salons, setSalons] = useState<Salon[]>([]);
@@ -122,6 +122,47 @@ export default function AdminExtras() {
     );
   }
 
+  function MetricsManager() {
+    const [m, setM] = useState<any>(null);
+    useEffect(() => {
+      (async () => { const r = await fetch("/api/admin/saas-metrics"); const d = await r.json(); if (d.success) setM(d.metrics); })();
+    }, []);
+    if (!m) return <p className="py-6 text-center text-neutral-400">در حال محاسبه...</p>;
+    const cards = [
+      { label: "درآمد ماهانه تکرارشونده (MRR)", value: m.mrrLabel, icon: "📈" },
+      { label: "مجموع درآمد", value: m.totalRevenueLabel, icon: "💵" },
+      { label: "اشتراک فعال", value: String(m.activeSubscriptions), icon: "✅" },
+      { label: "سالن تأییدشده", value: String(m.approvedSalons), icon: "🪞" },
+      { label: "سالن‌های آزمایشی", value: String(m.trialSalons), icon: "🎁" },
+      { label: "نرخ ریزش ۳۰ روزه", value: `${m.churnRate}٪`, icon: "📉" },
+    ];
+    return (
+      <div>
+        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+          {cards.map((c) => (
+            <div key={c.label} className="rounded-2xl border border-neutral-200 p-4">
+              <div className="text-2xl">{c.icon}</div>
+              <div className="mt-2 text-xl font-black text-neutral-900">{c.value}</div>
+              <div className="mt-1 text-xs text-neutral-500">{c.label}</div>
+            </div>
+          ))}
+        </div>
+        {m.planBreakdown?.length > 0 && (
+          <div className="mt-4 rounded-2xl border border-neutral-200 p-4">
+            <h4 className="text-sm font-extrabold text-neutral-800">توزیع پلن سالن‌ها</h4>
+            <div className="mt-2 flex flex-wrap gap-2">
+              {m.planBreakdown.map((p: any) => (
+                <span key={p.plan} className="rounded-full bg-neutral-100 px-3 py-1 text-xs font-bold text-neutral-700">
+                  {p.plan}: {p.count}
+                </span>
+              ))}
+            </div>
+          </div>
+        )}
+      </div>
+    );
+  }
+
   function SubscriptionManager() {
     const [subs, setSubs] = useState<any[]>([]);
     useEffect(() => {
@@ -208,6 +249,7 @@ export default function AdminExtras() {
   }
 
   const tabs = [
+    { id: "metrics", label: "درآمد SaaS" },
     { id: "salons", label: "سالن‌ها" },
     { id: "subscriptions", label: "اشتراک‌ها" },
     { id: "users", label: "کاربران" },
@@ -230,6 +272,7 @@ export default function AdminExtras() {
       </div>
 
       <div className="mt-6">
+        {tab === "metrics" && <MetricsManager />}
         {tab === "salons" && <SalonManagerList />}
         {tab === "subscriptions" && <SubscriptionManager />}
         {tab === "users" && <UserManager />}

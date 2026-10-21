@@ -1,4 +1,5 @@
 import Link from "next/link";
+import AnnouncementBanner from "@/components/AnnouncementBanner";
 
 const features = [
   {
@@ -36,6 +37,7 @@ const features = [
 export default function HomePage() {
   return (
     <main className="flex-1">
+      <AnnouncementBanner />
       {/* Hero */}
       <section className="relative overflow-hidden bg-gradient-to-bl from-pink-500 via-rose-500 to-purple-600 text-white">
         <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_right,rgba(255,255,255,0.15),transparent_50%)]" />
@@ -67,6 +69,12 @@ export default function HomePage() {
             >
               مشاهده سالن نمونه
             </a>
+            <Link
+              href="/salons"
+              className="rounded-xl bg-white/10 px-8 py-3.5 text-base font-bold text-white backdrop-blur transition hover:bg-white/20"
+            >
+              جستجوی آرایشگاه‌ها
+            </Link>
           </div>
         </div>
       </section>
