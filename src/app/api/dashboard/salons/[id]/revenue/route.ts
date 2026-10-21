@@ -1,12 +1,12 @@
-import { requireRole } from "@/lib/auth/guards";
+import { requireSalonManage } from "@/lib/auth/guards";
 import { prisma } from "@/lib/prisma";
 import { json, apiError } from "@/lib/utils";
 
 /** داده سری زمانی درآمد/نوبت برای نمودار (۳۰ روز اخیر) */
 export async function GET(_req: Request, { params }: { params: Promise<{ id: string }> }) {
   try {
-    await requireRole(["SALON_OWNER", "ADMIN"]);
     const { id } = await params;
+    await requireSalonManage(id);
 
     const since = new Date(Date.now() - 30 * 864e5);
     since.setHours(0, 0, 0, 0);

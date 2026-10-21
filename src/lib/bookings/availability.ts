@@ -63,9 +63,9 @@ export async function getStaffWindow(salonId: string, staffId: string, dayISO: s
 }
 
 /** بازه‌های اشغال (نوبت‌ها) در یک روز */
-export async function getOccupiedIntervals(salonId: string, dayISO: string, employeeId?: string, branchId?: string) {
-  const start = new Date(dayISO + "T00:00:00");
-  const end = new Date(dayISO + "T23:59:59.999");
+export async function getOccupiedIntervals(salonId: string, dayISO: string, employeeId?: string, branchId?: string, timeZone: string = "Asia/Tehran") {
+  const start = localMidnightUTC(dayISO, timeZone);
+  const end = new Date(start.getTime() + 24 * 60 * 60 * 1000);
   const where: any = {
     salonId,
     startAt: { gte: start, lt: end },
@@ -85,9 +85,9 @@ export async function getOccupiedIntervals(salonId: string, dayISO: string, empl
 }
 
 /** بازه‌های مسدود (TimeBlock) در یک روز */
-export async function getBlockedIntervals(salonId: string, dayISO: string, employeeId?: string, branchId?: string) {
-  const start = new Date(dayISO + "T00:00:00");
-  const end = new Date(dayISO + "T23:59:59.999");
+export async function getBlockedIntervals(salonId: string, dayISO: string, employeeId?: string, branchId?: string, timeZone: string = "Asia/Tehran") {
+  const start = localMidnightUTC(dayISO, timeZone);
+  const end = new Date(start.getTime() + 24 * 60 * 60 * 1000);
   const where: any = { salonId, startAt: { lt: end }, endAt: { gt: start } };
   if (employeeId) {
     where.OR = [{ staffId: employeeId }, { staffId: null }];
@@ -130,15 +130,15 @@ export async function computeFreeSlots(params: {
     ? await getStaffWindow(salon.id, params.employeeId, params.dayISO)
     : await getSalonWindow(salon.id, params.dayISO);
 
-  const rawOccupied = await getOccupiedIntervals(salon.id, params.dayISO, params.employeeId, params.branchId);
+  const tz = (salon as { timezone?: string }).timezone ?? "Asia/Tehran";
+  const rawOccupied = await getOccupiedIntervals(salon.id, params.dayISO, params.employeeId, params.branchId, tz);
   const occupied = rawOccupied.map((o) => ({ start: o.start, end: new Date(o.end.getTime() + buffer * 60 * 1000) }));
-  const blocked = await getBlockedIntervals(salon.id, params.dayISO, params.employeeId, params.branchId);
+  const blocked = await getBlockedIntervals(salon.id, params.dayISO, params.employeeId, params.branchId, tz);
 
   // حداکثر بازه رزرو آینده
   const maxAdvance = new Date(now.getTime() + salon.maxAdvanceDays * 24 * 60 * 60 * 1000);
   const minNotice = new Date(now.getTime() + salon.minNoticeMinutes * 60 * 1000);
 
-  const tz = (salon as { timezone?: string }).timezone ?? "Asia/Tehran";
   const dateStart = localMidnightUTC(params.dayISO, tz);
   const dayEnd = new Date(dateStart.getTime() + 24 * 60 * 60 * 1000);
 

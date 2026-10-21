@@ -1,4 +1,4 @@
-import { requireRole } from "@/lib/auth/guards";
+import { requireSalonManage } from "@/lib/auth/guards";
 import { prisma } from "@/lib/prisma";
 import { json, apiError } from "@/lib/utils";
 
@@ -12,8 +12,8 @@ import { json, apiError } from "@/lib/utils";
  */
 export async function GET(_req: Request, { params }: { params: Promise<{ id: string }> }) {
   try {
-    await requireRole(["SALON_OWNER", "ADMIN"]);
     const { id } = await params;
+    await requireSalonManage(id);
     const url = new URL(_req.url);
     const branchId = url.searchParams.get("branchId") || undefined;
 

@@ -11,12 +11,18 @@ export async function GET() {
   try {
     const user = await requireAuth();
 
-    let where: any = {};
+    let where: any = { id: "" };
     if (user.role === "SALON_OWNER") {
       const salon = await prisma.salon.findUnique({ where: { ownerId: user.id }, select: { id: true } });
-      where = salon ? { salonId: salon.id } : {};
+      where = salon ? { salonId: salon.id } : { id: "" };
+    } else if (user.role === "AGENT") {
+      const plans = await prisma.commissionPlan.findMany({ where: { agentId: user.id, isActive: true }, select: { salonId: true } });
+      const salonIds = plans.map((p) => p.salonId);
+      where = salonIds.length ? { salonId: { in: salonIds } } : { id: "" };
     } else if (user.role === "CUSTOMER") {
       where = { customerId: user.id };
+    } else if (user.role === "ADMIN") {
+      where = {};
     }
 
     const appointments = await prisma.appointment.findMany({

@@ -8,7 +8,11 @@ export class RescheduleConflictError extends Error {
 }
 
 /** جابه‌جایی نوبت با محافظت از تداخل (تراکنش + قفل سالن) */
-export async function rescheduleAppointmentSafe(appointmentId: string, newStartAt: Date) {
+export async function rescheduleAppointmentSafe(
+  appointmentId: string,
+  newStartAt: Date,
+  options?: { enforceCancelDeadline?: boolean }
+) {
   return prisma.$transaction(async (tx) => {
     const prev = await tx.appointment.findUnique({
       where: { id: appointmentId },
@@ -61,6 +65,14 @@ export async function rescheduleAppointmentSafe(appointmentId: string, newStartA
     }
     if (start.getTime() > new Date().getTime() + prev.salon.maxAdvanceDays * 86400 * 1000) {
       throw new RescheduleConflictError("max advance violation");
+    }
+
+    // مهلت تغییر زمان برای مشتری (مالک سالن/ادمین معاف)
+    if (options?.enforceCancelDeadline) {
+      const deadline = new Date(prev.startAt.getTime() - prev.salon.cancelDeadlineHours * 3600 * 1000);
+      if (new Date() > deadline) {
+        throw new RescheduleConflictError("cancel deadline passed");
+      }
     }
 
     return tx.appointment.update({

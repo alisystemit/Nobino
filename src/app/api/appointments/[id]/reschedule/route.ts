@@ -29,7 +29,9 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
       return json({ success: false, error: "این نوبت قابل تغییر نیست" }, { status: 400 });
     }
 
-    const updated = await rescheduleAppointmentSafe(id, new Date(body.startAt));
+    const updated = await rescheduleAppointmentSafe(id, new Date(body.startAt), {
+      enforceCancelDeadline: !isStaff,
+    });
 
     await enqueueSms({
       type: "APPOINTMENT_CHANGED",

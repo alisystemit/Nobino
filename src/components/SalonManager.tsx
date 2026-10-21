@@ -142,6 +142,9 @@ export default function SalonManager({ salonId, salonSlug }: { salonId: string; 
     const [aiAnalysis, setAiAnalysis] = useState<string | null>(null);
     const [aiLoading, setAiLoading] = useState(false);
     const [showRevenue, setShowRevenue] = useState(false);
+    const [financial, setFinancial] = useState<any>(null);
+    const [finFrom, setFinFrom] = useState(new Date(Date.now() - 30 * 864e5).toISOString().slice(0, 10));
+    const [finTo, setFinTo] = useState(new Date().toISOString().slice(0, 10));
     useEffect(() => {
       (async () => { const r = await fetch(`${base}/report`); const d = await r.json(); if (d.success) setReport(d.report); })();
       // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -157,6 +160,13 @@ export default function SalonManager({ salonId, salonSlug }: { salonId: string; 
       } finally {
         setAiLoading(false);
       }
+    }
+
+    async function loadFinancial() {
+      const r = await fetch(`${base}/financial?from=${finFrom}&to=${finTo}`);
+      const d = await r.json();
+      if (d.success) setFinancial(d.report);
+      else setMsg({ ok: false, text: d.error || "خطا" });
     }
     if (!report) return <p className="py-6 text-center text-neutral-400">در حال محاسبه گزارش...</p>;
     const cards = [
@@ -178,6 +188,37 @@ export default function SalonManager({ salonId, salonSlug }: { salonId: string; 
           </button>
         </div>
         {showRevenue && <div className="mb-4"><RevenueChart salonId={salonId} /></div>}
+
+        {/* گزارش مالی بازه‌ای */}
+        <div className="mb-4 rounded-2xl border border-neutral-200 p-4">
+          <h4 className="text-sm font-extrabold text-neutral-800">گزارش مالی بازه‌ای</h4>
+          <div className="mt-2 flex flex-wrap items-end gap-2">
+            <div>
+              <label className="text-[11px] font-medium text-neutral-500">از</label>
+              <input type="date" className={input} value={finFrom} onChange={(e) => setFinFrom(e.target.value)} />
+            </div>
+            <div>
+              <label className="text-[11px] font-medium text-neutral-500">تا</label>
+              <input type="date" className={input} value={finTo} onChange={(e) => setFinTo(e.target.value)} />
+            </div>
+            <button onClick={loadFinancial} className="rounded-xl bg-neutral-900 px-4 py-2.5 text-sm font-bold text-white hover:bg-neutral-800">نمایش</button>
+          </div>
+          {financial && (
+            <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-4">
+              {[
+                ["درآمد خدمات (انجام‌شده)", financial.revenueLabel],
+                ["نوبت‌های انجام‌شده", String(financial.completed)],
+                ["لغوها", String(financial.cancelled)],
+                ["پرداخت اشتراک", financial.paidSubscriptionsLabel],
+              ].map(([label, value]) => (
+                <div key={label} className="rounded-xl bg-neutral-50 px-3 py-2">
+                  <div className="text-sm font-black text-neutral-800">{value}</div>
+                  <div className="text-[11px] text-neutral-500">{label}</div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
         {aiAnalysis && (
           <div className="mb-4 rounded-2xl border border-purple-200 bg-purple-50 p-4 text-sm leading-relaxed text-purple-900">
             {aiAnalysis}

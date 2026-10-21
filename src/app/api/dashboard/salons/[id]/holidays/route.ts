@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { requireRole } from "@/lib/auth/guards";
+import { requireSalonManage } from "@/lib/auth/guards";
 import { prisma } from "@/lib/prisma";
 import { json, apiError } from "@/lib/utils";
 
@@ -14,8 +14,8 @@ const schema = z.object({
 
 export async function GET(_req: Request, { params }: { params: Promise<{ id: string }> }) {
   try {
-    await requireRole(["SALON_OWNER", "ADMIN"]);
     const { id } = await params;
+    await requireSalonManage(id);
     const url = new URL(_req.url);
     const branchId = url.searchParams.get("branchId") || undefined;
     const holidays = await prisma.holiday.findMany({
@@ -30,8 +30,8 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
 
 export async function POST(req: Request, { params }: { params: Promise<{ id: string }> }) {
   try {
-    await requireRole(["SALON_OWNER", "ADMIN"]);
     const { id } = await params;
+    await requireSalonManage(id);
     const body = schema.parse(await req.json());
     const holiday = await prisma.holiday.create({
       data: {

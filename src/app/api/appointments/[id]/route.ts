@@ -21,8 +21,11 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
     const { id } = await params;
     const body = schema.parse(await req.json());
 
-    const prev = await prisma.appointment.findUnique({ where: { id }, include: { salon: { select: { id: true, name: true } } } });
-    if (!prev) return json({ success: false, error: "نوبت یافت نشد" }, { status: 404 });
+    const prev = await prisma.appointment.findUnique({ where: { id }, include: { salon: { select: { id: true, name: true, ownerId: true } } } });
+    if (!prev) return json({ success: false, error: "appointment not found" }, { status: 404 });
+    if (user.role !== "ADMIN" && prev.salon.ownerId !== user.id) {
+      return json({ success: false, error: "forbidden for this salon" }, { status: 403 });
+    }
 
     const data: Record<string, unknown> = { status: body.status };
     if (body.cancelReason !== undefined) data.cancelReason = body.cancelReason;
