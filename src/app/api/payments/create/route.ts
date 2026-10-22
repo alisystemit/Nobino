@@ -21,6 +21,19 @@ export async function POST(req: Request) {
     const pkg = await prisma.package.findUnique({ where: { id: body.packageId } });
     if (!pkg || !pkg.isActive) return json({ success: false, error: "پکیج یافت نشد" }, { status: 404 });
 
+    // اعتبارسنجی مالکیت سالن: کاربر فقط می‌تواند برای سالن خودش اشتراک بخرد
+    let salonId = body.salonId;
+    if (salonId) {
+      const salon = await prisma.salon.findUnique({ where: { id: salonId }, select: { ownerId: true } });
+      if (!salon) return json({ success: false, error: "سالن یافت نشد" }, { status: 404 });
+      if (user.role !== "ADMIN" && salon.ownerId !== user.id) {
+        return json({ success: false, error: "دسترسی غیرمجاز" }, { status: 403 });
+      }
+    } else if (user.role !== "ADMIN") {
+      const owned = await prisma.salon.findUnique({ where: { ownerId: user.id }, select: { id: true } });
+      if (owned) salonId = owned.id;
+    }
+
     // قیمت بر اساس دوره: سالانه = price*10 (یا yearlyPrice اگر تنظیم شده باشد)
     const unitPrice = body.period === "YEARLY" ? (pkg.yearlyPrice ?? pkg.price * 10) : pkg.price;
 
@@ -50,7 +63,7 @@ export async function POST(req: Request) {
     const order = await prisma.order.create({
       data: {
         userId: user.id,
-        salonId: body.salonId,
+        salonId,
         packageId: pkg.id,
         discountId,
         amount,

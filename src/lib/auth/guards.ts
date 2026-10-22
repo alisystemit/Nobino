@@ -16,16 +16,15 @@ export async function getCurrentUser() {
   const payload = await verifyToken(token);
   if (!payload) return null;
 
+  // نشست باید دقیقاً با همین توکن مطابقت داشته باشد؛ در غیر این صورت توکن
+  // یا ابطال شده است یا هرگز ثبت نشده و نباید پذیرفته شود.
+  const { createHash } = await import("node:crypto");
+  const tokenHash = createHash("sha256").update(token).digest("hex");
   const session = await prisma.session.findFirst({
-    where: { userId: payload.sub, expiresAt: { gt: new Date() } },
-    orderBy: { createdAt: "desc" },
-    select: { id: true, tokenHash: true },
+    where: { userId: payload.sub, tokenHash, expiresAt: { gt: new Date() } },
+    select: { id: true },
   });
-  if (session) {
-    const { createHash } = await import("node:crypto");
-    const hash = createHash("sha256").update(token).digest("hex");
-    if (session.tokenHash !== hash) return null;
-  }
+  if (!session) return null;
 
   const user = await prisma.user.findUnique({ where: { id: payload.sub } });
   if (!user || !user.isActive) return null;

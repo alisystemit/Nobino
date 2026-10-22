@@ -1,9 +1,11 @@
 import Link from "next/link";
+import LogoutButton from "@/components/LogoutButton";
 
 const links = [
   { href: "/dashboard", label: "خانه", icon: "🏠" },
+  { href: "/dashboard/account", label: "حساب من", icon: "👤" },
   { href: "/dashboard/salon", label: "سالن من", icon: "🪞", roles: ["SALON_OWNER", "ADMIN"] },
-  { href: "/dashboard/appointments", label: "نوبت‌ها", icon: "📅", roles: ["SALON_OWNER", "ADMIN"] },
+  { href: "/dashboard/appointments", label: "نوبت‌ها", icon: "📅" },
   { href: "/dashboard/wallet", label: "کیف پول", icon: "💰" },
   { href: "/dashboard/commission", label: "کمیسیون", icon: "📈", roles: ["AGENT", "ADMIN"] },
   { href: "/dashboard/admin", label: "مدیریت کل", icon: "🛡️", roles: ["ADMIN"] },
@@ -27,6 +29,9 @@ export default function DashboardNav({ role }: { role: string }) {
             <span className="mr-1">{l.icon}</span> {l.label}
           </Link>
         ))}
+        <div className="ms-auto">
+          <LogoutButton />
+        </div>
       </div>
     </nav>
   );

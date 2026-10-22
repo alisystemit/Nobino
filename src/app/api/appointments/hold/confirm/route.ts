@@ -20,7 +20,7 @@ export async function POST(req: Request) {
 
     const appointment = await prisma.appointment.findUnique({
       where: { id: body.appointmentId },
-      include: { salon: { select: { name: true, id: true } } },
+      include: { salon: { select: { name: true, id: true, timezone: true } } },
     });
     if (!appointment) return json({ success: false, error: "نوبت یافت نشد" }, { status: 404 });
     if (!appointment.tempLockExpiresAt || appointment.tempLockExpiresAt < new Date()) {
@@ -32,7 +32,7 @@ export async function POST(req: Request) {
       data: { customerName: body.customerName, customerPhone: phone, tempLockExpiresAt: null, note: null, status: "REQUESTED" },
     });
 
-    const time = new Intl.DateTimeFormat("fa-IR", { timeStyle: "short" }).format(confirmed.startAt);
+    const time = new Intl.DateTimeFormat("fa-IR", { timeStyle: "short", timeZone: appointment.salon.timezone }).format(confirmed.startAt);
     await enqueueSms({
       type: "APPOINTMENT_CONFIRM",
       recipient: phone,

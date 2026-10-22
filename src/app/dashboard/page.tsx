@@ -25,6 +25,12 @@ export default async function DashboardPage() {
           { title: "نوبت‌ها", desc: "تأیید و مدیریت نوبت‌ها", href: "/dashboard/appointments", icon: "📅" },
         ]
       : []),
+    ...(user.role === "CUSTOMER"
+      ? [
+          { title: "حساب من", desc: "نوبت‌ها، تاریخچه، علاقه‌مندی‌ها و نظرات", href: "/dashboard/account", icon: "👤" },
+          { title: "جستجوی سالن", desc: "یافتن سالن بر اساس شهر، خدمت و قیمت", href: "/salons", icon: "🔎" },
+        ]
+      : []),
     ...(user.role === "AGENT" || user.role === "ADMIN"
       ? [{ title: "کمیسیون‌ها", desc: "نمایش درصد و درآمد نمایندگی", href: "/dashboard/commission", icon: "📈" }]
       : []),
@@ -32,14 +38,17 @@ export default async function DashboardPage() {
     { title: "خرید پکیج", desc: "فروش و فعال‌سازی اشتراک", href: "/packages", icon: "🧾" },
   ];
 
+  const displayName = user.name ?? user.email ?? user.phone;
+  const isEmailAccount = user.phone.startsWith("email:");
+
   return (
     <main className="mx-auto max-w-6xl px-6 py-12">
       <DashboardNav role={user.role} />
 
       <div className="mt-8 rounded-3xl bg-gradient-to-bl from-pink-500 to-purple-600 p-8 text-white">
-        <h1 className="text-2xl font-black">سلام، {user.name ?? user.phone} 👋</h1>
+        <h1 className="text-2xl font-black">سلام، {displayName} 👋</h1>
         <p className="mt-1 text-white/80">
-          نقش: {roleLabels[user.role] ?? user.role} — شماره: {toPersianDigits(user.phone)}
+          نقش: {roleLabels[user.role] ?? user.role} — {isEmailAccount ? `ایمیل: ${user.email ?? "—"}` : `شماره: ${toPersianDigits(user.phone)}`}
         </p>
       </div>
 

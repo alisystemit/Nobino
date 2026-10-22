@@ -3,6 +3,7 @@ import { prisma } from "@/lib/prisma";
 import { toPersianDigits, formatToman } from "@/lib/utils";
 import SalonBooking from "@/components/SalonBooking";
 import AssistantChat from "@/components/AssistantChat";
+import FavoriteButton from "@/components/FavoriteButton";
 import type { Metadata } from "next";
 
 export const instant = false;
@@ -32,6 +33,18 @@ export default async function SalonPage({ params }: { params: Promise<{ slug: st
 
   if (!salon || !salon.isActive) notFound();
 
+  const [reviews, reviewAgg] = await Promise.all([
+    prisma.review.findMany({
+      where: { salonId: salon.id },
+      include: { customer: { select: { name: true } }, staff: { select: { name: true } } },
+      orderBy: { createdAt: "desc" },
+      take: 12,
+    }),
+    prisma.review.aggregate({ where: { salonId: salon.id }, _avg: { rating: true }, _count: { _all: true } }),
+  ]);
+  const averageRating = Number((reviewAgg._avg.rating ?? 0).toFixed(1));
+  const reviewCount = reviewAgg._count._all;
+
   const days = ["شنبه", "یکشنبه", "دوشنبه", "سه‌شنبه", "چهارشنبه", "پنجشنبه", "جمعه"];
 
   return (
@@ -41,11 +54,15 @@ export default async function SalonPage({ params }: { params: Promise<{ slug: st
       <header className="relative h-72 w-full">
         <div
           className="absolute inset-0"
-          style={{ background: `linear-gradient(135deg, ${salon.coverColor}, #7c3aed)` }}
+          style={
+            salon.bannerUrl
+              ? { backgroundImage: `url(${salon.bannerUrl})`, backgroundSize: "cover", backgroundPosition: "center" }
+              : { background: `linear-gradient(135deg, ${salon.coverColor}, #7c3aed)` }
+          }
         />
-        <div className="absolute inset-0 bg-black/30" />
+        <div className="absolute inset-0 bg-black/40" />
         <div className="absolute bottom-0 left-0 right-0 mx-auto max-w-5xl px-6 pb-8">
-          <div className="flex items-end gap-5">
+          <div className="flex flex-wrap items-end gap-5">
             <div className="flex h-24 w-24 items-center justify-center rounded-2xl bg-white text-4xl shadow-lg">
               {salon.logoUrl ? (
                 // eslint-disable-next-line @next/next/no-img-element
@@ -62,6 +79,14 @@ export default async function SalonPage({ params }: { params: Promise<{ slug: st
               <p className="mt-1 text-sm" dir="ltr">
                 {toPersianDigits(salon.phone)}
               </p>
+              {reviewCount > 0 && (
+                <p className="mt-1 text-sm text-amber-200">
+                  <span className="text-amber-300">★</span> {toPersianDigits(averageRating)} از ۵ — {toPersianDigits(reviewCount)} نظر
+                </p>
+              )}
+            </div>
+            <div className="ms-auto">
+              <FavoriteButton salonId={salon.id} />
             </div>
           </div>
         </div>
@@ -158,6 +183,41 @@ export default async function SalonPage({ params }: { params: Promise<{ slug: st
               </div>
             </section>
           )}
+
+          <section id="reviews">
+            <div className="flex items-end justify-between">
+              <h2 className="text-xl font-extrabold text-neutral-900">نظرات مشتریان</h2>
+              {reviewCount > 0 && (
+                <span className="text-sm text-neutral-500">
+                  میانگین <span className="font-bold text-amber-600">{toPersianDigits(averageRating)}</span> از ۵
+                </span>
+              )}
+            </div>
+            {reviews.length === 0 ? (
+              <p className="mt-4 rounded-2xl border border-dashed border-neutral-200 p-6 text-center text-sm text-neutral-400">
+                هنوز نظری ثبت نشده است. پس از مراجعه می‌توانید اولین نظر را ثبت کنید.
+              </p>
+            ) : (
+              <div className="mt-4 space-y-3">
+                {reviews.map((r) => (
+                  <div key={r.id} className="rounded-2xl border border-neutral-200 bg-white p-4">
+                    <div className="flex items-center justify-between">
+                      <div className="text-sm font-bold text-neutral-800">{r.customer.name ?? "مشتری"}</div>
+                      <div className="text-amber-500">
+                        {"★".repeat(r.rating)}
+                        <span className="text-neutral-200">{"★".repeat(5 - r.rating)}</span>
+                      </div>
+                    </div>
+                    {r.staff?.name && <div className="text-[11px] text-neutral-400">آرایشگر: {r.staff.name}</div>}
+                    {r.comment && <p className="mt-2 text-sm leading-relaxed text-neutral-600">{r.comment}</p>}
+                  </div>
+                ))}
+              </div>
+            )}
+            <p className="mt-3 text-xs text-neutral-400">
+              فقط مشتریانی که نوبت «انجام‌شده» در این سالن دارند می‌توانند نظر ثبت کنند.
+            </p>
+          </section>
 
           <section>
             <h2 className="text-xl font-extrabold text-neutral-900">ساعات کاری</h2>

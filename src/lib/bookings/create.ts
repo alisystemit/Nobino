@@ -1,5 +1,6 @@
 import { prisma } from "@/lib/prisma";
 import type { CreationChannel } from "@prisma/client";
+import { assertBookableWindow } from "@/lib/bookings/availability";
 
 /**
  * ثبت نوبت با حفظ قطعیت در برابر رزرو هم‌زمان.
@@ -7,8 +8,8 @@ import type { CreationChannel } from "@prisma/client";
  * نحوه محافظت:
  * ۱) در یک تراکنش، ردیف «سالن» قفل می‌شود (SELECT ... FOR UPDATE)
  *     تا همه درخواست‌های نوبت همان سالن سری‌سازی شوند.
- * ۲) سپس تداخل با نوبت‌های موجود (و بافر) بررسی می‌شود.
- * ۳) اگر تداخلی نبود، نوبت درج می‌شود.
+ * ۲) سپس اعتبار بازه (ساعات کاری/تعطیلی) و تداخل با نوبت‌های موجود (و بافر) بررسی می‌شود.
+ * ۳) اگر مشکلی نبود، نوبت درج می‌شود.
  */
 
 export class BookingConflictError extends Error {
@@ -44,7 +45,6 @@ export async function createAppointmentSafe(input: {
     const buffer = salon.bufferMinutes;
     const end = new Date(start.getTime() + duration * 60 * 1000);
     const serviceEnd = new Date(end.getTime() + buffer * 60 * 1000);
-
     const now = new Date();
 
     // قوانین: حداقل فاصله تا رزرو
@@ -55,6 +55,14 @@ export async function createAppointmentSafe(input: {
     if (start.getTime() > now.getTime() + salon.maxAdvanceDays * 86400 * 1000) {
       throw new BookingConflictError("این تاریخ خارج از بازه مجاز رزرو است.");
     }
+    // داخل ساعات کاری و روز غیرتعطیل
+    await assertBookableWindow({
+      salon,
+      start,
+      end,
+      employeeId: input.employeeId,
+      branchId: input.branchId,
+    });
 
     // تداخل با نوبت‌های موجود (پوشش بافر)
     const clashWhere: any = {
@@ -62,16 +70,17 @@ export async function createAppointmentSafe(input: {
       status: { in: ["REQUESTED", "CONFIRMED"] },
       startAt: { lt: serviceEnd },
       endAt: { gt: new Date(start.getTime() - buffer * 60 * 1000) },
+      AND: [
+        // هر کارمند فقط با نوبت‌های خودش یا نوبت‌های بدون کارمند تداخل دارد
+        ...(input.employeeId ? [{ OR: [{ employeeId: input.employeeId }, { employeeId: null }] }] : []),
+        // همان منطق برای شعبه
+        ...(input.branchId ? [{ OR: [{ branchId: input.branchId }, { branchId: null }] }] : []),
+        // قفل‌های موقت منقضی‌شده ظرفیت را اشغال نمی‌کنند
+        { OR: [{ tempLockExpiresAt: null }, { tempLockExpiresAt: { gt: now } }] },
+      ],
     };
-    if (input.employeeId) {
-      clashWhere.OR = [{ employeeId: input.employeeId }, { employeeId: null }];
-    }
-    if (input.branchId) {
-      if (clashWhere.OR) clashWhere.OR.push({ branchId: input.branchId }, { branchId: null });
-      else clashWhere.OR = [{ branchId: input.branchId }, { branchId: null }];
-    }
     const existingAppts = await tx.appointment.findMany({ where: clashWhere });
-    const candidateEffectiveEnd = new Date(end.getTime() + buffer * 60 * 1000);
+    const candidateEffectiveEnd = serviceEnd;
     const clash = existingAppts.find((a) => {
       const existingEffectiveEnd = new Date(a.endAt.getTime() + buffer * 60 * 1000);
       return start < existingEffectiveEnd && candidateEffectiveEnd > a.startAt;
@@ -83,14 +92,11 @@ export async function createAppointmentSafe(input: {
       salonId: salon.id,
       startAt: { lt: serviceEnd },
       endAt: { gt: start },
+      AND: [
+        ...(input.employeeId ? [{ OR: [{ staffId: input.employeeId }, { staffId: null }] }] : []),
+        ...(input.branchId ? [{ OR: [{ branchId: input.branchId }, { branchId: null }] }] : []),
+      ],
     };
-    if (input.employeeId) {
-      blockWhere.OR = [{ staffId: input.employeeId }, { staffId: null }];
-    }
-    if (input.branchId) {
-      if (blockWhere.OR) blockWhere.OR.push({ branchId: input.branchId }, { branchId: null });
-      else blockWhere.OR = [{ branchId: input.branchId }, { branchId: null }];
-    }
     const blockClash = await tx.timeBlock.findFirst({ where: blockWhere });
     if (blockClash) throw new BookingConflictError("این بازه زمانی مسدود شده است.");
 

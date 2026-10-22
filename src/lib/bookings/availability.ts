@@ -1,21 +1,37 @@
 import { prisma } from "@/lib/prisma";
-import { localMidnightUTC } from "@/lib/timezone";
-import type { Salon, Service, Staff, Appointment } from "@prisma/client";
+import { localMidnightUTC, localParts } from "@/lib/timezone";
+import type { Salon, Service } from "@prisma/client";
 
 export type Slot = { startAt: Date; endAt: Date };
 
 const SLOT_STEP_MIN = 30;
 
-function toMin(d: Date) {
-  return d.getHours() * 60 + d.getMinutes();
+export class BookingWindowError extends Error {
+  status = 400;
 }
 
-export async function getSalonWindow(salonId: string, dayISO: string): Promise<{ open: number; close: number }> {
-  // تعطیلات استثنایی (Holiday)
+/**
+ * تبدیل روز هفته میلادی (JS: 0=یکشنبه) به قرارداد ذخیره‌سازی پروژه (0=شنبه).
+ * UI ساعات کاری و صفحه عمومی سالن از همین قرارداد استفاده می‌کنند.
+ */
+function storedDayOfWeek(date: Date): number {
+  return (date.getUTCDay() + 1) % 7;
+}
+
+export async function getSalonWindow(
+  salonId: string,
+  dayISO: string,
+  branchId?: string
+): Promise<{ open: number; close: number }> {
+  // تعطیلات استثنایی (Holiday) — تعطیلی اختصاصی شعبه یا تعطیلی کل سالن
   const dayStart = new Date(dayISO + "T00:00:00Z");
   const dayEnd = new Date(dayISO + "T23:59:59.999Z");
   const holiday = await prisma.holiday.findFirst({
-    where: { salonId, date: { gte: dayStart, lte: dayEnd } },
+    where: {
+      salonId,
+      date: { gte: dayStart, lte: dayEnd },
+      OR: branchId ? [{ branchId }, { branchId: null }] : [{ branchId: null }],
+    },
   });
   if (holiday) {
     if (holiday.isClosed || !holiday.openTime || !holiday.closeTime) return { open: 0, close: 0 };
@@ -25,7 +41,7 @@ export async function getSalonWindow(salonId: string, dayISO: string): Promise<{
   }
 
   const date = new Date(dayISO + "T00:00:00Z");
-  const day = date.getUTCDay(); // 0=Sun ... 6=Sat
+  const day = storedDayOfWeek(date); // 0=شنبه ... 6=جمعه (مطابق UI)
   const hour = await prisma.openingHour.findUnique({
     where: { salonId_dayOfWeek: { salonId, dayOfWeek: day } },
   });
@@ -36,11 +52,11 @@ export async function getSalonWindow(salonId: string, dayISO: string): Promise<{
 }
 
 /** پنجره کاری آرایشگر (اگر برنامه شخصی داشته باشد، وگرنه پنجره سالن) */
-export async function getStaffWindow(salonId: string, staffId: string, dayISO: string) {
-  const salonWindow = await getSalonWindow(salonId, dayISO);
+export async function getStaffWindow(salonId: string, staffId: string, dayISO: string, branchId?: string) {
+  const salonWindow = await getSalonWindow(salonId, dayISO, branchId);
   const staff = await prisma.staff.findUnique({ where: { id: staffId } });
   const schedule = (staff?.schedule as { day: number; open: string; close: string; isClosed?: boolean }[] | null) ?? null;
-  const day = new Date(dayISO + "T00:00:00Z").getUTCDay();
+  const day = storedDayOfWeek(new Date(dayISO + "T00:00:00Z"));
   const entry = schedule?.find((s) => s.day === day);
   if (!schedule || !entry) return salonWindow;
   if (entry.isClosed) return { open: 0, close: 0 };
@@ -49,48 +65,106 @@ export async function getStaffWindow(salonId: string, staffId: string, dayISO: s
   return { open: oh * 60 + om, close: ch * 60 + cm };
 }
 
-/** بازه‌های اشغال (نوبت‌ها) در یک روز */
-export async function getOccupiedIntervals(salonId: string, dayISO: string, employeeId?: string, branchId?: string, timeZone: string = "Asia/Tehran") {
+/**
+ * شرط «کارمند مشخص یا نوبت‌های بدون کارمند».
+ * نوبت بدون کارمند یعنی کل ظرفیت سالن/شعبه را اشغال می‌کند.
+ */
+function employeeScope(employeeId?: string) {
+  return employeeId ? [{ OR: [{ employeeId }, { employeeId: null }] }] : [];
+}
+
+/** شرط «شعبه مشخص یا رکورد بدون شعبه» — به‌صورت AND با بقیه شروط. */
+function branchScope(branchId?: string) {
+  return branchId ? [{ OR: [{ branchId }, { branchId: null }] }] : [];
+}
+
+/** قفل‌های موقتِ منقضی‌شده نباید ظرفیت را اشغال کنند. */
+function activeHoldScope(now: Date) {
+  return [{ OR: [{ tempLockExpiresAt: null }, { tempLockExpiresAt: { gt: now } }] }];
+}
+
+/** بازه‌های اشغال (نوبت‌ها) که با بازه روز هم‌پوشانی دارند. */
+export async function getOccupiedIntervals(
+  salonId: string,
+  dayISO: string,
+  employeeId?: string,
+  branchId?: string,
+  timeZone: string = "Asia/Tehran",
+  now: Date = new Date()
+) {
   const start = localMidnightUTC(dayISO, timeZone);
   const end = new Date(start.getTime() + 24 * 60 * 60 * 1000);
-  const where: any = {
-    salonId,
-    startAt: { gte: start, lt: end },
-    status: { in: ["REQUESTED", "CONFIRMED"] },
-  };
-  // U,U?U,�?OU�OUO U.O�O3O_U^O_ O�O O3OU,U+ (employeeId = null) OO� U.O�O3O_U^O_ O�O O�O�OUOO'U_O� O�U.OU+ U.O3O_U^O_O3OO�UO U.O�O3O_U^O_ OO3O�.
-  if (employeeId) {
-    where.OR = [{ employeeId }, { employeeId: null }];
-  }
-  if (branchId) {
-    const branchCond = { branchId };
-    if (where.OR) where.OR.push(branchCond, { branchId: null });
-    else where.OR = [branchCond, { branchId: null }];
-  }
-  const rows = await prisma.appointment.findMany({ where, select: { startAt: true, endAt: true, employeeId: true } });
+  const rows = await prisma.appointment.findMany({
+    where: {
+      salonId,
+      status: { in: ["REQUESTED", "CONFIRMED"] },
+      startAt: { lt: end },
+      endAt: { gt: start },
+      AND: [...employeeScope(employeeId), ...branchScope(branchId), ...activeHoldScope(now)],
+    },
+    select: { startAt: true, endAt: true },
+  });
   return rows.map((r) => ({ start: r.startAt, end: r.endAt }));
 }
 
-/** بازه‌های مسدود (TimeBlock) در یک روز */
-export async function getBlockedIntervals(salonId: string, dayISO: string, employeeId?: string, branchId?: string, timeZone: string = "Asia/Tehran") {
+/** بازه‌های مسدود (TimeBlock) که با بازه روز هم‌پوشانی دارند. */
+export async function getBlockedIntervals(
+  salonId: string,
+  dayISO: string,
+  employeeId?: string,
+  branchId?: string,
+  timeZone: string = "Asia/Tehran"
+) {
   const start = localMidnightUTC(dayISO, timeZone);
   const end = new Date(start.getTime() + 24 * 60 * 60 * 1000);
-  const where: any = { salonId, startAt: { lt: end }, endAt: { gt: start } };
-  if (employeeId) {
-    where.OR = [{ staffId: employeeId }, { staffId: null }];
-    delete where.staffId;
-  }
-  if (branchId) {
-    const branchCond = { branchId };
-    if (where.OR) where.OR.push(branchCond, { branchId: null });
-    else where.OR = [branchCond, { branchId: null }];
-  }
-  const rows = await prisma.timeBlock.findMany({ where, select: { startAt: true, endAt: true } });
+  const employee = employeeId ? [{ OR: [{ staffId: employeeId }, { staffId: null }] }] : [];
+  const rows = await prisma.timeBlock.findMany({
+    where: {
+      salonId,
+      startAt: { lt: end },
+      endAt: { gt: start },
+      AND: [...employee, ...branchScope(branchId)],
+    },
+    select: { startAt: true, endAt: true },
+  });
   return rows.map((r) => ({ start: r.startAt, end: r.endAt }));
 }
 
 function overlaps(a: { start: Date; end: Date }, b: { start: Date; end: Date }) {
   return a.start < b.end && a.end > b.start;
+}
+
+/**
+ * اعتبارسنجی قطعیِ بازه در لحظه ثبت/جابه‌جایی:
+ * باید در یک روز محلی باشد و داخل ساعات کاری (سالن/آرایشگر) قرار بگیرد و آن روز تعطیل نباشد.
+ */
+export async function assertBookableWindow(params: {
+  salon: Pick<Salon, "id" | "timezone">;
+  start: Date;
+  end: Date;
+  employeeId?: string;
+  branchId?: string;
+}) {
+  const tz = params.salon.timezone || "Asia/Tehran";
+  const startLocal = localParts(params.start, tz);
+  const endLocal = localParts(params.end, tz);
+
+  if (startLocal.dayISO !== endLocal.dayISO) {
+    throw new BookingWindowError("نوبت نمی‌تواند از نیمه‌شب عبور کند.");
+  }
+
+  const win = params.employeeId
+    ? await getStaffWindow(params.salon.id, params.employeeId, startLocal.dayISO, params.branchId)
+    : await getSalonWindow(params.salon.id, startLocal.dayISO, params.branchId);
+
+  if (win.close <= win.open) {
+    throw new BookingWindowError("سالن در این تاریخ تعطیل است.");
+  }
+  // پایان با ثانیه را به بالا گرد می‌کنیم تا نوبتی که چند ثانیه بعد از بسته‌شدن تمام می‌شود رد شود
+  const endMin = endLocal.minutes + (endLocal.second > 0 ? 1 : 0);
+  if (startLocal.minutes < win.open || endMin > win.close) {
+    throw new BookingWindowError("زمان انتخابی خارج از ساعات کاری سالن است.");
+  }
 }
 
 /**
@@ -114,11 +188,11 @@ export async function computeFreeSlots(params: {
   const buffer = salon.bufferMinutes;
 
   const win = params.employeeId
-    ? await getStaffWindow(salon.id, params.employeeId, params.dayISO)
-    : await getSalonWindow(salon.id, params.dayISO);
+    ? await getStaffWindow(salon.id, params.employeeId, params.dayISO, params.branchId)
+    : await getSalonWindow(salon.id, params.dayISO, params.branchId);
 
-  const tz = (salon as { timezone?: string }).timezone ?? "Asia/Tehran";
-  const rawOccupied = await getOccupiedIntervals(salon.id, params.dayISO, params.employeeId, params.branchId, tz);
+  const tz = salon.timezone || "Asia/Tehran";
+  const rawOccupied = await getOccupiedIntervals(salon.id, params.dayISO, params.employeeId, params.branchId, tz, now);
   const occupied = rawOccupied.map((o) => ({ start: o.start, end: new Date(o.end.getTime() + buffer * 60 * 1000) }));
   const blocked = await getBlockedIntervals(salon.id, params.dayISO, params.employeeId, params.branchId, tz);
 

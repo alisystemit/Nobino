@@ -80,6 +80,29 @@ export default function AppointmentsPage() {
     else setError(data.error || "خطا");
   }
 
+  async function cancelWithReason(id: string) {
+    const reason = window.prompt("دلیل لغو (اختیاری):") ?? "";
+    const res = await fetch(`/api/appointments/${id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ status: "CANCELLED", cancelReason: reason || undefined }),
+    });
+    const data = await res.json();
+    if (data.success) load();
+    else setError(data.error || "خطا");
+  }
+
+  async function noShow(id: string) {
+    const res = await fetch(`/api/appointments/${id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ status: "NO_SHOW" }),
+    });
+    const data = await res.json();
+    if (data.success) load();
+    else setError(data.error || "خطا");
+  }
+
   async function rescheduleMine(id: string) {
     const raw = prompt("زمان جدید را وارد کنید (مثال: 2026-10-25T16:00)"); 
     if (!raw) return;
@@ -174,7 +197,13 @@ export default function AppointmentsPage() {
                             انجام شد
                           </button>
                           <button
-                            onClick={() => updateStatus(a.id, "CANCELLED")}
+                            onClick={() => noShow(a.id)}
+                            className="rounded-lg bg-amber-100 px-3 py-1.5 text-xs font-bold text-amber-700 hover:bg-amber-200"
+                          >
+                            عدم حضور
+                          </button>
+                          <button
+                            onClick={() => cancelWithReason(a.id)}
                             className="rounded-lg bg-neutral-200 px-3 py-1.5 text-xs font-bold text-neutral-700 hover:bg-neutral-300"
                           >
                             لغو

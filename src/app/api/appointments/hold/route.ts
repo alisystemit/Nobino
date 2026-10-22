@@ -10,6 +10,7 @@ const schema = z.object({
   salonId: z.string(),
   serviceId: z.string().optional(),
   employeeId: z.string().optional(),
+  branchId: z.string().optional(),
   startAt: z.string().datetime(),
   durationMin: z.number().int().positive().optional(),
 });
@@ -23,16 +24,26 @@ export async function POST(req: Request) {
     if (!salon) return json({ success: false, error: "سالن یافت نشد" }, { status: 404 });
 
     let duration = body.durationMin;
-    if (!duration && body.serviceId) {
-      const svc = await prisma.service.findUnique({ where: { id: body.serviceId } });
-      duration = svc?.durationMin;
+    if (body.serviceId) {
+      // مدت خدمت همیشه از دیتابیس خوانده می‌شود و باید متعلق به همین سالن باشد
+      const svc = await prisma.service.findFirst({ where: { id: body.serviceId, salonId: salon.id, isActive: true } });
+      if (!svc) return json({ success: false, error: "خدمت یافت نشد" }, { status: 404 });
+      duration = svc.durationMin;
     }
     duration = duration ?? 60;
+
+    if (body.branchId) {
+      const branch = await prisma.branch.findUnique({ where: { id: body.branchId }, select: { salonId: true } });
+      if (!branch || branch.salonId !== salon.id) {
+        return json({ success: false, error: "شعبه یافت نشد" }, { status: 400 });
+      }
+    }
 
     const appointment = await createAppointmentSafe({
       salonId: salon.id,
       serviceId: body.serviceId,
       employeeId: body.employeeId,
+      branchId: body.branchId,
       customerName: "در انتظار پرداخت",
       customerPhone: "0000000000",
       startAt: new Date(body.startAt),

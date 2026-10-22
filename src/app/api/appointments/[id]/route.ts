@@ -4,6 +4,7 @@ import { requireRole } from "@/lib/auth/guards";
 import { dispatchWebhook } from "@/lib/webhooks";
 import { enqueueSms } from "@/lib/notifications/queue";
 import { credit } from "@/lib/financial/wallet";
+import { syncCustomerProfile } from "@/lib/crm";
 import { json, apiError } from "@/lib/utils";
 
 const schema = z.object({
@@ -27,6 +28,15 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
       return json({ success: false, error: "forbidden for this salon" }, { status: 403 });
     }
 
+    // تغییر تکراری/بازگشت از وضعیت پایانی مجاز نیست (جلوگیری از کمیسیون و امتیاز تکراری)
+    if (prev.status === body.status) {
+      return json({ success: true, appointment: prev });
+    }
+    const terminal = ["COMPLETED", "CANCELLED", "NO_SHOW"];
+    if (terminal.includes(prev.status) && !terminal.includes(body.status)) {
+      return json({ success: false, error: "این نوبت در وضعیت پایانی است و قابل تغییر نیست" }, { status: 400 });
+    }
+
     const data: Record<string, unknown> = { status: body.status };
     if (body.cancelReason !== undefined) data.cancelReason = body.cancelReason;
     if (body.status === "CANCELLED") data.cancelledAt = new Date();
@@ -37,6 +47,16 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
     // امتیاز وفاداری در صورت مراجعه واقعی
     if (body.status === "COMPLETED" && prev.customerId) {
       await prisma.user.update({ where: { id: prev.customerId }, data: { loyaltyPoints: { increment: LOYALTY_POINTS } } });
+    }
+
+    // همگام‌سازی CRM پس از مراجعهٔ واقعی
+    if (body.status === "COMPLETED") {
+      await syncCustomerProfile({
+        salonId: prev.salonId,
+        phone: prev.customerPhone,
+        name: prev.customerName,
+        customerId: prev.customerId ?? null,
+      }).catch(() => {});
     }
 
     // کمیسیون آرایشگر (درصدی از قیمت خدمت) در صورت تکمیل

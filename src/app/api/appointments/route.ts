@@ -7,7 +7,7 @@ import { enqueueSms, processPendingNotifications } from "@/lib/notifications/que
 import { renderSmsTemplate } from "@/lib/notifications/templates";
 
 /** فهرست نوبت‌های سالنِ آرایشگر (یا همه برای ادمین) */
-export async function GET() {
+export async function GET(req: Request) {
   try {
     const user = await requireAuth();
 
@@ -25,6 +25,17 @@ export async function GET() {
       where = {};
     }
 
+    // بازه زمانی اختیاری برای تقویم (روز/هفته/ماه)
+    const url = new URL(req.url);
+    const from = url.searchParams.get("from");
+    const to = url.searchParams.get("to");
+    if (from || to) {
+      where.startAt = {
+        ...(from ? { gte: new Date(from) } : {}),
+        ...(to ? { lt: new Date(to) } : {}),
+      };
+    }
+
     const appointments = await prisma.appointment.findMany({
       where,
       include: {
@@ -33,7 +44,7 @@ export async function GET() {
         employee: { select: { name: true } },
       },
       orderBy: { startAt: "desc" },
-      take: 200,
+      take: from || to ? 2000 : 200,
     });
 
     return json({
@@ -91,6 +102,33 @@ export async function POST(req: Request) {
       duration = services.reduce((sum, s) => sum + s.durationMin, 0);
       primaryServiceId = services[0].id;
       combinedNote = [body.note, services.map((s) => s.name).join("، ")].filter(Boolean).join(" — ");
+    } else if (body.serviceId) {
+      // مدت‌زمان همیشه از خود خدمت خوانده می‌شود، نه از ورودی کلاینت
+      const service = await prisma.service.findFirst({ where: { id: body.serviceId, salonId: salon.id, isActive: true } });
+      if (!service) return json({ success: false, error: "خدمت یافت نشد" }, { status: 404 });
+      duration = service.durationMin;
+      primaryServiceId = service.id;
+    } else {
+      // نوبت بدون خدمت (مثلاً مراجعه سرخود): مدت باید منطقی باشد
+      const raw = body.durationMin ?? 60;
+      if (raw < 5 || raw > 480) {
+        return json({ success: false, error: "مدت نوبت باید بین ۵ تا ۴۸۰ دقیقه باشد" }, { status: 400 });
+      }
+      duration = raw;
+    }
+
+    // اعتبارسنجی تعلق کارمند و شعبه به همین سالن (جلوگیری از ثبت متقاطع)
+    if (body.employeeId) {
+      const staff = await prisma.staff.findUnique({ where: { id: body.employeeId }, select: { salonId: true } });
+      if (!staff || staff.salonId !== salon.id) {
+        return json({ success: false, error: "آرایشگر یافت نشد" }, { status: 400 });
+      }
+    }
+    if (body.branchId) {
+      const branch = await prisma.branch.findUnique({ where: { id: body.branchId }, select: { salonId: true } });
+      if (!branch || branch.salonId !== salon.id) {
+        return json({ success: false, error: "شعبه یافت نشد" }, { status: 400 });
+      }
     }
 
     const user = await requireAuth().catch(() => null);
@@ -112,12 +150,12 @@ export async function POST(req: Request) {
     });
 
     // ارسال پیامک تأیید از طریق صف (با حذف تکراری و تلاش مجدد)
-    const time = new Intl.DateTimeFormat("fa-IR", { timeStyle: "short" }).format(appointment.startAt);
+    const time = new Intl.DateTimeFormat("fa-IR", { timeStyle: "short", timeZone: salon.timezone }).format(appointment.startAt);
     const confirmMsg = await renderSmsTemplate("sms.template.confirm", {
       salon: salon.name,
       customer: body.customerName,
       time,
-      date: appointment.startAt.toLocaleDateString("fa-IR"),
+      date: appointment.startAt.toLocaleDateString("fa-IR", { timeZone: salon.timezone }),
       code: appointment.id.slice(0, 8),
     });
     await enqueueSms({
