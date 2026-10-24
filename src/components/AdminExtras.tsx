@@ -1,17 +1,16 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+import AdminCharts from "@/components/AdminCharts";
 
 type Discount = { id: string; code: string; percent: number; maxUses: number; usedCount: number; isActive: boolean };
 type Salon = { id: string; name: string; slug: string; owner: { phone: string } | null; isApproved: boolean; isActive: boolean };
-type Audit = { id: string; action: string; entityType: string; actorPhone: string | null; createdAt: string };
 
 export default function AdminExtras() {
-  const [tab, setTab] = useState<"metrics" | "salons" | "reviews" | "subscriptions" | "users" | "packages" | "discounts" | "sms" | "audit">("metrics");
+  const [tab, setTab] = useState<"metrics" | "charts" | "salons" | "reviews" | "subscriptions" | "users" | "packages" | "discounts" | "sms" | "broadcast" | "audit">("metrics");
 
   const [discounts, setDiscounts] = useState<Discount[]>([]);
   const [salons, setSalons] = useState<Salon[]>([]);
-  const [audits, setAudits] = useState<Audit[]>([]);
   const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null);
 
   const refreshSalons = useCallback(async () => {
@@ -24,12 +23,6 @@ export default function AdminExtras() {
     const r = await fetch("/api/admin/discounts");
     const d = await r.json();
     if (d.success) setDiscounts(d.discounts);
-  }, []);
-
-  const refreshAudits = useCallback(async () => {
-    const r = await fetch("/api/admin/audit");
-    const d = await r.json();
-    if (d.success) setAudits(d.logs);
   }, []);
 
   useEffect(() => {
@@ -76,19 +69,67 @@ export default function AdminExtras() {
   }
 
   function SalonManagerList() {
+    const [detail, setDetail] = useState<any>(null);
+    async function open(salonId: string) {
+      const r = await fetch(`/api/admin/salons/${salonId}`);
+      const d = await r.json();
+      if (d.success) setDetail(d.salon);
+      else setMsg({ ok: false, text: d.error || "خطا" });
+    }
     return (
       <div className="space-y-2">
-        {salons.map((s) => (
-          <div key={s.id} className="flex flex-wrap items-center justify-between gap-2 rounded-2xl border border-neutral-200 px-4 py-3">
-            <div>
-              <div className="font-bold text-neutral-800">{s.name} <span className="text-xs text-neutral-400" dir="ltr">/{s.slug}</span></div>
-              <div className="text-xs text-neutral-500">{s.owner?.phone ?? "—"}</div>
+        {detail && (
+          <div className="rounded-2xl border border-pink-200 bg-pink-50/50 p-4 dark:border-pink-800 dark:bg-pink-950/20">
+            <div className="flex items-center justify-between">
+              <h4 className="font-extrabold text-neutral-900 dark:text-neutral-100">{detail.name}</h4>
+              <button onClick={() => setDetail(null)} className="rounded-lg bg-neutral-200 px-3 py-1 text-xs font-bold">بستن ✕</button>
             </div>
+            <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-3">
+              {[
+                ["نوبت‌ها", detail._count.appointments],
+                ["کارکنان", detail._count.staff],
+                ["خدمات", detail._count.services],
+                ["شعبه‌ها", detail._count.branches],
+                ["نظرات", detail._count.reviews],
+                ["سفارش‌ها", detail._count.orders],
+                ["درآمد پرداخت‌شده", (detail.paidRevenue ?? 0).toLocaleString("fa-IR")],
+              ].map(([l, v]) => (
+                <div key={l} className="rounded-xl bg-white px-3 py-2 text-center dark:bg-neutral-800">
+                  <div className="text-sm font-black text-neutral-900 dark:text-neutral-100">{v}</div>
+                  <div className="text-[11px] text-neutral-500">{l}</div>
+                </div>
+              ))}
+            </div>
+            {detail.subscription && (
+              <div className="mt-2 rounded-xl bg-white px-3 py-2 text-xs dark:bg-neutral-800">
+                اشتراک: <b>{detail.subscription.plan}</b> — تا {new Date(detail.subscription.endsAt).toLocaleDateString("fa-IR")}
+              </div>
+            )}
+            <div className="mt-3 space-y-1">
+              <div className="text-xs font-bold text-neutral-600 dark:text-neutral-300">آخرین نوبت‌ها</div>
+              {(detail.recentAppointments ?? []).slice(0, 5).map((a: any) => (
+                <div key={a.id} className="flex justify-between rounded-lg bg-white px-3 py-1.5 text-xs dark:bg-neutral-800">
+                  <span>{a.customerName}</span>
+                  <span className="text-neutral-500">{new Date(a.startAt).toLocaleString("fa-IR")} — {a.status}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+        {salons.map((s) => (
+          <div key={s.id} className="flex flex-wrap items-center justify-between gap-2 rounded-2xl border border-neutral-200 px-4 py-3 dark:border-neutral-800">
+            <button onClick={() => open(s.id)} className="text-right">
+              <div className="font-bold text-neutral-800 dark:text-neutral-100">{s.name} <span className="text-xs text-neutral-400" dir="ltr">/{s.slug}</span></div>
+              <div className="text-xs text-neutral-500">{s.owner?.phone ?? "—"}</div>
+            </button>
             <div className="flex gap-2">
-              <span className={`rounded-full px-3 py-1 text-xs font-semibold ${s.isApproved ? "bg-emerald-50 text-emerald-700" : "bg-amber-50 text-amber-700"}`}>
+              <span className={`rounded-full px-3 py-1 text-xs font-semibold ${s.isApproved ? "bg-emerald-50 text-emerald-700 dark:bg-emerald-900/40" : "bg-amber-50 text-amber-700 dark:bg-amber-900/40"}`}>
                 {s.isApproved ? "تأیید‌شده" : "در انتظار"}
               </span>
-              <button onClick={async () => { await api(`/api/admin/salons/${s.id}/status`, "PATCH", { isApproved: !s.isApproved }); refreshSalons(); }} className="rounded-lg bg-neutral-100 px-3 py-1.5 text-xs font-bold text-neutral-700 hover:bg-neutral-200">
+              <button onClick={() => open(s.id)} className="rounded-lg bg-neutral-100 px-3 py-1.5 text-xs font-bold text-neutral-700 hover:bg-neutral-200 dark:bg-neutral-800 dark:text-neutral-300">
+                جزئیات
+              </button>
+              <button onClick={async () => { await api(`/api/admin/salons/${s.id}/status`, "PATCH", { isApproved: !s.isApproved }); refreshSalons(); }} className="rounded-lg bg-neutral-100 px-3 py-1.5 text-xs font-bold text-neutral-700 hover:bg-neutral-200 dark:bg-neutral-800 dark:text-neutral-300">
                 {s.isApproved ? "لغو تأیید" : "تأیید"}
               </button>
               <button onClick={async () => { await api(`/api/admin/salons/${s.id}/status`, "PATCH", { isActive: !s.isActive }); refreshSalons(); }} className={`rounded-lg px-3 py-1.5 text-xs font-bold ${s.isActive ? "bg-red-50 text-red-600 hover:bg-red-100" : "bg-emerald-50 text-emerald-700 hover:bg-emerald-100"}`}>
@@ -191,6 +232,73 @@ export default function AdminExtras() {
     );
   }
 
+  function AuditView() {
+    const [logs, setLogs] = useState<any[]>([]);
+    const [action, setAction] = useState("");
+    const [entity, setEntity] = useState("");
+    async function load() {
+      const params = new URLSearchParams();
+      if (action) params.set("action", action);
+      if (entity) params.set("entity", entity);
+      const r = await fetch(`/api/admin/audit?${params}`);
+      const d = await r.json();
+      if (d.success) setLogs(d.logs);
+    }
+    useEffect(() => { load(); // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, []);
+    return (
+      <div>
+        <div className="mb-3 flex flex-wrap gap-2">
+          <input className={input} placeholder="اقدام (مثلاً approve_salon)" value={action} onChange={(e) => setAction(e.target.value)} />
+          <input className={input} placeholder="نوع موجودیت (Salon/User)" value={entity} onChange={(e) => setEntity(e.target.value)} />
+          <button onClick={load} className="rounded-xl bg-neutral-900 px-4 py-2 text-sm font-bold text-white hover:bg-neutral-800">فیلتر</button>
+        </div>
+        <div className="space-y-2">
+          {logs.length === 0 && <p className="py-8 text-center text-neutral-400">رویدادی یافت نشد.</p>}
+          {logs.map((a) => (
+            <div key={a.id} className="flex items-center justify-between rounded-2xl border border-neutral-200 px-4 py-3 dark:border-neutral-800">
+              <div>
+                <div className="font-bold text-neutral-800 dark:text-neutral-100">{a.action}</div>
+                <div className="text-xs text-neutral-500 dark:text-neutral-400">{a.entityType} — {a.actorPhone ?? "سیستم"}</div>
+              </div>
+              <div className="text-xs text-neutral-400">{new Date(a.createdAt).toLocaleString("fa-IR")}</div>
+            </div>
+          ))}
+        </div>
+      </div>
+    );
+  }
+
+  function BroadcastView() {
+    const [message, setMessage] = useState("");
+    const [audience, setAudience] = useState("ALL_SALONS");
+    const [sending, setSending] = useState(false);
+    async function send() {
+      if (!message.trim()) return;
+      setSending(true);
+      const d = await api("/api/admin/broadcast", "POST", { message, audience });
+      if (d.success) {
+        setMsg({ ok: true, text: `پیامک به ${d.queued} شماره در صف قرار گرفت ✅` });
+        setMessage("");
+      }
+      setSending(false);
+    }
+    return (
+      <div className="rounded-2xl border border-neutral-200 p-4">
+        <h4 className="text-sm font-extrabold text-neutral-800">پخش پیامک سراسری</h4>
+        <textarea className={`${input} mt-3 min-h-[90px]`} placeholder="متن پیامک..." value={message} onChange={(e) => setMessage(e.target.value)} />
+        <select className={`${input} mt-3`} value={audience} onChange={(e) => setAudience(e.target.value)}>
+          <option value="ALL_SALONS">همه سالن‌ها (فعال)</option>
+          <option value="SALON_OWNERS">همه مالکان سالن</option>
+          <option value="ACTIVE_SUBS">مشترکین فعال</option>
+        </select>
+        <button onClick={send} disabled={sending || !message.trim()} className="mt-3 w-full rounded-xl bg-gradient-to-l from-pink-600 to-purple-600 py-3 font-black text-white shadow-lg disabled:opacity-50">
+          {sending ? "در حال ارسال..." : "ارسال پیامک سراسری"}
+        </button>
+      </div>
+    );
+  }
+
   function SubscriptionManager() {
     const [subs, setSubs] = useState<any[]>([]);
     useEffect(() => {
@@ -227,27 +335,50 @@ export default function AdminExtras() {
 
   function UserManager() {
     const [users, setUsers] = useState<any[]>([]);
-    useEffect(() => {
-      (async () => { const r = await fetch("/api/admin/users"); const d = await r.json(); if (d.success) setUsers(d.users); })();
+    const [q, setQ] = useState("");
+    async function load() {
+      const r = await fetch(`/api/admin/users?q=${encodeURIComponent(q)}`);
+      const d = await r.json();
+      if (d.success) setUsers(d.users);
+    }
+    useEffect(() => { load(); // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);
     async function changeRole(id: string, role: string) {
       await api("/api/admin/users", "PATCH", { userId: id, role });
-      const r = await fetch("/api/admin/users"); const d = await r.json(); if (d.success) setUsers(d.users);
+      load();
+    }
+    async function toggleActive(u: any) {
+      await api("/api/admin/users", "PATCH", { userId: u.id, isActive: !u.isActive });
+      load();
     }
     return (
-      <div className="space-y-2">
-        {users.length === 0 && <p className="py-6 text-center text-neutral-400">کاربری یافت نشد.</p>}
-        {users.map((u) => (
-          <div key={u.id} className="flex flex-wrap items-center justify-between gap-2 rounded-2xl border border-neutral-200 px-4 py-3">
-            <div>
-              <div className="font-bold text-neutral-800">{u.name ?? u.phone} <span className="text-xs text-neutral-400" dir="ltr">{u.phone}</span></div>
-              <div className="text-xs text-neutral-500">امتیاز وفاداری: {u.loyaltyPoints}</div>
+      <div>
+        <div className="mb-3 flex gap-2">
+          <input className={input} placeholder="جستجوی موبایل/نام/ایمیل..." value={q} onChange={(e) => setQ(e.target.value)} />
+          <button onClick={load} className="rounded-xl bg-neutral-900 px-4 py-2 text-sm font-bold text-white hover:bg-neutral-800">جستجو</button>
+        </div>
+        <div className="space-y-2">
+          {users.length === 0 && <p className="py-6 text-center text-neutral-400">کاربری یافت نشد.</p>}
+          {users.map((u) => (
+            <div key={u.id} className="flex flex-wrap items-center justify-between gap-2 rounded-2xl border border-neutral-200 px-4 py-3 dark:border-neutral-800">
+              <div>
+                <div className="font-bold text-neutral-800 dark:text-neutral-100">{u.name ?? u.phone} <span className="text-xs text-neutral-400" dir="ltr">{u.phone}</span></div>
+                <div className="text-xs text-neutral-500">امتیاز: {u.loyaltyPoints} — {u.email ?? ""}</div>
+              </div>
+              <div className="flex items-center gap-2">
+                <select value={u.role} onChange={(e) => changeRole(u.id, e.target.value)} className="rounded-xl border border-neutral-300 px-3 py-1.5 text-xs font-bold outline-none dark:border-neutral-700 dark:bg-neutral-800">
+                  {["CUSTOMER", "SALON_OWNER", "AGENT", "ADMIN"].map((r) => <option key={r} value={r}>{r}</option>)}
+                </select>
+                <button
+                  onClick={() => toggleActive(u)}
+                  className={`rounded-lg px-3 py-1.5 text-xs font-bold ${u.isActive ? "bg-red-50 text-red-600 hover:bg-red-100" : "bg-emerald-50 text-emerald-700 hover:bg-emerald-100"}`}
+                >
+                  {u.isActive ? "تعلیق" : "فعال"}
+                </button>
+              </div>
             </div>
-            <select value={u.role} onChange={(e) => changeRole(u.id, e.target.value)} className="rounded-xl border border-neutral-300 px-3 py-1.5 text-xs font-bold outline-none">
-              {["CUSTOMER", "SALON_OWNER", "AGENT", "ADMIN"].map((r) => <option key={r} value={r}>{r}</option>)}
-            </select>
-          </div>
-        ))}
+          ))}
+        </div>
       </div>
     );
   }
@@ -278,6 +409,7 @@ export default function AdminExtras() {
 
   const tabs = [
     { id: "metrics", label: "درآمد SaaS" },
+    { id: "charts", label: "نمودارها" },
     { id: "salons", label: "سالن‌ها" },
     { id: "reviews", label: "نظرات" },
     { id: "subscriptions", label: "اشتراک‌ها" },
@@ -285,6 +417,7 @@ export default function AdminExtras() {
     { id: "packages", label: "پکیج‌ها" },
     { id: "discounts", label: "کد تخفیف" },
     { id: "sms", label: "تست پیامک" },
+    { id: "broadcast", label: "پخش پیامک" },
     { id: "audit", label: "لاگ حسابرسی" },
   ] as const;
 
@@ -302,6 +435,7 @@ export default function AdminExtras() {
 
       <div className="mt-6">
         {tab === "metrics" && <MetricsManager />}
+        {tab === "charts" && <AdminCharts />}
         {tab === "salons" && <SalonManagerList />}
         {tab === "reviews" && <ReviewManager />}
         {tab === "subscriptions" && <SubscriptionManager />}
@@ -309,21 +443,8 @@ export default function AdminExtras() {
         {tab === "packages" && <PackageManager />}
         {tab === "discounts" && <DiscountManager />}
         {tab === "sms" && <SmsTest />}
-        {tab === "audit" && (
-          <div className="space-y-2">
-            {audits.length === 0 && <p className="py-8 text-center text-neutral-400">رویدادی ثبت نشده است.</p>}
-            {audits.map((a) => (
-              <div key={a.id} className="flex items-center justify-between rounded-2xl border border-neutral-200 px-4 py-3">
-                <div>
-                  <div className="font-bold text-neutral-800">{a.action}</div>
-                  <div className="text-xs text-neutral-500">{a.entityType} {a.actorPhone ?? ""}</div>
-                </div>
-                <div className="text-xs text-neutral-400">{new Date(a.createdAt).toLocaleString("fa-IR")}</div>
-              </div>
-            ))}
-            <button onClick={refreshAudits} className="rounded-xl bg-neutral-100 px-4 py-2 text-sm font-bold text-neutral-700 hover:bg-neutral-200">بارگیری</button>
-          </div>
-        )}
+        {tab === "broadcast" && <BroadcastView />}
+        {tab === "audit" && <AuditView />}
       </div>
     </div>
   );

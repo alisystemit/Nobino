@@ -4,13 +4,22 @@ import { prisma } from "@/lib/prisma";
 import { logAudit } from "@/lib/audit";
 import { json, apiError } from "@/lib/utils";
 
-export async function GET() {
+export async function GET(req: Request) {
   try {
     await requireRole(["ADMIN"]);
+    const url = new URL(req.url);
+    const q = url.searchParams.get("q")?.trim();
+    const roleFilter = url.searchParams.get("role")?.trim();
+
+    const where: any = {};
+    if (q) where.OR = [{ phone: { contains: q } }, { name: { contains: q } }, { email: { contains: q } }];
+    if (roleFilter) where.role = roleFilter;
+
     const users = await prisma.user.findMany({
-      select: { id: true, phone: true, name: true, email: true, role: true, isActive: true, createdAt: true, loyaltyPoints: true },
+      where,
+      select: { id: true, phone: true, name: true, email: true, role: true, isActive: true, createdAt: true, loyaltyPoints: true, verifiedAt: true },
       orderBy: { createdAt: "desc" },
-      take: 300,
+      take: 400,
     });
     return json({ success: true, users });
   } catch (err) {

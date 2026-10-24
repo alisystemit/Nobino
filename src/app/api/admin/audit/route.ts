@@ -1,11 +1,20 @@
 import { requireRole } from "@/lib/auth/guards";
-import { getAuditLogs } from "@/lib/audit";
+import { prisma } from "@/lib/prisma";
 import { json, apiError } from "@/lib/utils";
 
-export async function GET() {
+/** لاگ حسابرسی با فیلتر (اقدام / نوع موجودیت) */
+export async function GET(req: Request) {
   try {
     await requireRole(["ADMIN"]);
-    const logs = await getAuditLogs(200);
+    const url = new URL(req.url);
+    const action = url.searchParams.get("action")?.trim();
+    const entity = url.searchParams.get("entity")?.trim();
+
+    const where: any = {};
+    if (action) where.action = { contains: action, mode: "insensitive" };
+    if (entity) where.entityType = { contains: entity, mode: "insensitive" };
+
+    const logs = await prisma.auditLog.findMany({ where, orderBy: { createdAt: "desc" }, take: 300 });
     return json({ success: true, logs });
   } catch (err) {
     return apiError(err);
