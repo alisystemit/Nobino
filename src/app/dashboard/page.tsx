@@ -23,6 +23,7 @@ export default async function DashboardPage() {
       ? [
           { title: "سالن من", desc: "صفحه عمومی، خدمات، گالری و ساعات کاری", href: "/dashboard/salon", icon: "🪞" },
           { title: "نوبت‌ها", desc: "تأیید و مدیریت نوبت‌ها", href: "/dashboard/appointments", icon: "📅" },
+          { title: "رزرو صوتی", desc: "ثبت نوبت با صدای فارسی", href: "/dashboard/voice-booking", icon: "🎙️" },
         ]
       : []),
     ...(user.role === "CUSTOMER"

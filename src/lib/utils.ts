@@ -24,6 +24,10 @@ export function apiError(error: unknown) {
       /* ignore */
     }
   }
+  // ثبت خطاهای سرور برای پایش (گزارش خطا)
+  if (status >= 500) {
+    import("@/lib/monitoring").then((m) => m.reportError(error, { status })).catch(() => {});
+  }
   return json({ success: false, error: message }, { status });
 }
 
