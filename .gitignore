@@ -43,3 +43,7 @@ next-env.d.ts
 
 # local embedded postgres
 .pgdata/
+
+# uploads (voice/فایل‌های محلی)
+public/voice/
+public/uploads/
