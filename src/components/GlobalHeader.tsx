@@ -1,12 +1,20 @@
 "use client";
 
 import Link from "next/link";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { LangSwitch, useI18n } from "@/lib/i18n";
 
 export default function GlobalHeader() {
   const { t } = useI18n();
   const [mobileOpen, setMobileOpen] = useState(false);
+  const [scrolled, setScrolled] = useState(false);
+
+  useEffect(() => {
+    const onScroll = () => setScrolled(window.scrollY > 12);
+    onScroll();
+    window.addEventListener("scroll", onScroll, { passive: true });
+    return () => window.removeEventListener("scroll", onScroll);
+  }, []);
 
   const links = [
     { href: "/salons", label: t("nav.salons") },
@@ -14,7 +22,13 @@ export default function GlobalHeader() {
   ];
 
   return (
-    <header className="sticky top-0 z-40 border-b border-white/40 glass">
+    <header
+      className={`sticky top-0 z-40 transition-all duration-300 ${
+        scrolled
+          ? "bg-white/90 shadow-lg shadow-black/5 backdrop-blur-xl"
+          : "bg-white/70 backdrop-blur-xl border-b border-black/5"
+      }`}
+    >
       <div className="mx-auto flex h-16 max-w-7xl items-center justify-between px-4 sm:px-6">
         <Link href="/" className="group flex items-center gap-2">
           <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-gradient-to-br from-pink-500 to-purple-600 text-lg text-white shadow-lg shadow-pink-500/30 transition group-hover:scale-110">

@@ -8,8 +8,8 @@ const floating = ["💇‍♀️", "🎨", "💅", "✨", "🪞", "💄"];
 export default function HomeHero() {
   const { t } = useI18n();
   return (
-    <section className="relative overflow-hidden bg-gradient-to-bl from-pink-500 via-rose-500 to-purple-700 text-white">
-      <div className="absolute inset-0 bg-hero-pattern animate-gradient" />
+    <section className="relative overflow-hidden bg-brand-gradient text-white">
+      <div className="absolute inset-0 bg-hero-pattern" />
 
       {/* ذرات شناور */}
       <div className="pointer-events-none absolute inset-0 hidden sm:block">
