@@ -98,15 +98,22 @@ async function main() {
     // وضعیت → COMPLETED
     const done = await req(`/api/appointments/${apptId}`, { method: "PATCH", headers: { "content-type": "application/json" }, body: JSON.stringify({ status: "COMPLETED" }) }, owner);
     report("Appointments", "تکمیل نوبت", done.status === 200 && done.json.appointment.status === "COMPLETED", done.json?.appointment?.status);
-    // جابه‌جایی
-    const newSlot = av.json?.slots?.[1]?.startAt;
-    if (newSlot) {
-      const rs = await req(`/api/appointments/${apptId}/reschedule`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ startAt: newSlot }) }, owner);
-      report("Appointments", "جابه‌جایی", rs.status === 200, rs.status);
+  }
+
+  // جابه‌جایی و لغو روی یک نوبت «فعال» (نه تکمیل‌شده)
+  const actSlot = av.json?.slots?.[1]?.startAt;
+  const rsSlot = av.json?.slots?.[3]?.startAt;
+  if (actSlot) {
+    const act = await req("/api/appointments", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ salonId: salon.id, serviceId: svc.id, customerName: "فعال", customerPhone: "09121119922", startAt: actSlot, channel: "WEBAPP" }) }, owner);
+    const actId = act.json?.appointment?.id;
+    if (actId) {
+      if (rsSlot) {
+        const rs = await req(`/api/appointments/${actId}/reschedule`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ startAt: rsSlot }) }, owner);
+        report("Appointments", "جابه‌جایی (فعال)", rs.status === 200, rs.status);
+      }
+      const canc = await req(`/api/appointments/${actId}/cancel`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ reason: "تست" }) }, owner);
+      report("Appointments", "لغو نوبت (فعال)", canc.status === 200, canc.status);
     }
-    // لغو
-    const canc = await req(`/api/appointments/${apptId}/cancel`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ reason: "تست" }) }, owner);
-    report("Appointments", "لغو نوبت", canc.status === 200, canc.status);
   }
 
   // ═══════════ ۶) قفل موقت ═══════════
