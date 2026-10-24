@@ -143,7 +143,7 @@ export default function HomePage() {
             </div>
           </div>
           <div className="mt-8 border-t border-neutral-200 pt-6 text-center text-sm text-neutral-400 dark:border-neutral-800">
-            © ۱۴۰۴ نوبینو — نوبت‌دهی هوشمند آرایشگاه
+            © 1405 نوبینو — نوبت‌دهی هوشمند آرایشگاه
           </div>
         </div>
       </footer>

@@ -4,6 +4,16 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 
+// مشتریان به پکیج‌ها دسترسی ندارند
+async function isCustomer(): Promise<boolean> {
+  try {
+    const me = await (await fetch("/api/auth/me")).json();
+    return me.user?.role === "CUSTOMER";
+  } catch {
+    return false;
+  }
+}
+
 type Pkg = { id: string; name: string; description?: string; price: number; yearlyPrice?: number | null; durationDays: number; features: string[] };
 type Gateway = { id: string; name: string; sandbox: boolean };
 
@@ -21,6 +31,10 @@ export default function PackagesPage() {
 
   useEffect(() => {
     (async () => {
+      if (await isCustomer()) {
+        router.replace("/dashboard");
+        return;
+      }
       try {
         const [pkgRes, gwRes] = await Promise.all([
           fetch("/api/packages"),

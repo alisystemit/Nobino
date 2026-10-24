@@ -18,7 +18,7 @@ const NAV: NavItem[] = [
   { href: "/dashboard/commission", label: "کمیسیون", icon: "M4 19V5h3v14H4Zm6 0V9h3v10h-3Zm6 0V3h3v16h-3Z", roles: ["AGENT", "ADMIN"] },
   { href: "/admin", label: "سوپرادمین", icon: "M12 2 4 5v6c0 5 3.4 9.4 8 11 4.6-1.6 8-6 8-11V5l-8-3Zm0 2.2 6 2.3v4.5c0 3.9-2.5 7.4-6 8.8-3.5-1.4-6-4.9-6-8.8V6.5l6-2.3ZM11 7h2v6h-2V7Zm0 7h2v2h-2v-2Z", roles: ["ADMIN"] },
   { href: "/dashboard/account", label: "حساب", icon: "M12 12a4 4 0 1 0 0-8 4 4 0 0 0 0 8Zm0-6a2 2 0 1 1 0 4 2 2 0 0 1 0-4Zm4 14v-2a4 4 0 0 0-8 0v2H6v-2a6 6 0 0 1 12 0v2h-2Z" },
-  { href: "/packages", label: "پکیج‌ها", icon: "M4 6h16v2H4V6Zm0 5h16v2H4v-2Zm0 5h10v2H4v-2Zm14-2 3 3-3 3-1.4-1.4L17.2 17H14v-2h3.2l-.6-.6L18 14Z" },
+  { href: "/packages", label: "پکیج‌ها", icon: "M4 6h16v2H4V6Zm0 5h16v2H4v-2Zm0 5h10v2H4v-2Zm14-2 3 3-3 3-1.4-1.4L17.2 17H14v-2h3.2l-.6-.6L18 14Z", roles: ["SALON_OWNER", "AGENT", "ADMIN"] },
 ];
 
 function Icon({ d }: { d: string }) {

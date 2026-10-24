@@ -36,7 +36,9 @@ export default async function DashboardPage() {
       ? [{ title: "کمیسیون‌ها", desc: "نمایش درصد و درآمد نمایندگی", href: "/dashboard/commission", icon: "📈" }]
       : []),
     { title: "کیف پول", desc: "موجودی و تراکنش‌ها", href: "/dashboard/wallet", icon: "💰" },
-    { title: "خرید پکیج", desc: "فروش و فعال‌سازی اشتراک", href: "/packages", icon: "🧾" },
+    ...(user.role !== "CUSTOMER"
+      ? [{ title: "خرید پکیج", desc: "فروش و فعال‌سازی اشتراک", href: "/packages", icon: "🧾" }]
+      : []),
   ];
 
   const displayName = user.name ?? user.email ?? user.phone;
