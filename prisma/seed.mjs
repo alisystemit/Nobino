@@ -71,9 +71,9 @@ async function main() {
   }
 
   const gallery = [
-    { title: "استایل مو", imageUrl: "/gallery/hair.jpg" },
-    { title: "میکاپ عروس", imageUrl: "/gallery/makeup.jpg" },
-    { title: "ناخن", imageUrl: "/gallery/nails.jpg" },
+    { title: "استایل مو", imageUrl: "/gallery/hair.svg" },
+    { title: "میکاپ عروس", imageUrl: "/gallery/makeup.svg" },
+    { title: "ناخن", imageUrl: "/gallery/nails.svg" },
   ];
   for (const [i, g] of gallery.entries()) {
     await prisma.galleryItem.upsert({

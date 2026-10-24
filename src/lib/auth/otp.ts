@@ -65,6 +65,11 @@ export async function requestOtp(phone: string) {
     data: { phone, code, purpose: "LOGIN", expiresAt: new Date(Date.now() + OTP_TTL_MS) },
   });
 
+  // لاگ قطعی کد در کنسول سرور (در حالت توسعه)
+  console.log("\n════════════════════════════════════════════");
+  console.log(`  🔐 کد تأیید برای ${phone}: ${code}`);
+  console.log("════════════════════════════════════════════\n");
+
   await (await getSmsProvider()).sendOtp(phone, code);
   return { expiresIn: OTP_TTL_MS / 1000 };
 }

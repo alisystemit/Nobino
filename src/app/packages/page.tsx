@@ -78,56 +78,76 @@ export default function PackagesPage() {
         <p className="mt-16 text-center text-neutral-400">در حال بارگیری...</p>
       ) : (
         <>
-          <div className="mt-10 grid gap-6 md:grid-cols-3">
-            {packages.map((p) => (
-              <div key={p.id} className="flex flex-col rounded-3xl border border-neutral-200 bg-white p-8 shadow-sm">
-                <h3 className="text-xl font-extrabold text-neutral-900">{p.name}</h3>
-                <div className="mt-4 flex items-baseline gap-1">
-                  <span className="text-3xl font-black text-pink-600">
-                    {(period === "YEARLY" ? (p.yearlyPrice ?? p.price * 10) : p.price).toLocaleString("fa-IR")}
-                  </span>
-                  <span className="text-sm text-neutral-500">تومان</span>
-                </div>
-                <p className="mt-1 text-xs text-neutral-400">
-                  {period === "YEARLY" ? "سالانه (۱۰ ماه با ۲ ماه تخفیف)" : "ماهانه"}
-                </p>
-                <ul className="mt-6 flex-1 space-y-2">
-                  {(p.features ?? []).map((f, i) => (
-                    <li key={i} className="flex items-center gap-2 text-sm text-neutral-600">
-                      <span className="text-emerald-500">✓</span> {f}
-                    </li>
-                  ))}
-                </ul>
-                <div className="mt-6">
-                  <label className="text-xs font-medium text-neutral-500">درگاه پرداخت</label>
-                  <select
-                    value={gateway}
-                    onChange={(e) => setGateway(e.target.value)}
-                    className="mt-1 w-full rounded-xl border border-neutral-300 px-3 py-2.5 text-sm outline-none focus:border-pink-500"
-                  >
-                    {gateways.map((g) => (
-                      <option key={g.id} value={g.id}>
-                        {g.name}
-                        {g.sandbox ? " (تست)" : ""}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-                <button
-                  onClick={() => buy(p.id)}
-                  disabled={buying === p.id || !gateway}
-                  className="mt-4 w-full rounded-xl bg-neutral-900 py-3.5 font-bold text-white transition hover:bg-neutral-800 disabled:opacity-50"
+          <div className="mt-10 grid items-stretch gap-6 md:grid-cols-3">
+            {packages.map((p, idx) => {
+              const featured = idx === 1;
+              return (
+                <div
+                  key={p.id}
+                  className={`relative flex flex-col rounded-[2rem] p-8 transition card-hover ${
+                    featured
+                      ? "border-2 border-pink-500 bg-gradient-to-b from-pink-50 to-purple-50 shadow-2xl shadow-pink-500/20"
+                      : "border border-neutral-200 bg-white shadow-sm"
+                  }`}
                 >
-                  {buying === p.id ? "در حال انتقال..." : "خرید پکیج"}
-                </button>
-              </div>
-            ))}
+                  {featured && (
+                    <span className="absolute -top-3 right-6 rounded-full bg-gradient-to-l from-pink-600 to-purple-600 px-4 py-1 text-xs font-black text-white shadow-lg">
+                      ⭐ پیشنهاد ویژه
+                    </span>
+                  )}
+                  <h3 className="text-xl font-extrabold text-neutral-900">{p.name}</h3>
+                  <div className="mt-4 flex items-baseline gap-1">
+                    <span className={`text-4xl font-black ${featured ? "text-pink-600" : "text-neutral-900"}`}>
+                      {(period === "YEARLY" ? (p.yearlyPrice ?? p.price * 10) : p.price).toLocaleString("fa-IR")}
+                    </span>
+                    <span className="text-sm text-neutral-500">تومان</span>
+                  </div>
+                  <p className="mt-1 text-xs text-neutral-400">
+                    {period === "YEARLY" ? "سالانه (۱۰ ماه با ۲ ماه تخفیف)" : "ماهانه"}
+                  </p>
+                  <ul className="mt-6 flex-1 space-y-2.5">
+                    {(p.features ?? []).map((f, i) => (
+                      <li key={i} className="flex items-center gap-2 text-sm text-neutral-700">
+                        <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-emerald-100 text-[11px] font-black text-emerald-600">✓</span>
+                        {f}
+                      </li>
+                    ))}
+                  </ul>
+                  <div className="mt-6">
+                    <label className="text-xs font-medium text-neutral-500">درگاه پرداخت</label>
+                    <select
+                      value={gateway}
+                      onChange={(e) => setGateway(e.target.value)}
+                      className="mt-1 w-full rounded-2xl border border-neutral-200 bg-neutral-50/60 px-3 py-2.5 text-sm outline-none transition focus:border-pink-400 focus:bg-white"
+                    >
+                      {gateways.map((g) => (
+                        <option key={g.id} value={g.id}>
+                          {g.name}
+                          {g.sandbox ? " (تست)" : ""}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                  <button
+                    onClick={() => buy(p.id)}
+                    disabled={buying === p.id || !gateway}
+                    className={`mt-4 w-full rounded-2xl py-3.5 font-black transition disabled:opacity-50 ${
+                      featured
+                        ? "bg-gradient-to-l from-pink-600 to-purple-600 text-white shadow-lg shadow-pink-500/25 hover:scale-[1.02]"
+                        : "bg-neutral-900 text-white hover:bg-neutral-800"
+                    }`}
+                  >
+                    {buying === p.id ? "در حال انتقال..." : "خرید پکیج"}
+                  </button>
+                </div>
+              );
+            })}
           </div>
 
           <div className="mx-auto mt-8 max-w-md space-y-3">
-            <div className="flex gap-2">
-              <button onClick={() => setPeriod("MONTHLY")} className={`flex-1 rounded-xl py-3 text-sm font-bold transition ${period === "MONTHLY" ? "bg-neutral-900 text-white" : "bg-neutral-100 text-neutral-600"}`}>ماهانه</button>
-              <button onClick={() => setPeriod("YEARLY")} className={`flex-1 rounded-xl py-3 text-sm font-bold transition ${period === "YEARLY" ? "bg-neutral-900 text-white" : "bg-neutral-100 text-neutral-600"}`}>سالانه</button>
+            <div className="flex gap-2 rounded-2xl bg-neutral-100 p-1.5">
+              <button onClick={() => setPeriod("MONTHLY")} className={`flex-1 rounded-xl py-2.5 text-sm font-bold transition ${period === "MONTHLY" ? "bg-white text-pink-600 shadow" : "text-neutral-500"}`}>ماهانه</button>
+              <button onClick={() => setPeriod("YEARLY")} className={`flex-1 rounded-xl py-2.5 text-sm font-bold transition ${period === "YEARLY" ? "bg-white text-pink-600 shadow" : "text-neutral-500"}`}>سالانه</button>
             </div>
             <label className="flex items-center gap-2 text-sm text-neutral-600">
               <input type="checkbox" checked={autoRenew} onChange={(e) => setAutoRenew(e.target.checked)} />

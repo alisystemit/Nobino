@@ -51,19 +51,20 @@ export default async function SalonPage({ params }: { params: Promise<{ slug: st
     <main>
       <AssistantChat salonId={salon.id} />
       {/* Header */}
-      <header className="relative h-72 w-full">
+      <header className="relative h-80 w-full">
         <div
-          className="absolute inset-0"
+          className="absolute inset-0 animate-gradient"
           style={
             salon.bannerUrl
               ? { backgroundImage: `url(${salon.bannerUrl})`, backgroundSize: "cover", backgroundPosition: "center" }
               : { background: `linear-gradient(135deg, ${salon.coverColor}, #7c3aed)` }
           }
         />
+        <div className="absolute inset-0 bg-hero-pattern" />
         <div className="absolute inset-0 bg-black/40" />
-        <div className="absolute bottom-0 left-0 right-0 mx-auto max-w-5xl px-6 pb-8">
+        <div className="absolute bottom-0 left-0 right-0 mx-auto max-w-6xl px-6 pb-8">
           <div className="flex flex-wrap items-end gap-5">
-            <div className="flex h-24 w-24 items-center justify-center rounded-2xl bg-white text-4xl shadow-lg">
+            <div className="flex h-28 w-28 items-center justify-center rounded-3xl border-4 border-white/70 bg-white/90 text-5xl shadow-2xl backdrop-blur">
               {salon.logoUrl ? (
                 // eslint-disable-next-line @next/next/no-img-element
                 <img src={salon.logoUrl} alt={salon.name} className="h-full w-full rounded-2xl object-cover" />
@@ -71,22 +72,25 @@ export default async function SalonPage({ params }: { params: Promise<{ slug: st
                 "🪞"
               )}
             </div>
-            <div className="text-white">
-              <h1 className="text-3xl font-black">{salon.name}</h1>
-              <p className="mt-1 text-white/80">
-                {salon.city} {salon.address}
-              </p>
-              <p className="mt-1 text-sm" dir="ltr">
-                {toPersianDigits(salon.phone)}
-              </p>
-              {reviewCount > 0 && (
-                <p className="mt-1 text-sm text-amber-200">
-                  <span className="text-amber-300">★</span> {toPersianDigits(averageRating)} از ۵ — {toPersianDigits(reviewCount)} نظر
-                </p>
-              )}
+            <div className="min-w-0 flex-1 text-white">
+              <h1 className="text-3xl font-black drop-shadow sm:text-4xl">{salon.name}</h1>
+              <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-white/85">
+                <span className="inline-flex items-center gap-1.5">📍 {salon.city} {salon.address}</span>
+                <span className="inline-flex items-center gap-1.5" dir="ltr">📞 {toPersianDigits(salon.phone)}</span>
+                {reviewCount > 0 && (
+                  <span className="inline-flex items-center gap-1.5 text-amber-200">
+                    ★ <b>{toPersianDigits(averageRating)}</b> از ۵ — {toPersianDigits(reviewCount)} نظر
+                  </span>
+                )}
+              </div>
             </div>
-            <div className="ms-auto">
+            <div className="ms-auto flex flex-col items-end gap-2">
               <FavoriteButton salonId={salon.id} />
+              {reviewCount > 0 && (
+                <span className="rounded-full border border-white/30 bg-white/10 px-3 py-1 text-xs font-semibold text-white backdrop-blur">
+                  ★ {toPersianDigits(averageRating)} / ۵
+                </span>
+              )}
             </div>
           </div>
         </div>
@@ -116,18 +120,27 @@ export default async function SalonPage({ params }: { params: Promise<{ slug: st
           )}
 
           <section>
-            <h2 className="text-xl font-extrabold text-neutral-900">خدمات</h2>
+            <div className="flex items-center gap-3">
+              <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-pink-50 text-xl">💇‍♀️</span>
+              <h2 className="text-xl font-extrabold text-neutral-900">خدمات</h2>
+            </div>
             <div className="mt-4 grid gap-4 sm:grid-cols-2">
               {salon.services.map((s) => (
-                <div key={s.id} className="rounded-2xl border border-neutral-200 bg-white p-5">
-                  <div className="flex items-center justify-between">
-                    <h3 className="font-bold text-neutral-900">{s.name}</h3>
-                    <span className="text-sm font-semibold text-pink-600">{formatToman(s.price)}</span>
+                <div key={s.id} className="group card-hover relative overflow-hidden rounded-3xl border border-neutral-200 bg-white p-5 shadow-sm">
+                  <div className="absolute -left-6 -top-6 h-20 w-20 rounded-full bg-gradient-to-br from-pink-100 to-purple-100 opacity-0 transition group-hover:opacity-100" />
+                  <div className="relative flex items-start justify-between gap-3">
+                    <div>
+                      <h3 className="font-extrabold text-neutral-900">{s.name}</h3>
+                      <div className="mt-2 inline-flex items-center gap-1.5 rounded-full bg-neutral-100 px-2.5 py-1 text-[11px] font-semibold text-neutral-600">
+                        ⏱ {toPersianDigits(s.durationMin)} دقیقه
+                      </div>
+                    </div>
+                    <div className="text-left">
+                      <div className="text-base font-black text-pink-600">{formatToman(s.price)}</div>
+                      <div className="text-[10px] text-neutral-400">تومان</div>
+                    </div>
                   </div>
-                  <p className="mt-2 text-xs text-neutral-500">
-                    مدت: {toPersianDigits(s.durationMin)} دقیقه
-                    {s.description ? ` — ${s.description}` : ""}
-                  </p>
+                  {s.description && <p className="relative mt-3 text-sm text-neutral-500">{s.description}</p>}
                 </div>
               ))}
             </div>
@@ -169,15 +182,21 @@ export default async function SalonPage({ params }: { params: Promise<{ slug: st
 
           {salon.galleryItems.length > 0 && (
             <section>
-              <h2 className="text-xl font-extrabold text-neutral-900">گالری</h2>
+              <div className="flex items-center gap-3">
+                <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-purple-50 text-xl">🖼️</span>
+                <h2 className="text-xl font-extrabold text-neutral-900">گالری</h2>
+              </div>
               <div className="mt-4 grid grid-cols-2 gap-4 sm:grid-cols-3">
                 {salon.galleryItems.map((g) => (
-                  <div key={g.id} className="group overflow-hidden rounded-2xl bg-neutral-100">
+                  <div key={g.id} className="group relative aspect-square overflow-hidden rounded-3xl bg-neutral-100 shadow-sm">
                     <img
                       src={g.imageUrl}
                       alt={g.title ?? ""}
-                      className="aspect-square w-full object-cover transition group-hover:scale-105"
+                      className="h-full w-full object-cover transition duration-500 group-hover:scale-110"
                     />
+                    <div className="absolute inset-0 flex items-end bg-gradient-to-t from-black/60 via-transparent to-transparent opacity-0 transition group-hover:opacity-100">
+                      <span className="p-3 text-sm font-bold text-white">{g.title ?? ""}</span>
+                    </div>
                   </div>
                 ))}
               </div>

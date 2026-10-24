@@ -160,11 +160,15 @@ export default function SalonBooking({
   const input = "w-full rounded-xl border border-neutral-300 px-4 py-3 text-sm outline-none focus:border-pink-500";
 
   return (
-    <div className="rounded-3xl border border-neutral-200 bg-white p-6 shadow-lg">
-      <h3 className="text-lg font-extrabold text-neutral-900">رزرو نوبت</h3>
+    <div className="relative overflow-hidden rounded-[2rem] border border-neutral-200 bg-white shadow-xl shadow-pink-500/5">
+      <div className="bg-gradient-to-l from-pink-600 to-purple-600 px-6 py-4 text-white">
+        <h3 className="text-lg font-black">رزرو نوبت</h3>
+        <p className="text-xs text-white/80">در چند ثانیه نوبت خود را قطعی کنید</p>
+      </div>
 
+      <div className="p-6">
       {/* Voice AI */}
-      <div className="mt-5 rounded-2xl bg-gradient-to-bl from-pink-50 to-purple-50 p-4">
+      <div className="rounded-2xl bg-gradient-to-bl from-pink-50 to-purple-50 p-4">
         <p className="text-sm font-bold text-neutral-700">🎙️ نوبت‌دهی با صدا</p>
         <p className="mt-1 text-xs text-neutral-500">میکروفون را بزنید و با صدای فارسی بگویید چه زمانی برای چه خدمتی نوبت می‌خواهید.</p>
         <div className="mt-3 flex items-center gap-3">
@@ -269,16 +273,17 @@ export default function SalonBooking({
         <button
           onClick={submit}
           disabled={canning || (Boolean(date) && !time)}
-          className="w-full rounded-xl bg-neutral-900 py-3.5 font-bold text-white transition hover:bg-neutral-800 disabled:opacity-50"
+          className="w-full rounded-xl bg-gradient-to-l from-pink-600 to-purple-600 py-3.5 font-black text-white shadow-lg shadow-pink-500/25 transition hover:scale-[1.02] hover:shadow-pink-500/40 disabled:opacity-50"
         >
-          {canning ? "در حال ثبت..." : "ثبت نوبت"}
+          {canning ? "در حال ثبت..." : "ثبت نوبت ✨"}
         </button>
 
         {msg && (
-          <p className={`rounded-lg px-3 py-2 text-sm ${msg.ok ? "bg-emerald-50 text-emerald-700" : "bg-red-50 text-red-600"}`}>
+          <p className={`rounded-xl px-3 py-2 text-sm ${msg.ok ? "bg-emerald-50 text-emerald-700" : "bg-red-50 text-red-600"}`}>
             {msg.text}
           </p>
         )}
+      </div>
       </div>
     </div>
   );
