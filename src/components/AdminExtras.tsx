@@ -9,6 +9,11 @@ type Salon = { id: string; name: string; slug: string; owner: { phone: string } 
 export default function AdminExtras({ initialTab = "metrics" }: { initialTab?: string }) {
   const [tab, setTab] = useState<string>(initialTab);
 
+  // وقتی از سایدبار تب عوض می‌شود (?tab=...)، حالت داخلی هم همگام شود
+  useEffect(() => {
+    if (initialTab) setTab(initialTab);
+  }, [initialTab]);
+
   const [discounts, setDiscounts] = useState<Discount[]>([]);
   const [salons, setSalons] = useState<Salon[]>([]);
   const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null);

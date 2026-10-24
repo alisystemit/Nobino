@@ -49,7 +49,8 @@ export default function LoginPage() {
     const data = await res.json();
     setLoading(false);
     if (!data.success) return setError(data.error || "کد صحیح نیست");
-    router.push("/dashboard");
+    // ادمین → پنل سوپرادمین؛ بقیه → داشبورد
+    router.push(data.user?.role === "ADMIN" ? "/admin" : "/dashboard");
     router.refresh();
   }
 
