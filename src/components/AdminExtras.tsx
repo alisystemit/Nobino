@@ -385,24 +385,87 @@ export default function AdminExtras() {
 
   function PackageManager() {
     const [pkgs, setPkgs] = useState<any[]>([]);
-    useEffect(() => {
-      (async () => { const r = await fetch("/api/admin/packages"); const d = await r.json(); if (d.success) setPkgs(d.packages); })();
-    }, []);
-    async function setPrice(id: string, price: number) {
-      await api("/api/admin/packages", "PATCH", { id, price });
-      const r = await fetch("/api/admin/packages"); const d = await r.json(); if (d.success) setPkgs(d.packages);
+    const [editing, setEditing] = useState<any>(null);
+
+    async function load() {
+      const r = await fetch("/api/admin/packages");
+      const d = await r.json();
+      if (d.success) setPkgs(d.packages);
     }
+    useEffect(() => { load(); // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, []);
+
+    async function save() {
+      if (!editing) return;
+      const d = await api("/api/admin/packages", editing.id ? "PATCH" : "POST", editing);
+      if (d.success) { setEditing(null); load(); }
+    }
+
+    function addFeature() {
+      setEditing((e: any) => ({ ...e, features: [...(e.features ?? []), ""] }));
+    }
+    function setFeature(i: number, v: string) {
+      setEditing((e: any) => { const f = [...(e.features ?? [])]; f[i] = v; return { ...e, features: f }; });
+    }
+    function removeFeature(i: number) {
+      setEditing((e: any) => ({ ...e, features: (e.features ?? []).filter((_: string, idx: number) => idx !== i) }));
+    }
+
+    const numCls = "w-full rounded-xl border border-neutral-300 px-3 py-2 text-sm outline-none focus:border-pink-500";
+
     return (
-      <div className="space-y-2">
-        {pkgs.map((p) => (
-          <div key={p.id} className="flex flex-wrap items-center justify-between gap-2 rounded-2xl border border-neutral-200 px-4 py-3">
-            <div>
-              <div className="font-bold text-neutral-800">{p.name} <span className="text-xs text-neutral-400">({p.plan})</span></div>
-              <div className="text-xs text-neutral-500">ماهانه: {p.price.toLocaleString("fa-IR")} — سالانه: {(p.yearlyPrice ?? p.price * 10).toLocaleString("fa-IR")}</div>
+      <div>
+        <button onClick={() => setEditing({ id: null, name: "", plan: "BASIC", price: 0, yearlyPrice: null, durationDays: 30, features: [] })} className="mb-4 rounded-xl bg-gradient-to-l from-pink-600 to-purple-600 px-4 py-2 text-sm font-black text-white shadow-lg">
+          + پکیج جدید
+        </button>
+
+        {editing && (
+          <div className="mb-4 rounded-2xl border border-pink-200 bg-pink-50/50 p-4 dark:border-pink-800 dark:bg-pink-950/20">
+            <div className="grid gap-3 sm:grid-cols-2">
+              <input className={numCls} placeholder="نام پکیج" value={editing.name} onChange={(e) => setEditing({ ...editing, name: e.target.value })} />
+              <select className={numCls} value={editing.plan} onChange={(e) => setEditing({ ...editing, plan: e.target.value })}>
+                {["FREE", "BASIC", "PRO", "ENTERPRISE"].map((p) => <option key={p} value={p}>{p}</option>)}
+              </select>
+              <input className={numCls} type="number" placeholder="قیمت ماهانه (تومان)" value={editing.price} onChange={(e) => setEditing({ ...editing, price: Number(e.target.value) })} />
+              <input className={numCls} type="number" placeholder="قیمت سالانه (اختیاری)" value={editing.yearlyPrice ?? ""} onChange={(e) => setEditing({ ...editing, yearlyPrice: e.target.value === "" ? null : Number(e.target.value) })} />
+              <input className={numCls} type="number" placeholder="مدت (روز)" value={editing.durationDays} onChange={(e) => setEditing({ ...editing, durationDays: Number(e.target.value) })} />
             </div>
-            <input type="number" defaultValue={p.price} onBlur={(e) => setPrice(p.id, Number(e.target.value))} className="w-28 rounded-xl border border-neutral-300 px-3 py-1.5 text-xs outline-none" />
+            <div className="mt-3">
+              <div className="mb-1 text-xs font-bold text-neutral-600">ماژول‌ها / ویژگی‌ها</div>
+              {(editing.features ?? []).map((f: string, i: number) => (
+                <div key={i} className="mb-2 flex gap-2">
+                  <input className={numCls} value={f} onChange={(e) => setFeature(i, e.target.value)} placeholder={`ویژگی ${i + 1}`} />
+                  <button onClick={() => removeFeature(i)} className="rounded-lg bg-red-50 px-3 text-xs font-bold text-red-600 hover:bg-red-100">حذف</button>
+                </div>
+              ))}
+              <button onClick={addFeature} className="rounded-lg bg-neutral-100 px-3 py-1.5 text-xs font-bold text-neutral-700 hover:bg-neutral-200">+ افزودن ماژول</button>
+            </div>
+            <div className="mt-4 flex gap-2">
+              <button onClick={save} className="rounded-xl bg-neutral-900 px-5 py-2 text-sm font-bold text-white hover:bg-neutral-800">ذخیره</button>
+              <button onClick={() => setEditing(null)} className="rounded-xl bg-neutral-200 px-5 py-2 text-sm font-bold text-neutral-700">انصراف</button>
+            </div>
           </div>
-        ))}
+        )}
+
+        <div className="space-y-2">
+          {pkgs.map((p) => (
+            <div key={p.id} className="flex flex-wrap items-center justify-between gap-2 rounded-2xl border border-neutral-200 px-4 py-3 dark:border-neutral-800">
+              <div>
+                <div className="font-bold text-neutral-800 dark:text-neutral-100">{p.name} <span className="text-xs text-neutral-400">({p.plan})</span></div>
+                <div className="text-xs text-neutral-500">ماهانه: {p.price.toLocaleString("fa-IR")} — سالانه: {(p.yearlyPrice ?? p.price * 10).toLocaleString("fa-IR")} — {p.features?.length ?? 0} ماژول</div>
+              </div>
+              <div className="flex items-center gap-2">
+                <button onClick={() => setEditing({ id: p.id, name: p.name, plan: p.plan, price: p.price, yearlyPrice: p.yearlyPrice, durationDays: p.durationDays, features: p.features ?? [], isActive: p.isActive })} className="rounded-lg bg-neutral-100 px-3 py-1.5 text-xs font-bold text-neutral-700 hover:bg-neutral-200 dark:bg-neutral-800 dark:text-neutral-300">
+                  ویرایش
+                </button>
+                <label className="flex items-center gap-1 text-xs text-neutral-500">
+                  <input type="checkbox" checked={p.isActive} onChange={async (e) => { await api("/api/admin/packages", "PATCH", { id: p.id, isActive: e.target.checked }); load(); }} />
+                  فعال
+                </label>
+              </div>
+            </div>
+          ))}
+        </div>
       </div>
     );
   }

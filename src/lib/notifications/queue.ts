@@ -1,5 +1,5 @@
 import { prisma } from "@/lib/prisma";
-import { getSmsProvider } from "@/lib/sms/provider";
+import { getSmsProvider, sendSmsWithFallback } from "@/lib/sms/provider";
 import { getEmailSender } from "@/lib/email/provider";
 
 const MAX_ATTEMPTS = 5;
@@ -116,7 +116,8 @@ export async function processPendingNotifications(limit = 50) {
         await emailSender.sendEmail(n.recipient, subject ?? "نوبینو", html ?? "");
       } else {
         const message = (n.payload as { message?: string } | null)?.message ?? "";
-        await smsProvider.sendText(n.recipient, message);
+        // ارسال با fallback بین سرویس‌های پیامک
+        await sendSmsWithFallback(n.recipient, message);
       }
       await prisma.notification.update({
         where: { id: n.id },

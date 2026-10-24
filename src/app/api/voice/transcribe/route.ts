@@ -1,5 +1,5 @@
 import { prisma } from "@/lib/prisma";
-import { transcribeAudio } from "@/lib/ai/whisper";
+import { transcribeWithFallback } from "@/lib/ai/stt";
 import { extractAppointment } from "@/lib/ai/parser";
 import { storeFile } from "@/lib/storage";
 import { json, apiError } from "@/lib/utils";
@@ -37,36 +37,31 @@ export async function POST(req: Request) {
       },
     });
 
-    if (transcribeAudio) {
-      // شروع پردازش
-      const { transcript, provider, durationSec } = await transcribeAudio(buffer, {
-        filename: audio.name || "recording.webm",
-        mimeType: audio.type,
-      });
+    // پردازش با زنجیره ربات‌های STT (OpenAI → Groq → Mock)
+    const { transcript, provider } = await transcribeWithFallback(new Uint8Array(buffer), {
+      filename: audio.name || "recording.webm",
+      mimeType: audio.type,
+    });
 
-      const extracted = await extractAppointment(transcript);
+    const extracted = await extractAppointment(transcript);
 
-      await prisma.voiceCall.update({
-        where: { id: voiceCall.id },
-        data: {
-          transcript,
-          durationSec: durationSec,
-          extracted: { ...extracted, provider } as never,
-          status: "DONE",
-        },
-      });
-
-      return json({
-        success: true,
-        voiceCallId: voiceCall.id,
+    await prisma.voiceCall.update({
+      where: { id: voiceCall.id },
+      data: {
         transcript,
-        provider,
-        extracted,
-        salon: { id: salon.id, name: salon.name, slug: salon.slug },
-      });
-    }
+        extracted: { ...extracted, provider } as never,
+        status: "DONE",
+      },
+    });
 
-    return json({ success: true, voiceCallId: voiceCall.id, pending: true });
+    return json({
+      success: true,
+      voiceCallId: voiceCall.id,
+      transcript,
+      provider,
+      extracted,
+      salon: { id: salon.id, name: salon.name, slug: salon.slug },
+    });
   } catch (err) {
     return apiError(err);
   }

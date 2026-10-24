@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import RevenueChart from "@/components/RevenueChart";
+import DailyBoard from "@/components/DailyBoard";
 import { useI18n } from "@/lib/i18n";
 
 type Service = { id: string; name: string; durationMin: number; price: number; description?: string | null; category?: string | null; bufferMin?: number; isActive: boolean };
@@ -21,7 +22,7 @@ type Block = { id: string; startAt: string; endAt: string; reason?: string | nul
 type Branch = { id: string; name: string; city?: string | null; address?: string | null; phone?: string | null; isActive: boolean };
 type CashEntry = { id: string; branch?: { name: string } | null; cashAmount: number; cardAmount: number; onlineAmount: number; expenseAmount: number; note?: string | null; createdAt: string };
 
-type Tab = "services" | "staff" | "blocks" | "booking" | "branches" | "cash" | "report" | "waitlist" | "calendar" | "holidays" | "customers" | "invoices" | "campaigns" | "domain" | "data";
+type Tab = "services" | "staff" | "blocks" | "booking" | "branches" | "cash" | "report" | "waitlist" | "calendar" | "board" | "holidays" | "customers" | "invoices" | "campaigns" | "domain" | "data";
 
 export default function SalonManager({ salonId, salonSlug }: { salonId: string; salonSlug?: string }) {
   const { t } = useI18n();
@@ -1123,6 +1124,7 @@ export default function SalonManager({ salonId, salonSlug }: { salonId: string; 
   const tabs: { id: Tab; label: string }[] = [
     { id: "services", label: t("manager.tabs.services") },
     { id: "calendar", label: t("manager.tabs.calendar") },
+    { id: "board", label: "برنامه روزانه" },
     { id: "staff", label: t("manager.tabs.staff") },
     { id: "customers", label: t("manager.tabs.customers") },
     { id: "holidays", label: t("manager.tabs.holidays") },
@@ -1230,6 +1232,7 @@ export default function SalonManager({ salonId, salonSlug }: { salonId: string; 
         {tab === "data" && <DataView />}
         {tab === "waitlist" && <WaitlistView />}
         {tab === "calendar" && <CalendarView />}
+        {tab === "board" && <DailyBoard salonId={salonId} />}
 
         {tab === "blocks" && (
           <>

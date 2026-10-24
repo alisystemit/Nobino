@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useI18n } from "@/lib/i18n";
 
-const floating = ["💇‍♀️", "🎨", "💅", "✨", "🪞", "💄"];
+const floating = ["✂️", "🎨", "💅", "✨", "🪞", "💄"];
 
 export default function HomeHero() {
   const { t } = useI18n();

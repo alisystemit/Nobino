@@ -25,6 +25,15 @@ const patchSchema = z.object({
   isActive: z.boolean().optional(),
 });
 
+const createSchema = z.object({
+  name: z.string().min(1),
+  plan: z.string().default("BASIC"),
+  price: z.number().int().min(0),
+  yearlyPrice: z.number().int().min(0).nullable().optional(),
+  durationDays: z.number().int().positive().default(30),
+  features: z.array(z.string()).default([]),
+});
+
 export async function PATCH(req: Request) {
   try {
     const user = await requireRole(["ADMIN"]);
@@ -38,6 +47,19 @@ export async function PATCH(req: Request) {
     await logAudit({ actorId: user.id, actorPhone: user.phone, action: "update_package", entityType: "Package", entityId: id, before, after: updated });
 
     return json({ success: true, package: updated });
+  } catch (err) {
+    return apiError(err);
+  }
+}
+
+/** ساخت پکیج جدید توسط سوپرادمین */
+export async function POST(req: Request) {
+  try {
+    const user = await requireRole(["ADMIN"]);
+    const body = createSchema.parse(await req.json());
+    const pkg = await prisma.package.create({ data: body });
+    await logAudit({ actorId: user.id, actorPhone: user.phone, action: "create_package", entityType: "Package", entityId: pkg.id, after: body });
+    return json({ success: true, package: pkg }, { status: 201 });
   } catch (err) {
     return apiError(err);
   }

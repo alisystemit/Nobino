@@ -44,7 +44,7 @@ export async function GET(req: Request) {
         salon: { select: { name: true, slug: true } },
         employee: { select: { name: true } },
       },
-      orderBy: { startAt: "desc" },
+      orderBy: { startAt: "asc" },
       take: from || to ? 2000 : 200,
     });
 
@@ -59,9 +59,13 @@ export async function GET(req: Request) {
         status: a.status,
         channel: a.channel,
         service: a.service?.name,
+        servicePrice: a.service?.price,
         salonName: a.salon?.name,
         salonSlug: a.salon?.slug,
         employee: a.employee?.name,
+        note: a.note,
+        depositAmount: a.depositAmount,
+        depositPaid: a.depositPaid,
       })),
     });
   } catch (err) {
