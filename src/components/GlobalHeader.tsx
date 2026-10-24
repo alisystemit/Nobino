@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { LangSwitch, useI18n } from "@/lib/i18n";
+import { ThemeToggle } from "@/lib/theme";
 
 export default function GlobalHeader() {
   const { t } = useI18n();
@@ -23,10 +24,10 @@ export default function GlobalHeader() {
 
   return (
     <header
-      className={`sticky top-0 z-40 transition-all duration-300 ${
+      className={`sticky top-0 z-40 transition-all duration-300 dark:bg-neutral-950/85 ${
         scrolled
-          ? "bg-white/90 shadow-lg shadow-black/5 backdrop-blur-xl"
-          : "bg-white/70 backdrop-blur-xl border-b border-black/5"
+          ? "bg-white/90 shadow-lg shadow-black/5 backdrop-blur-xl dark:shadow-black/40"
+          : "bg-white/70 backdrop-blur-xl border-b border-black/5 dark:border-white/10"
       }`}
     >
       <div className="mx-auto flex h-16 max-w-7xl items-center justify-between px-4 sm:px-6">
@@ -50,12 +51,14 @@ export default function GlobalHeader() {
             {t("nav.login")}
           </Link>
           <span className="mr-2"><LangSwitch /></span>
+          <span className="mr-1"><ThemeToggle /></span>
         </nav>
 
         {/* موبایل */}
         <div className="flex items-center gap-2 md:hidden">
           <LangSwitch />
-          <button onClick={() => setMobileOpen((o) => !o)} className="flex h-10 w-10 items-center justify-center rounded-xl bg-neutral-100 text-xl" aria-label="منو">
+          <ThemeToggle />
+          <button onClick={() => setMobileOpen((o) => !o)} className="flex h-10 w-10 items-center justify-center rounded-xl bg-neutral-100 text-xl dark:bg-neutral-800" aria-label="منو">
             {mobileOpen ? "✕" : "☰"}
           </button>
         </div>

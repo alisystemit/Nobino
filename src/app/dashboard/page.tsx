@@ -64,12 +64,12 @@ export default async function DashboardPage() {
           <Link
             key={c.title}
             href={c.href}
-            className="group card-hover relative overflow-hidden rounded-3xl border border-neutral-200 bg-white p-6 shadow-sm"
+            className="group card-hover relative overflow-hidden rounded-3xl border border-neutral-200 bg-white p-6 shadow-sm dark:border-neutral-800 dark:bg-neutral-900"
           >
-            <div className="absolute -right-6 -top-6 h-20 w-20 rounded-full bg-gradient-to-br from-pink-100 to-purple-100 opacity-0 transition group-hover:opacity-100" />
+            <div className="absolute -right-6 -top-6 h-20 w-20 rounded-full bg-gradient-to-br from-pink-100 to-purple-100 opacity-0 transition group-hover:opacity-100 dark:from-pink-900/40 dark:to-purple-900/40" />
             <div className="text-3xl">{c.icon}</div>
-            <h3 className="mt-3 font-extrabold text-neutral-900">{c.title}</h3>
-            <p className="mt-1 text-sm text-neutral-500">{c.desc}</p>
+            <h3 className="mt-3 font-extrabold text-neutral-900 dark:text-neutral-100">{c.title}</h3>
+            <p className="mt-1 text-sm text-neutral-500 dark:text-neutral-400">{c.desc}</p>
             <div className="mt-3 text-sm font-bold text-pink-600 opacity-0 transition group-hover:opacity-100">مشاهده ←</div>
           </Link>
         ))}

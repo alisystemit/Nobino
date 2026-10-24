@@ -1,11 +1,31 @@
 @import "tailwindcss";
 
+@custom-variant dark (&:where(.dark, .dark *));
+
 @theme inline {
   --font-sans: var(--font-vazir), sans-serif;
 }
 
+:root {
+  --bg: #fafafa;
+  --fg: #18181b;
+  --surface: #ffffff;
+  --surface-muted: #f4f4f5;
+  --line: #e4e4e7;
+}
+.dark {
+  --bg: #09090c;
+  --fg: #f4f4f5;
+  --surface: #131318;
+  --surface-muted: #1c1c23;
+  --line: #26262d;
+}
+
 body {
   font-family: var(--font-sans), system-ui, sans-serif;
+  background: var(--bg);
+  color: var(--fg);
+  transition: background-color 0.3s, color 0.3s;
 }
 
 /* ─── اسکرول‌بار ظریف ─── */

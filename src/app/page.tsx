@@ -42,27 +42,27 @@ export default function HomePage() {
 
         <div className="mt-12 grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
           {features.map((f) => (
-            <div key={f.title} className="group card-hover relative overflow-hidden rounded-3xl border border-neutral-200 bg-white p-6 shadow-sm">
+            <div key={f.title} className="group card-hover relative overflow-hidden rounded-3xl border border-neutral-200 bg-white p-6 shadow-sm dark:border-neutral-800 dark:bg-neutral-900">
               <div className={`absolute -right-8 -top-8 h-24 w-24 rounded-full bg-gradient-to-br ${f.grad} opacity-10 transition group-hover:scale-150`} />
               <div className={`relative flex h-14 w-14 items-center justify-center rounded-2xl bg-gradient-to-br ${f.grad} text-2xl text-white shadow-lg`}>
                 {f.icon}
               </div>
-              <h3 className="relative mt-5 text-lg font-extrabold text-neutral-900">{f.title}</h3>
-              <p className="relative mt-2 text-sm leading-relaxed text-neutral-500">{f.desc}</p>
+              <h3 className="relative mt-5 text-lg font-extrabold text-neutral-900 dark:text-neutral-100">{f.title}</h3>
+              <p className="relative mt-2 text-sm leading-relaxed text-neutral-500 dark:text-neutral-400">{f.desc}</p>
             </div>
           ))}
         </div>
       </section>
 
       {/* مراحل */}
-      <section className="bg-gradient-to-b from-purple-50/60 to-white py-20">
+      <section className="bg-gradient-to-b from-purple-50/60 to-white py-20 dark:from-neutral-900 dark:to-neutral-950">
         <div className="mx-auto max-w-7xl px-6">
           <div className="text-center">
-            <h2 className="text-3xl font-black text-neutral-900">در ۳ قدم شروع کنید</h2>
+            <h2 className="text-3xl font-black text-neutral-900 dark:text-neutral-100">در ۳ قدم شروع کنید</h2>
           </div>
           <div className="mt-12 grid gap-8 md:grid-cols-3">
             {steps.map((s) => (
-              <div key={s.title} className="relative rounded-3xl border border-neutral-200 bg-white p-8 text-center shadow-sm">
+              <div key={s.title} className="relative rounded-3xl border border-neutral-200 bg-white p-8 text-center shadow-sm dark:border-neutral-800 dark:bg-neutral-900">
                 <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-2xl bg-gradient-to-br from-pink-500 to-purple-600 text-3xl shadow-lg shadow-pink-500/30">
                   {s.icon}
                 </div>
@@ -77,17 +77,17 @@ export default function HomePage() {
       {/* نظرات */}
       <section className="mx-auto max-w-7xl px-6 py-20">
         <div className="text-center">
-          <h2 className="text-3xl font-black text-neutral-900">مشتریان چه می‌گویند؟</h2>
+          <h2 className="text-3xl font-black text-neutral-900 dark:text-neutral-100">مشتریان چه می‌گویند؟</h2>
         </div>
         <div className="mt-12 grid gap-6 md:grid-cols-3">
           {testimonials.map((t) => (
-            <div key={t.name} className="card-hover rounded-3xl border border-neutral-200 bg-white p-6 shadow-sm">
+            <div key={t.name} className="card-hover rounded-3xl border border-neutral-200 bg-white p-6 shadow-sm dark:border-neutral-800 dark:bg-neutral-900">
               <div className="text-yellow-400">★★★★★</div>
-              <p className="mt-3 text-sm leading-relaxed text-neutral-600">“{t.text}”</p>
+              <p className="mt-3 text-sm leading-relaxed text-neutral-600 dark:text-neutral-300">“{t.text}”</p>
               <div className="mt-5 flex items-center gap-3">
-                <div className="flex h-11 w-11 items-center justify-center rounded-full bg-gradient-to-br from-pink-100 to-purple-100 text-xl">{t.avatar}</div>
+                <div className="flex h-11 w-11 items-center justify-center rounded-full bg-gradient-to-br from-pink-100 to-purple-100 text-xl dark:from-pink-900/40 dark:to-purple-900/40">{t.avatar}</div>
                 <div>
-                  <div className="text-sm font-extrabold text-neutral-800">{t.name}</div>
+                  <div className="text-sm font-extrabold text-neutral-800 dark:text-neutral-100">{t.name}</div>
                   <div className="text-xs text-neutral-400">{t.role}</div>
                 </div>
               </div>
@@ -116,33 +116,33 @@ export default function HomePage() {
       </section>
 
       {/* Footer */}
-      <footer className="border-t border-neutral-200 bg-neutral-50">
+      <footer className="border-t border-neutral-200 bg-neutral-50 dark:border-neutral-800 dark:bg-neutral-950">
         <div className="mx-auto max-w-7xl px-6 py-10">
           <div className="grid gap-8 sm:grid-cols-3">
             <div>
               <div className="flex items-center gap-2">
                 <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-gradient-to-br from-pink-500 to-purple-600 text-white">🪞</span>
-                <span className="text-lg font-black text-neutral-900">نوبینو</span>
+                <span className="text-lg font-black text-neutral-900 dark:text-neutral-100">نوبینو</span>
               </div>
-              <p className="mt-3 text-sm text-neutral-500">نوبت‌دهی هوشمند آرایشگاه با هوش مصنوعی صوتی.</p>
+              <p className="mt-3 text-sm text-neutral-500 dark:text-neutral-400">نوبت‌دهی هوشمند آرایشگاه با هوش مصنوعی صوتی.</p>
             </div>
             <div>
-              <div className="text-sm font-extrabold text-neutral-800">دسترسی سریع</div>
-              <div className="mt-3 flex flex-col gap-2 text-sm text-neutral-500">
+              <div className="text-sm font-extrabold text-neutral-800 dark:text-neutral-200">دسترسی سریع</div>
+              <div className="mt-3 flex flex-col gap-2 text-sm text-neutral-500 dark:text-neutral-400">
                 <Link href="/salons" className="hover:text-pink-600">جستجوی آرایشگاه‌ها</Link>
                 <Link href="/packages" className="hover:text-pink-600">پکیج‌ها</Link>
                 <Link href="/login" className="hover:text-pink-600">ورود</Link>
               </div>
             </div>
             <div>
-              <div className="text-sm font-extrabold text-neutral-800">تماس</div>
-              <div className="mt-3 flex flex-col gap-2 text-sm text-neutral-500">
+              <div className="text-sm font-extrabold text-neutral-800 dark:text-neutral-200">تماس</div>
+              <div className="mt-3 flex flex-col gap-2 text-sm text-neutral-500 dark:text-neutral-400">
                 <span>support@nobino.ir</span>
                 <span dir="ltr">۰۲۱-۱۲۰۰۰۰۰۰</span>
               </div>
             </div>
           </div>
-          <div className="mt-8 border-t border-neutral-200 pt-6 text-center text-sm text-neutral-400">
+          <div className="mt-8 border-t border-neutral-200 pt-6 text-center text-sm text-neutral-400 dark:border-neutral-800">
             © ۱۴۰۴ نوبینو — نوبت‌دهی هوشمند آرایشگاه
           </div>
         </div>

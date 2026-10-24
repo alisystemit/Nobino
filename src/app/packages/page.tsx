@@ -86,8 +86,8 @@ export default function PackagesPage() {
                   key={p.id}
                   className={`relative flex flex-col rounded-[2rem] p-8 transition card-hover ${
                     featured
-                      ? "border-2 border-pink-500 bg-gradient-to-b from-pink-50 to-purple-50 shadow-2xl shadow-pink-500/20"
-                      : "border border-neutral-200 bg-white shadow-sm"
+                      ? "border-2 border-pink-500 bg-gradient-to-b from-pink-50 to-purple-50 shadow-2xl shadow-pink-500/20 dark:from-pink-950/40 dark:to-purple-950/40"
+                      : "border border-neutral-200 bg-white shadow-sm dark:border-neutral-800 dark:bg-neutral-900"
                   }`}
                 >
                   {featured && (
@@ -95,9 +95,9 @@ export default function PackagesPage() {
                       ⭐ پیشنهاد ویژه
                     </span>
                   )}
-                  <h3 className="text-xl font-extrabold text-neutral-900">{p.name}</h3>
+                  <h3 className="text-xl font-extrabold text-neutral-900 dark:text-neutral-100">{p.name}</h3>
                   <div className="mt-4 flex items-baseline gap-1">
-                    <span className={`text-4xl font-black ${featured ? "text-pink-600" : "text-neutral-900"}`}>
+                    <span className={`text-4xl font-black ${featured ? "text-pink-600" : "text-neutral-900 dark:text-neutral-100"}`}>
                       {(period === "YEARLY" ? (p.yearlyPrice ?? p.price * 10) : p.price).toLocaleString("fa-IR")}
                     </span>
                     <span className="text-sm text-neutral-500">تومان</span>
@@ -107,8 +107,8 @@ export default function PackagesPage() {
                   </p>
                   <ul className="mt-6 flex-1 space-y-2.5">
                     {(p.features ?? []).map((f, i) => (
-                      <li key={i} className="flex items-center gap-2 text-sm text-neutral-700">
-                        <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-emerald-100 text-[11px] font-black text-emerald-600">✓</span>
+                      <li key={i} className="flex items-center gap-2 text-sm text-neutral-700 dark:text-neutral-300">
+                        <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-emerald-100 text-[11px] font-black text-emerald-600 dark:bg-emerald-900/40">✓</span>
                         {f}
                       </li>
                     ))}

@@ -13,14 +13,20 @@ export default function LoginPage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [msg, setMsg] = useState("");
+  const [devCode, setDevCode] = useState("");
 
   async function requestOtp() {
-    setLoading(true); setError(""); setMsg("");
+    setLoading(true); setError(""); setMsg(""); setDevCode("");
     const res = await fetch("/api/auth/otp/request", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ phone }) });
     const data = await res.json();
     setLoading(false);
     if (!data.success) return setError(data.error || "خطا در ارسال کد");
-    setMsg("کد تأیید به شماره شما ارسال شد. (در حالت توسعه، کد در کنسول سرور نمایش داده می‌شود)");
+    // در حالت توسعه، کد را مستقیم روی صفحه نشان بده
+    try {
+      const d = await (await fetch(`/api/auth/otp/dev-last?phone=${encodeURIComponent(phone)}`)).json();
+      if (d.success && d.code) setDevCode(String(d.code));
+    } catch {}
+    setMsg("کد تأیید به شماره شما ارسال شد.");
     setStep("code");
   }
 
@@ -47,7 +53,7 @@ export default function LoginPage() {
     router.refresh();
   }
 
-  const input = "w-full rounded-2xl border border-neutral-200 bg-neutral-50/60 px-4 py-3.5 text-center text-lg font-semibold outline-none transition focus:border-pink-400 focus:bg-white focus:ring-4 focus:ring-pink-100";
+  const input = "w-full rounded-2xl border border-neutral-200 bg-neutral-50/60 px-4 py-3.5 text-center text-lg font-semibold text-neutral-900 outline-none transition focus:border-pink-400 focus:bg-white focus:ring-4 focus:ring-pink-100 dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-100 dark:focus:bg-neutral-800";
 
   const stepLabel = step === "phone" ? "شماره موبایل" : step === "email" ? "ایمیل" : "کد تأیید";
 
@@ -58,7 +64,7 @@ export default function LoginPage() {
       <div className="absolute -left-24 -top-24 -z-10 h-80 w-80 rounded-full bg-pink-300/30 blur-3xl" />
       <div className="absolute -bottom-24 -right-24 -z-10 h-80 w-80 rounded-full bg-purple-300/30 blur-3xl" />
 
-      <div className="grid w-full max-w-4xl overflow-hidden rounded-[2.5rem] border border-white/60 bg-white shadow-2xl shadow-pink-500/10 lg:grid-cols-2">
+      <div className="grid w-full max-w-4xl overflow-hidden rounded-[2.5rem] border border-white/60 bg-white shadow-2xl shadow-pink-500/10 dark:border-neutral-800 dark:bg-neutral-900 lg:grid-cols-2">
         {/* برند */}
         <div className="relative hidden flex-col justify-between bg-gradient-to-bl from-pink-600 via-rose-600 to-purple-700 p-10 text-white lg:flex">
           <div className="absolute inset-0 bg-hero-pattern" />
@@ -79,8 +85,8 @@ export default function LoginPage() {
 
         {/* فرم */}
         <div className="p-8 sm:p-10">
-          <h1 className="text-2xl font-black text-neutral-900">ورود به نوبینو</h1>
-          <p className="mt-1 text-sm text-neutral-500">با {stepLabel} وارد شوید</p>
+          <h1 className="text-2xl font-black text-neutral-900 dark:text-neutral-100">ورود به نوبینو</h1>
+          <p className="mt-1 text-sm text-neutral-500 dark:text-neutral-400">با {stepLabel} وارد شوید</p>
 
           <div className="mt-6 space-y-4">
             {step === "phone" && (
@@ -127,7 +133,15 @@ export default function LoginPage() {
             )}
 
             {error && <p className="rounded-xl bg-red-50 px-4 py-3 text-sm text-red-600">{error}</p>}
-            {msg && <p className="rounded-xl bg-emerald-50 px-4 py-3 text-sm text-emerald-700">{msg}</p>}
+            {msg && <p className="rounded-xl bg-emerald-50 px-4 py-3 text-sm text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300">{msg}</p>}
+            {devCode && (
+              <div className="rounded-2xl border-2 border-dashed border-pink-300 bg-pink-50 p-4 text-center dark:border-pink-700 dark:bg-pink-950/30">
+                <div className="text-xs font-semibold text-pink-600 dark:text-pink-400">کد تأیید (توسعه)</div>
+                <div className="mt-1 text-3xl font-black tracking-[0.4em] text-pink-700 dark:text-pink-300" dir="ltr">
+                  {devCode}
+                </div>
+              </div>
+            )}
           </div>
 
           <p className="mt-6 text-center text-xs text-neutral-400">
