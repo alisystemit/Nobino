@@ -259,8 +259,11 @@ model Service {
   branch      Branch?  @relation(fields: [branchId], references: [id])
   name        String
   durationMin Int
-  price       Int // تومان
+  price       Int
   description String?
+  category    String?
+  bufferMin   Int      @default(0)
+  steps       Json?
   isActive    Boolean  @default(true)
   createdAt   DateTime @default(now())
 
@@ -749,7 +752,9 @@ model Notification {
   id            String    @id @default(cuid())
   type          String // OTP | APPOINTMENT_CONFIRM | REMINDER | CANCEL | SUBSCRIPTION
   channel       String    @default("SMS")
-  recipient     String // شماره یا ایمیل
+  recipient     String
+  userId        String?
+  readAt        DateTime? // شماره یا ایمیل
   payload       Json?
   uniqueKey     String?   @unique // برای جلوگیری از ارسال تکراری
   status        String    @default("PENDING") // PENDING | SENT | FAILED | DROPPED

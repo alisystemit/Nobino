@@ -17,7 +17,7 @@ export async function rescheduleAppointmentSafe(
   return prisma.$transaction(async (tx) => {
     const prev = await tx.appointment.findUnique({
       where: { id: appointmentId },
-      include: { salon: true },
+      include: { salon: true, service: { select: { bufferMin: true } } },
     });
     if (!prev) throw new Error("نوبت یافت نشد");
 
@@ -32,7 +32,8 @@ export async function rescheduleAppointmentSafe(
     }
 
     const duration = (prev.endAt.getTime() - prev.startAt.getTime()) / 60000;
-    const buffer = prev.salon.bufferMinutes;
+    const serviceBuf = prev.service?.bufferMin && prev.service.bufferMin > 0 ? prev.service.bufferMin : 0;
+    const buffer = serviceBuf || prev.salon.bufferMinutes;
     const start = new Date(newStartAt);
     const end = new Date(start.getTime() + duration * 60 * 1000);
     const serviceEnd = new Date(end.getTime() + buffer * 60 * 1000);

@@ -7,7 +7,11 @@ const createSchema = z.object({
   name: z.string().min(1),
   durationMin: z.number().int().positive(),
   price: z.number().int().min(0),
-  description: z.string().optional(),
+  branchId: z.string().optional().nullable(),
+  description: z.string().optional().nullable(),
+  category: z.string().optional().nullable(),
+  bufferMin: z.number().int().min(0).optional(),
+  steps: z.array(z.object({ name: z.string(), durationMin: z.number().int().positive() })).optional(),
 });
 
 export async function GET(_req: Request, { params }: { params: Promise<{ id: string }> }) {
@@ -24,10 +28,7 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
 export async function POST(req: Request, { params }: { params: Promise<{ id: string }> }) {
   try {
     const { id } = await params;
-    const user = await requireSalonManage(id);
-
-    const salon = await prisma.salon.findUnique({ where: { id } });
-    if (!salon) return json({ success: false, error: "salon not found" }, { status: 404 });
+    await requireSalonManage(id);
 
     const body = createSchema.parse(await req.json());
     const service = await prisma.service.create({ data: { salonId: id, ...body } });

@@ -185,7 +185,7 @@ export async function computeFreeSlots(params: {
   const now = params.now ?? new Date();
   const { salon, service } = params;
   const duration = service.durationMin;
-  const buffer = salon.bufferMinutes;
+  const buffer = service.bufferMin && service.bufferMin > 0 ? service.bufferMin : salon.bufferMinutes;
 
   const win = params.employeeId
     ? await getStaffWindow(salon.id, params.employeeId, params.dayISO, params.branchId)

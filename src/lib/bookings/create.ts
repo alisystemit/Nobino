@@ -38,11 +38,14 @@ export async function createAppointmentSafe(input: {
     await tx.$queryRaw`SELECT id FROM "Salon" WHERE id = ${input.salonId}::text FOR UPDATE`;
 
     const salon = await tx.salon.findUnique({ where: { id: input.salonId } });
-    if (!salon) throw new Error("سالن یافت نشد");
+    if (!salon) throw new Error("salon not found");
+
+    // per-service buffer takes precedence over salon default
+    const service = input.serviceId ? await tx.service.findUnique({ where: { id: input.serviceId } }) : null;
 
     const start = new Date(input.startAt);
     const duration = input.durationMin;
-    const buffer = salon.bufferMinutes;
+    const buffer = service?.bufferMin && service.bufferMin > 0 ? service.bufferMin : salon.bufferMinutes;
     const end = new Date(start.getTime() + duration * 60 * 1000);
     const serviceEnd = new Date(end.getTime() + buffer * 60 * 1000);
     const now = new Date();

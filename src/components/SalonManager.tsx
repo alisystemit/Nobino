@@ -4,7 +4,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import RevenueChart from "@/components/RevenueChart";
 import { useI18n } from "@/lib/i18n";
 
-type Service = { id: string; name: string; durationMin: number; price: number; description?: string | null; isActive: boolean };
+type Service = { id: string; name: string; durationMin: number; price: number; description?: string | null; category?: string | null; bufferMin?: number; isActive: boolean };
 type StaffItem = {
   id: string;
   name: string;
@@ -95,15 +95,19 @@ export default function SalonManager({ salonId, salonSlug }: { salonId: string; 
     const [name, setName] = useState("");
     const [durationMin, setDurationMin] = useState(30);
     const [price, setPrice] = useState(0);
+    const [category, setCategory] = useState("");
+    const [bufferMin, setBufferMin] = useState(0);
     async function submit() {
-      await api(`${base}/services`, "POST", { name, durationMin, price });
+      await api(`${base}/services`, "POST", { name, durationMin, price, category: category || undefined, bufferMin: Number(bufferMin) });
       refreshServices();
     }
     return (
-      <div className="grid gap-3 rounded-2xl border border-neutral-200 p-4 sm:grid-cols-[1fr_100px_120px_auto]">
-        <input className={input} placeholder="نام خدمت" value={name} onChange={(e) => setName(e.target.value)} />
-        <input className={input} type="number" placeholder="مدت (دق)" value={durationMin} onChange={(e) => setDurationMin(Number(e.target.value))} />
-        <input className={input} type="number" placeholder="قیمت (تومان)" value={price} onChange={(e) => setPrice(Number(e.target.value))} />
+      <div className="grid gap-3 rounded-2xl border border-neutral-200 p-4 sm:grid-cols-[1fr_100px_120px_100px_100px_auto]">
+        <input className={input} placeholder="نام خدمت" aria-label="نام خدمت" value={name} onChange={(e) => setName(e.target.value)} />
+        <input className={input} type="number" placeholder="مدت (دق)" aria-label="مدت" value={durationMin} onChange={(e) => setDurationMin(Number(e.target.value))} />
+        <input className={input} type="number" placeholder="قیمت (تومان)" aria-label="قیمت" value={price} onChange={(e) => setPrice(Number(e.target.value))} />
+        <input className={input} placeholder="دسته‌بندی" aria-label="دسته‌بندی" value={category} onChange={(e) => setCategory(e.target.value)} />
+        <input className={input} type="number" placeholder="استراحت (دق)" aria-label="استراحت" value={bufferMin} onChange={(e) => setBufferMin(Number(e.target.value))} />
         <button onClick={submit} className="rounded-xl bg-neutral-900 px-5 py-2.5 text-sm font-bold text-white hover:bg-neutral-800">افزودن</button>
       </div>
     );
@@ -951,12 +955,16 @@ export default function SalonManager({ salonId, salonSlug }: { salonId: string; 
     const [name, setName] = useState(service.name);
     const [durationMin, setDurationMin] = useState(service.durationMin);
     const [price, setPrice] = useState(service.price);
+    const [category, setCategory] = useState(service.category ?? "");
+    const [bufferMin, setBufferMin] = useState(service.bufferMin ?? 0);
 
     async function save() {
       const r = await api(`${base}/services/${service.id}`, "PATCH", {
         name,
         durationMin: Number(durationMin),
         price: Number(price),
+        category: category || null,
+        bufferMin: Number(bufferMin),
       });
       if (r) {
         setEditing(false);
@@ -972,10 +980,12 @@ export default function SalonManager({ salonId, salonSlug }: { salonId: string; 
     return (
       <div className="rounded-2xl border border-neutral-200 px-4 py-3">
         {editing ? (
-          <div className="grid gap-2 sm:grid-cols-[1fr_100px_120px_auto]">
+                    <div className="grid gap-2 sm:grid-cols-[1fr_100px_120px_110px_100px_auto]">
             <input className={input} value={name} onChange={(e) => setName(e.target.value)} />
             <input className={input} type="number" value={durationMin} onChange={(e) => setDurationMin(Number(e.target.value))} />
             <input className={input} type="number" value={price} onChange={(e) => setPrice(Number(e.target.value))} />
+            <input className={input} placeholder="دسته‌بندی" value={category} onChange={(e) => setCategory(e.target.value)} />
+            <input className={input} type="number" placeholder="استراحت" value={bufferMin} onChange={(e) => setBufferMin(Number(e.target.value))} />
             <button onClick={save} className="rounded-xl bg-pink-600 px-4 py-2.5 text-sm font-bold text-white hover:bg-pink-700">ذخیره</button>
           </div>
         ) : (
@@ -984,6 +994,8 @@ export default function SalonManager({ salonId, salonSlug }: { salonId: string; 
               <div className={`font-bold ${service.isActive ? "text-neutral-800" : "text-neutral-400 line-through"}`}>{service.name}</div>
               <div className="text-xs text-neutral-500">
                 {service.durationMin} دقیقه — {service.price.toLocaleString("fa-IR")} تومان
+                {service.category ? " - " + service.category : ""}
+                {service.bufferMin && service.bufferMin > 0 ? " - استراحت " + service.bufferMin + " دقیقه" : ""}
                 {!service.isActive ? " — غیرفعال" : ""}
               </div>
             </div>

@@ -63,6 +63,36 @@ export async function enqueueEmail(params: {
 }
 
 /** پردازش اعلان‌های در انتظار (SMS + ایمیل) با تلاش مجدد */
+/** ثبت اعلان داخل برنامه‌ای برای یک کاربر (بدون ارسال SMS/ایمیل) */
+export async function enqueueInApp(params: {
+  type: string;
+  userId: string;
+  message: string;
+  uniqueKey?: string;
+}) {
+  if (params.uniqueKey) {
+    const existing = await prisma.notification.findUnique({
+      where: { uniqueKey: params.uniqueKey },
+      select: { status: true },
+    });
+    if (existing && existing.status !== "FAILED") return;
+  }
+
+  await prisma.notification.create({
+    data: {
+      type: params.type,
+      channel: "IN_APP",
+      recipient: params.userId,
+      userId: params.userId,
+      payload: { message: params.message },
+      uniqueKey: params.uniqueKey,
+      status: "SENT",
+      sentAt: new Date(),
+      nextAttemptAt: new Date(),
+    },
+  });
+}
+
 export async function processPendingNotifications(limit = 50) {
   const pending = await prisma.notification.findMany({
     where: { status: "PENDING", nextAttemptAt: { lte: new Date() } },

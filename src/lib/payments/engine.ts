@@ -123,6 +123,24 @@ export async function handlePaymentCallback(params: {
       await generateInvoiceForOrder(order.id, activeSubscription?.id ?? null).catch(() => {});
     }
 
+    // کمیسیون نمایندگان فعال سالن از مبلغ سفارش پرداخت‌شده
+    if (order.salonId && order.status !== "FAILED") {
+      const plans = await prisma.commissionPlan.findMany({
+        where: { salonId: order.salonId, isActive: true },
+        select: { agentId: true, percent: true },
+      });
+      for (const plan of plans) {
+        if (plan.percent > 0) {
+          const { applyCommissionOnAmount } = await import("@/lib/financial/commission");
+          await applyCommissionOnAmount({
+            agentId: plan.agentId,
+            salonId: order.salonId,
+            amount: order.amount,
+          }).catch(() => {});
+        }
+      }
+    }
+
     return { success: true, companyId: result.refId };
   }
 
