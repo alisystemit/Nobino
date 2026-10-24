@@ -70,11 +70,18 @@ export default function DailyBoard({ salonId }: { salonId: string }) {
         <p className="rounded-2xl border border-dashed border-neutral-300 p-10 text-center text-neutral-400">برای این روز نوبتی ثبت نشده است.</p>
       ) : (
         <div className="space-y-5">
-          {[...groups.entries()].map(([service, list]) => (
+          {[...groups.entries()].map(([service, list]) => {
+            const groupRevenue = list.reduce((s, r) => s + (r.status === "COMPLETED" ? r.servicePrice ?? 0 : 0), 0);
+            const groupPrepaid = list.filter((r) => r.depositPaid).length;
+            return (
             <div key={service} className="rounded-2xl border border-neutral-200 bg-white p-4 dark:border-neutral-800 dark:bg-neutral-900">
-              <div className="mb-3 flex items-center justify-between">
+              <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
                 <h4 className="font-extrabold text-neutral-900 dark:text-neutral-100">💇 {service}</h4>
-                <span className="rounded-full bg-pink-50 px-3 py-1 text-xs font-bold text-pink-700 dark:bg-pink-900/40">{list.length} نوبت</span>
+                <div className="flex items-center gap-2">
+                  <span className="rounded-full bg-pink-50 px-3 py-1 text-xs font-bold text-pink-700 dark:bg-pink-900/40">{list.length} نوبت</span>
+                  <span className="rounded-full bg-emerald-50 px-3 py-1 text-xs font-bold text-emerald-700 dark:bg-emerald-900/40">درآمد {groupRevenue.toLocaleString("fa-IR")}</span>
+                  {groupPrepaid > 0 && <span className="rounded-full bg-amber-50 px-3 py-1 text-xs font-bold text-amber-700 dark:bg-amber-900/40">بیعانه {groupPrepaid}</span>}
+                </div>
               </div>
               <div className="space-y-2">
                 {list.map((r) => (
@@ -100,7 +107,8 @@ export default function DailyBoard({ salonId }: { salonId: string }) {
                 ))}
               </div>
             </div>
-          ))}
+            );
+          })}
         </div>
       )}
     </div>

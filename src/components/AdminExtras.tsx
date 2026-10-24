@@ -6,8 +6,8 @@ import AdminCharts from "@/components/AdminCharts";
 type Discount = { id: string; code: string; percent: number; maxUses: number; usedCount: number; isActive: boolean };
 type Salon = { id: string; name: string; slug: string; owner: { phone: string } | null; isApproved: boolean; isActive: boolean };
 
-export default function AdminExtras() {
-  const [tab, setTab] = useState<"metrics" | "charts" | "salons" | "reviews" | "subscriptions" | "users" | "packages" | "discounts" | "sms" | "broadcast" | "audit">("metrics");
+export default function AdminExtras({ initialTab = "metrics" }: { initialTab?: string }) {
+  const [tab, setTab] = useState<string>(initialTab);
 
   const [discounts, setDiscounts] = useState<Discount[]>([]);
   const [salons, setSalons] = useState<Salon[]>([]);
