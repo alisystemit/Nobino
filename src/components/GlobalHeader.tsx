@@ -9,6 +9,7 @@ export default function GlobalHeader() {
   const { t } = useI18n();
   const [mobileOpen, setMobileOpen] = useState(false);
   const [scrolled, setScrolled] = useState(false);
+  const [role, setRole] = useState<string | null>(null);
 
   useEffect(() => {
     const onScroll = () => setScrolled(window.scrollY > 12);
@@ -17,9 +18,19 @@ export default function GlobalHeader() {
     return () => window.removeEventListener("scroll", onScroll);
   }, []);
 
+  // اگر مشتری وارد شده باشد، پکیج‌ها را در منو نشان نده
+  useEffect(() => {
+    (async () => {
+      try {
+        const me = await (await fetch("/api/auth/me")).json();
+        if (me.user?.role) setRole(me.user.role);
+      } catch {}
+    })();
+  }, []);
+
   const links = [
     { href: "/salons", label: t("nav.salons") },
-    { href: "/packages", label: t("nav.packages") },
+    ...(role === "CUSTOMER" ? [] : [{ href: "/packages", label: t("nav.packages") }]),
   ];
 
   return (
