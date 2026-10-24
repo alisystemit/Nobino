@@ -5,6 +5,7 @@ import { usePathname } from "next/navigation";
 import { useState } from "react";
 import { ThemeToggle } from "@/lib/theme";
 import { LangSwitch } from "@/lib/i18n";
+import NotificationBell from "@/components/NotificationBell";
 
 type NavItem = { href: string; label: string; icon: string; roles?: string[] };
 
@@ -87,6 +88,7 @@ export default function DashboardShell({ role, title, children }: { role: string
             <h1 className="text-base font-black text-neutral-900 dark:text-neutral-100 sm:text-lg">{title}</h1>
           </div>
           <div className="flex items-center gap-2">
+            <NotificationBell />
             <ThemeToggle />
             <Link href="/" className="hidden items-center gap-1.5 rounded-lg bg-neutral-100 px-3 py-1.5 text-xs font-semibold text-neutral-600 hover:bg-neutral-200 sm:flex dark:bg-neutral-800 dark:text-neutral-300">
               🏠 بازگشت

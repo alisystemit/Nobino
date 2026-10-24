@@ -470,8 +470,217 @@ export default function AdminExtras({ initialTab = "metrics" }: { initialTab?: s
     );
   }
 
+  function SupportManager() {
+    const [tickets, setTickets] = useState<any[]>([]);
+    const [summary, setSummary] = useState<Record<string, number>>({ OPEN: 0, IN_PROGRESS: 0, CLOSED: 0 });
+    const [statusFilter, setStatusFilter] = useState("");
+    const [drafts, setDrafts] = useState<Record<string, string>>({});
+
+    const load = useCallback(async () => {
+      const params = new URLSearchParams();
+      if (statusFilter) params.set("status", statusFilter);
+      const r = await fetch(`/api/admin/support?${params}`);
+      const d = await r.json();
+      if (d.success) {
+        setTickets(d.tickets);
+        setSummary(d.summary);
+      }
+    }, [statusFilter]);
+
+    useEffect(() => {
+      load();
+    }, [load]);
+
+    async function update(id: string, patch: Record<string, unknown>) {
+      const d = await api("/api/admin/support", "PATCH", { id, ...patch });
+      if (d.success) load();
+    }
+
+    return (
+      <div>
+        <div className="mb-4 flex flex-wrap gap-2">
+          {[
+            { value: "", label: "همه" },
+            { value: "OPEN", label: `باز (${summary.OPEN ?? 0})` },
+            { value: "IN_PROGRESS", label: `در بررسی (${summary.IN_PROGRESS ?? 0})` },
+            { value: "CLOSED", label: `بسته (${summary.CLOSED ?? 0})` },
+          ].map((f) => (
+            <button
+              key={f.value}
+              onClick={() => setStatusFilter(f.value)}
+              className={`rounded-xl px-4 py-2 text-sm font-bold ${
+                statusFilter === f.value ? "bg-pink-600 text-white" : "bg-neutral-100 text-neutral-600 hover:bg-neutral-200"
+              }`}
+            >
+              {f.label}
+            </button>
+          ))}
+        </div>
+
+        <div className="space-y-3">
+          {tickets.length === 0 && <p className="py-8 text-center text-neutral-400">درخواستی یافت نشد.</p>}
+          {tickets.map((t) => (
+            <div key={t.id} className="rounded-2xl border border-neutral-200 p-4 dark:border-neutral-800">
+              <div className="flex flex-wrap items-start justify-between gap-2">
+                <div>
+                  <div className="font-bold text-neutral-800 dark:text-neutral-100">{t.subject}</div>
+                  <div className="text-xs text-neutral-500">
+                    {t.user?.name ?? t.name} — <span dir="ltr">{t.phone || t.email || t.user?.phone}</span> — {t.category}
+                  </div>
+                </div>
+                <div className="flex items-center gap-2">
+                  <span className={`rounded-full px-3 py-1 text-xs font-semibold ${
+                    t.status === "OPEN" ? "bg-amber-50 text-amber-700" : t.status === "IN_PROGRESS" ? "bg-sky-50 text-sky-700" : "bg-emerald-50 text-emerald-700"
+                  }`}>
+                    {t.status === "OPEN" ? "باز" : t.status === "IN_PROGRESS" ? "در بررسی" : "بسته"}
+                  </span>
+                  {t.status !== "IN_PROGRESS" && (
+                    <button onClick={() => update(t.id, { status: "IN_PROGRESS" })} className="rounded-lg bg-sky-50 px-3 py-1.5 text-xs font-bold text-sky-700 hover:bg-sky-100">
+                      در بررسی
+                    </button>
+                  )}
+                  {t.status !== "CLOSED" && (
+                    <button onClick={() => update(t.id, { status: "CLOSED" })} className="rounded-lg bg-emerald-50 px-3 py-1.5 text-xs font-bold text-emerald-700 hover:bg-emerald-100">
+                      بستن
+                    </button>
+                  )}
+                </div>
+              </div>
+              <p className="mt-2 whitespace-pre-wrap text-sm text-neutral-600 dark:text-neutral-300">{t.message}</p>
+              {t.adminReply && (
+                <div className="mt-2 rounded-xl bg-neutral-50 p-3 text-sm dark:bg-neutral-800">
+                  <span className="text-xs font-bold text-neutral-500">پاسخ فعلی: </span>
+                  <span className="whitespace-pre-wrap">{t.adminReply}</span>
+                </div>
+              )}
+              <div className="mt-3 flex flex-col gap-2 sm:flex-row">
+                <textarea
+                  className={`${input} min-h-[64px] flex-1`}
+                  placeholder="پاسخ به کاربر..."
+                  value={drafts[t.id] ?? ""}
+                  onChange={(e) => setDrafts((prev) => ({ ...prev, [t.id]: e.target.value }))}
+                />
+                <button
+                  onClick={async () => {
+                    const reply = (drafts[t.id] ?? "").trim();
+                    if (!reply) return setMsg({ ok: false, text: "متن پاسخ خالی است" });
+                    await update(t.id, { adminReply: reply, status: "CLOSED" });
+                    setDrafts((prev) => ({ ...prev, [t.id]: "" }));
+                  }}
+                  className="rounded-xl bg-pink-600 px-5 py-2 text-sm font-bold text-white hover:bg-pink-700"
+                >
+                  ارسال پاسخ
+                </button>
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+    );
+  }
+
+  function NotificationReport() {
+    const [data, setData] = useState<any>(null);
+    const [statusFilter, setStatusFilter] = useState("");
+    const [channelFilter, setChannelFilter] = useState("");
+    const [busy, setBusy] = useState(false);
+
+    const load = useCallback(async () => {
+      const params = new URLSearchParams();
+      if (statusFilter) params.set("status", statusFilter);
+      if (channelFilter) params.set("channel", channelFilter);
+      const r = await fetch(`/api/admin/notifications?${params}`);
+      const d = await r.json();
+      if (d.success) setData(d);
+      else setMsg({ ok: false, text: d.error || "خطا" });
+    }, [statusFilter, channelFilter]);
+
+    useEffect(() => {
+      load();
+    }, [load]);
+
+    async function retry(id?: string) {
+      setBusy(true);
+      const d = await api("/api/admin/notifications", "POST", id ? { id } : {});
+      if (d.success) {
+        setMsg({ ok: true, text: `${d.reset ?? 0} اعلان برای تلاش مجدد بازنشانی شد.` });
+        load();
+      }
+      setBusy(false);
+    }
+
+    if (!data) return <p className="py-6 text-center text-neutral-400">در حال بارگیری...</p>;
+    const s = data.summary;
+    const cards = [
+      { label: "در صف", value: s.PENDING ?? 0, icon: "⏳" },
+      { label: "ارسال‌شده", value: s.SENT ?? 0, icon: "✅" },
+      { label: "ناموفق", value: s.FAILED ?? 0, icon: "⚠️" },
+      { label: "حذف‌شده", value: s.DROPPED ?? 0, icon: "🗑" },
+      { label: "هزینه تخمینی (تومان)", value: (s.estimatedCost ?? 0).toLocaleString("fa-IR"), icon: "💸" },
+    ];
+
+    return (
+      <div>
+        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
+          {cards.map((c) => (
+            <div key={c.label} className="rounded-2xl border border-neutral-200 p-4 dark:border-neutral-800">
+              <div className="text-xl">{c.icon}</div>
+              <div className="mt-1 text-lg font-black text-neutral-900 dark:text-neutral-100">{c.value}</div>
+              <div className="text-xs text-neutral-500">{c.label}</div>
+            </div>
+          ))}
+        </div>
+
+        <div className="mt-4 flex flex-wrap items-center gap-2">
+          <select className={input} value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)} aria-label="وضعیت">
+            <option value="">همه وضعیت‌ها</option>
+            <option value="PENDING">در صف</option>
+            <option value="SENT">ارسال‌شده</option>
+            <option value="FAILED">ناموفق</option>
+            <option value="DROPPED">حذف‌شده</option>
+          </select>
+          <select className={input} value={channelFilter} onChange={(e) => setChannelFilter(e.target.value)} aria-label="کانال">
+            <option value="">همه کانال‌ها</option>
+            <option value="SMS">پیامک</option>
+            <option value="EMAIL">ایمیل</option>
+            <option value="IN_APP">درون‌برنامه‌ای</option>
+          </select>
+          <button onClick={() => retry()} disabled={busy} className="rounded-xl bg-neutral-900 px-4 py-2.5 text-sm font-bold text-white hover:bg-neutral-800 disabled:opacity-50">
+            {busy ? "در حال تلاش..." : "تلاش مجدد برای همه ناموفق‌ها"}
+          </button>
+        </div>
+
+        <div className="mt-4 space-y-2">
+          {data.notifications.length === 0 && <p className="py-8 text-center text-neutral-400">اعلانی یافت نشد.</p>}
+          {data.notifications.map((n: any) => (
+            <div key={n.id} className="flex flex-wrap items-center justify-between gap-2 rounded-2xl border border-neutral-200 px-4 py-3 dark:border-neutral-800">
+              <div className="min-w-0">
+                <div className="flex flex-wrap items-center gap-2">
+                  <span className="font-bold text-neutral-800 dark:text-neutral-100">{n.type}</span>
+                  <span className="rounded-full bg-neutral-100 px-2 py-0.5 text-[11px] font-bold text-neutral-600 dark:bg-neutral-800 dark:text-neutral-300">{n.channel}</span>
+                  <span className="rounded-full bg-neutral-100 px-2 py-0.5 text-[11px] font-bold text-neutral-600 dark:bg-neutral-800 dark:text-neutral-300">{n.status}</span>
+                  {n.attempts > 0 && <span className="text-[11px] text-neutral-400">تلاش: {n.attempts}</span>}
+                </div>
+                <div className="mt-1 text-xs text-neutral-500" dir="ltr">{n.recipient}</div>
+                {n.lastError && <div className="mt-1 text-xs text-red-500">{String(n.lastError).slice(0, 160)}</div>}
+                <div className="text-[11px] text-neutral-400">{new Date(n.createdAt).toLocaleString("fa-IR")}</div>
+              </div>
+              {(n.status === "FAILED" || n.status === "DROPPED") && (
+                <button onClick={() => retry(n.id)} disabled={busy} className="rounded-lg bg-amber-50 px-3 py-1.5 text-xs font-bold text-amber-700 hover:bg-amber-100 disabled:opacity-50">
+                  تلاش مجدد
+                </button>
+              )}
+            </div>
+          ))}
+        </div>
+      </div>
+    );
+  }
+
   const tabs = [
     { id: "metrics", label: "درآمد SaaS" },
+    { id: "support", label: "پشتیبانی" },
+    { id: "notifications", label: "گزارش پیامک" },
     { id: "charts", label: "نمودارها" },
     { id: "salons", label: "سالن‌ها" },
     { id: "reviews", label: "نظرات" },
@@ -498,6 +707,8 @@ export default function AdminExtras({ initialTab = "metrics" }: { initialTab?: s
 
       <div className="mt-6">
         {tab === "metrics" && <MetricsManager />}
+        {tab === "support" && <SupportManager />}
+        {tab === "notifications" && <NotificationReport />}
         {tab === "charts" && <AdminCharts />}
         {tab === "salons" && <SalonManagerList />}
         {tab === "reviews" && <ReviewManager />}

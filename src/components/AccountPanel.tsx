@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
+import RescheduleModal from "@/components/RescheduleModal";
 import { toJalali, toPersianDigits } from "@/lib/utils";
 
 type Appointment = {
@@ -12,9 +13,14 @@ type Appointment = {
   endAt: string;
   status: string;
   service?: string | null;
+  serviceId?: string | null;
+  salonId?: string | null;
   salonName?: string | null;
   salonSlug?: string | null;
+  salonTimezone?: string | null;
   employee?: string | null;
+  employeeId?: string | null;
+  branchId?: string | null;
 };
 
 type Favorite = { id: string; salon: { id: string; slug: string; name: string; city?: string | null; coverColor?: string | null } };
@@ -30,6 +36,34 @@ type Review = {
 };
 type SessionInfo = { id: string; device?: string | null; ip?: string | null; createdAt: string; expiresAt: string };
 type Me = { id: string; phone: string; name?: string | null; email?: string | null; avatarUrl?: string | null; role: string };
+type SupportTicket = {
+  id: string;
+  subject: string;
+  message: string;
+  category: string;
+  status: "OPEN" | "IN_PROGRESS" | "CLOSED";
+  adminReply?: string | null;
+  repliedAt?: string | null;
+  createdAt: string;
+};
+
+const ticketStatusLabel: Record<string, string> = {
+  OPEN: "باز",
+  IN_PROGRESS: "در حال بررسی",
+  CLOSED: "بسته‌شده",
+};
+const ticketStatusColor: Record<string, string> = {
+  OPEN: "bg-amber-50 text-amber-700",
+  IN_PROGRESS: "bg-sky-50 text-sky-700",
+  CLOSED: "bg-emerald-50 text-emerald-700",
+};
+const ticketCategories = [
+  { value: "GENERAL", label: "عمومی" },
+  { value: "BOOKING", label: "رزرو و نوبت" },
+  { value: "PAYMENT", label: "پرداخت و اشتراک" },
+  { value: "TECHNICAL", label: "مشکل فنی" },
+  { value: "COMPLAINT", label: "شکایت" },
+];
 
 const statusLabel: Record<string, string> = {
   REQUESTED: "در انتظار تأیید",
@@ -51,6 +85,7 @@ const tabs = [
   { id: "favorites", label: "علاقه‌مندی‌ها", icon: "❤️" },
   { id: "reviews", label: "نظرات من", icon: "⭐" },
   { id: "profile", label: "پروفایل", icon: "👤" },
+  { id: "support", label: "پشتیبانی", icon: "🎫" },
   { id: "security", label: "امنیت و نشست‌ها", icon: "🔐" },
 ] as const;
 
@@ -63,23 +98,33 @@ export default function AccountPanel({ initialMe }: { initialMe: Me }) {
   const [favorites, setFavorites] = useState<Favorite[]>([]);
   const [reviews, setReviews] = useState<Review[]>([]);
   const [sessions, setSessions] = useState<SessionInfo[]>([]);
+  const [tickets, setTickets] = useState<SupportTicket[]>([]);
+  const [rescheduleTarget, setRescheduleTarget] = useState<Appointment | null>(null);
   const [loading, setLoading] = useState(true);
   const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null);
 
   async function loadAll() {
     setLoading(true);
     try {
-      const [aRes, fRes, rRes, sRes] = await Promise.all([
+      const [aRes, fRes, rRes, sRes, tRes] = await Promise.all([
         fetch("/api/appointments"),
         fetch("/api/favorites"),
         fetch("/api/account/reviews"),
         fetch("/api/auth/sessions"),
+        fetch("/api/support"),
       ]);
-      const [a, f, r, s] = await Promise.all([aRes.json(), fRes.json(), rRes.json(), sRes.json()]);
+      const [a, f, r, s, t] = await Promise.all([
+        aRes.json(),
+        fRes.json(),
+        rRes.json(),
+        sRes.json(),
+        tRes.json(),
+      ]);
       if (a.success) setAppointments(a.appointments);
       if (f.success) setFavorites(f.favorites);
       if (r.success) setReviews(r.reviews);
       if (s.success) setSessions(s.sessions);
+      if (t.success) setTickets(t.tickets);
     } catch {
       setMsg({ ok: false, text: "خطا در بارگیری اطلاعات. اتصال اینترنت را بررسی کنید." });
     } finally {
@@ -120,22 +165,23 @@ export default function AccountPanel({ initialMe }: { initialMe: Me }) {
     if (data.success) loadAll();
   }
 
-  async function rescheduleAppointment(id: string) {
-    const raw = window.prompt("زمان جدید (مثال: 2026-10-25T16:00)");
-    if (!raw) return;
-    const when = new Date(raw);
-    if (Number.isNaN(when.getTime())) {
-      setMsg({ ok: false, text: "زمان واردشده معتبر نیست." });
-      return;
-    }
-    const res = await fetch(`/api/appointments/${id}/reschedule`, {
+  function rescheduleAppointment(appointment: Appointment) {
+    setRescheduleTarget(appointment);
+  }
+
+  async function submitTicket(input: { subject: string; category: string; message: string }) {
+    const res = await fetch("/api/support", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ startAt: when.toISOString() }),
+      body: JSON.stringify(input),
     });
     const data = await res.json();
-    setMsg({ ok: !!data.success, text: data.success ? "زمان نوبت تغییر کرد." : data.error || "خطا" });
+    setMsg({
+      ok: !!data.success,
+      text: data.success ? "درخواست شما ثبت شد. تیم پشتیبانی به‌زودی پاسخ می‌دهد." : data.error || "خطا",
+    });
     if (data.success) loadAll();
+    return !!data.success;
   }
 
   async function submitReview(appointment: Appointment, rating: number, comment: string) {
@@ -316,6 +362,8 @@ export default function AccountPanel({ initialMe }: { initialMe: Me }) {
 
           {tab === "profile" && <ProfileForm me={me} onSave={saveProfile} />}
 
+          {tab === "support" && <SupportView tickets={tickets} onSubmit={submitTicket} />}
+
           {tab === "security" && (
             <div>
               <h3 className="mb-2 text-lg font-black text-neutral-900">نشست‌های فعال</h3>
@@ -341,6 +389,123 @@ export default function AccountPanel({ initialMe }: { initialMe: Me }) {
           )}
         </div>
       )}
+
+      {rescheduleTarget && (
+        <RescheduleModal
+          appointmentId={rescheduleTarget.id}
+          salonSlug={rescheduleTarget.salonSlug}
+          serviceId={rescheduleTarget.serviceId}
+          employeeId={rescheduleTarget.employeeId}
+          branchId={rescheduleTarget.branchId}
+          timezone={rescheduleTarget.salonTimezone}
+          onClose={() => setRescheduleTarget(null)}
+          onDone={(text) => {
+            setRescheduleTarget(null);
+            setMsg({ ok: true, text });
+            loadAll();
+          }}
+        />
+      )}
+    </div>
+  );
+}
+
+function SupportView({
+  tickets,
+  onSubmit,
+}: {
+  tickets: SupportTicket[];
+  onSubmit: (input: { subject: string; category: string; message: string }) => Promise<boolean>;
+}) {
+  const [subject, setSubject] = useState("");
+  const [category, setCategory] = useState("GENERAL");
+  const [message, setMessage] = useState("");
+  const [sending, setSending] = useState(false);
+
+  const input = "w-full rounded-xl border border-neutral-200 px-3 py-2.5 text-sm outline-none focus:border-pink-400 dark:border-neutral-700 dark:bg-neutral-800";
+
+  async function send() {
+    if (subject.trim().length < 3 || message.trim().length < 10) return;
+    setSending(true);
+    const ok = await onSubmit({ subject: subject.trim(), category, message: message.trim() });
+    if (ok) {
+      setSubject("");
+      setMessage("");
+      setCategory("GENERAL");
+    }
+    setSending(false);
+  }
+
+  return (
+    <div className="space-y-6">
+      <div className="rounded-2xl border border-neutral-200 bg-white p-5 dark:border-neutral-800 dark:bg-neutral-900">
+        <h3 className="text-lg font-black text-neutral-900 dark:text-neutral-100">ثبت درخواست پشتیبانی</h3>
+        <p className="mt-1 text-sm text-neutral-500">سوال، مشکل یا شکایت خود را ثبت کنید؛ پاسخ در همین صفحه نمایش داده می‌شود.</p>
+        <div className="mt-4 grid gap-3 sm:grid-cols-[1fr_180px]">
+          <input
+            className={input}
+            placeholder="موضوع (مثلاً مشکل در لغو نوبت)"
+            value={subject}
+            onChange={(e) => setSubject(e.target.value)}
+            maxLength={120}
+            aria-label="موضوع"
+          />
+          <select className={input} value={category} onChange={(e) => setCategory(e.target.value)} aria-label="دسته‌بندی">
+            {ticketCategories.map((c) => (
+              <option key={c.value} value={c.value}>{c.label}</option>
+            ))}
+          </select>
+        </div>
+        <textarea
+          className={`${input} mt-3 min-h-[110px]`}
+          placeholder="توضیحات کامل (حداقل ۱۰ حرف)"
+          value={message}
+          onChange={(e) => setMessage(e.target.value)}
+          maxLength={2000}
+          aria-label="توضیحات"
+        />
+        <div className="mt-3 flex justify-end">
+          <button
+            onClick={send}
+            disabled={sending || subject.trim().length < 3 || message.trim().length < 10}
+            className="rounded-xl bg-pink-600 px-5 py-2.5 text-sm font-bold text-white hover:bg-pink-700 disabled:opacity-50"
+          >
+            {sending ? "در حال ارسال..." : "ارسال درخواست"}
+          </button>
+        </div>
+      </div>
+
+      <div>
+        <h3 className="mb-3 text-lg font-black text-neutral-900 dark:text-neutral-100">درخواست‌های من</h3>
+        {tickets.length === 0 ? (
+          <p className="rounded-2xl border border-dashed border-neutral-200 p-8 text-center text-sm text-neutral-400 dark:border-neutral-800">
+            هنوز درخواستی ثبت نکرده‌اید.
+          </p>
+        ) : (
+          <div className="space-y-3">
+            {tickets.map((t) => (
+              <div key={t.id} className="rounded-2xl border border-neutral-200 bg-white p-4 dark:border-neutral-800 dark:bg-neutral-900">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <div className="font-bold text-neutral-800 dark:text-neutral-100">{t.subject}</div>
+                  <span className={`rounded-full px-3 py-1 text-xs font-semibold ${ticketStatusColor[t.status] ?? "bg-neutral-100 text-neutral-500"}`}>
+                    {ticketStatusLabel[t.status] ?? t.status}
+                  </span>
+                </div>
+                <div className="mt-1 text-xs text-neutral-400">
+                  {ticketCategories.find((c) => c.value === t.category)?.label ?? t.category} — {toJalali(t.createdAt)}
+                </div>
+                <p className="mt-2 whitespace-pre-wrap text-sm text-neutral-600 dark:text-neutral-300">{t.message}</p>
+                {t.adminReply && (
+                  <div className="mt-3 rounded-xl bg-emerald-50 p-3 dark:bg-emerald-950/30">
+                    <div className="text-xs font-bold text-emerald-700 dark:text-emerald-300">پاسخ پشتیبانی</div>
+                    <p className="mt-1 whitespace-pre-wrap text-sm text-emerald-800 dark:text-emerald-200">{t.adminReply}</p>
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
     </div>
   );
 }
@@ -356,7 +521,7 @@ function AppointmentList({
   empty: string;
   items: Appointment[];
   onCancel: (id: string) => void;
-  onReschedule: (id: string) => void;
+  onReschedule: (appointment: Appointment) => void;
 }) {
   return (
     <div>
@@ -380,7 +545,7 @@ function AppointmentList({
                 </span>
               </div>
               <div className="mt-3 flex flex-wrap gap-2">
-                <button onClick={() => onReschedule(a.id)} className="rounded-lg bg-amber-500 px-3 py-1.5 text-xs font-bold text-white hover:bg-amber-600">
+                <button onClick={() => onReschedule(a)} className="rounded-lg bg-amber-500 px-3 py-1.5 text-xs font-bold text-white hover:bg-amber-600">
                   تغییر زمان
                 </button>
                 <button onClick={() => onCancel(a.id)} className="rounded-lg bg-neutral-200 px-3 py-1.5 text-xs font-bold text-neutral-700 hover:bg-neutral-300">

@@ -1,6 +1,6 @@
 import { prisma } from "@/lib/prisma";
 import { localMidnightUTC, localParts } from "@/lib/timezone";
-import { serviceDuration } from "@/lib/bookings/service";
+import { combinedBooking, effectiveBuffer } from "@/lib/bookings/service";
 import type { Salon, Service } from "@prisma/client";
 
 export type Slot = { startAt: Date; endAt: Date };
@@ -169,28 +169,32 @@ export async function assertBookableWindow(params: {
 }
 
 /**
- * محاسبه بازه‌های واقعاً آزاد برای یک خدمت در یک روز.
- * - مدت‌ زمان + بافر سالن
+ * محاسبه بازه‌های واقعاً آزاد برای یک یا چند خدمت در یک روز.
+ * - مجموع مدت خدمات + بافر مؤثر
  * - محدود به پنجره کاری (سالن + آرایشگر)
  * - حذف تداخل با نوبت‌ها و بازه‌های مسدود
  * - رعایت حداقل فاصله تا رزرو و حداکثر بازه آینده
  */
 export async function computeFreeSlots(params: {
   salon: Salon;
-  service: Service;
+  services: Service[];
   employeeId?: string;
   branchId?: string;
   dayISO: string;
   now?: Date;
 }): Promise<Slot[]> {
   const now = params.now ?? new Date();
-  const { salon, service } = params;
-  const duration = serviceDuration(service);
-  const buffer = service.bufferMin && service.bufferMin > 0 ? service.bufferMin : salon.bufferMinutes;
+  const { salon, services } = params;
+  if (services.length === 0) return [];
+  const duration = combinedBooking(services).durationMin;
+  const buffer = effectiveBuffer(services, salon.bufferMinutes);
 
   const win = params.employeeId
     ? await getStaffWindow(salon.id, params.employeeId, params.dayISO, params.branchId)
     : await getSalonWindow(salon.id, params.dayISO, params.branchId);
+
+  // سالن/آرایشگر در این روز تعطیل است
+  if (win.close <= win.open) return [];
 
   const tz = salon.timezone || "Asia/Tehran";
   const rawOccupied = await getOccupiedIntervals(salon.id, params.dayISO, params.employeeId, params.branchId, tz, now);

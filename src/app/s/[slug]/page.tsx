@@ -26,7 +26,19 @@ export default async function SalonPage({ params }: { params: Promise<{ slug: st
       services: { where: { isActive: true } },
       galleryItems: { orderBy: { sortOrder: "asc" } },
       openingHours: true,
-      staff: { where: { isActive: true }, select: { id: true, name: true, title: true, bio: true, avatarUrl: true, specialties: true, branchId: true } },
+      staff: {
+        where: { isActive: true },
+        select: {
+          id: true,
+          name: true,
+          title: true,
+          bio: true,
+          avatarUrl: true,
+          specialties: true,
+          branchId: true,
+          services: { select: { id: true } },
+        },
+      },
       branches: { where: { isActive: true }, select: { id: true, name: true, city: true, address: true } },
     },
   });
@@ -121,7 +133,7 @@ export default async function SalonPage({ params }: { params: Promise<{ slug: st
 
           <section>
             <div className="flex items-center gap-3">
-              <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-pink-50 text-xl">💇‍♀️</span>
+              <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-pink-50 text-xl">✂️</span>
               <h2 className="text-xl font-extrabold text-neutral-900">خدمات</h2>
             </div>
             <div className="mt-4 grid gap-4 sm:grid-cols-2">
@@ -157,7 +169,7 @@ export default async function SalonPage({ params }: { params: Promise<{ slug: st
                         // eslint-disable-next-line @next/next/no-img-element
                         <img src={st.avatarUrl} alt={st.name} className="h-full w-full rounded-full object-cover" />
                       ) : (
-                        "💇‍♀️"
+                        "✂️"
                       )}
                     </div>
                     <div>
@@ -262,6 +274,8 @@ export default async function SalonPage({ params }: { params: Promise<{ slug: st
           <SalonBooking
             salonId={salon.id}
             slug={salon.slug}
+            timezone={salon.timezone}
+            maxAdvanceDays={salon.maxAdvanceDays}
             services={salon.services}
             staff={salon.staff}
             branches={salon.branches}

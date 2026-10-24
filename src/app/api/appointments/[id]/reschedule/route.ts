@@ -2,7 +2,7 @@ import { z } from "zod";
 import { prisma } from "@/lib/prisma";
 import { requireAuth } from "@/lib/auth/guards";
 import { rescheduleAppointmentSafe } from "@/lib/bookings/reschedule";
-import { enqueueSms } from "@/lib/notifications/queue";
+import { enqueueInApp, enqueueSms } from "@/lib/notifications/queue";
 import { json, apiError } from "@/lib/utils";
 
 const schema = z.object({ startAt: z.string().datetime() });
@@ -33,12 +33,21 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
       enforceCancelDeadline: !isStaff,
     });
 
+    const newTime = new Intl.DateTimeFormat("fa-IR", { timeStyle: "short" }).format(updated.startAt);
     await enqueueSms({
       type: "APPOINTMENT_CHANGED",
       recipient: appointment.customerPhone,
-      message: `نوبت شما در «${appointment.salon.name}» به ساعت ${new Intl.DateTimeFormat("fa-IR", { timeStyle: "short" }).format(updated.startAt)} تغییر کرد.`,
-      uniqueKey: `changed:${id}`,
+      message: `نوبت شما در «${appointment.salon.name}» به ساعت ${newTime} تغییر کرد.`,
+      uniqueKey: `changed:${id}:${updated.startAt.getTime()}`,
     });
+    if (appointment.customerId) {
+      await enqueueInApp({
+        type: "APPOINTMENT_CHANGED",
+        userId: appointment.customerId,
+        message: `زمان نوبت شما در «${appointment.salon.name}» به ${newTime} تغییر کرد.`,
+        uniqueKey: `inapp-changed:${id}:${updated.startAt.getTime()}`,
+      }).catch(() => {});
+    }
 
     return json({ success: true, appointment: updated });
   } catch (err) {

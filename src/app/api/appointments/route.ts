@@ -3,8 +3,8 @@ import { prisma } from "@/lib/prisma";
 import { requireAuth } from "@/lib/auth/guards";
 import { json, apiError } from "@/lib/utils";
 import { createAppointmentSafe } from "@/lib/bookings/create";
-import { serviceDuration } from "@/lib/bookings/service";
-import { enqueueSms, processPendingNotifications } from "@/lib/notifications/queue";
+import { combinedBooking } from "@/lib/bookings/service";
+import { enqueueInApp, enqueueSms, processPendingNotifications } from "@/lib/notifications/queue";
 import { renderSmsTemplate } from "@/lib/notifications/templates";
 
 /** فهرست نوبت‌های سالنِ آرایشگر (یا همه برای ادمین) */
@@ -40,9 +40,9 @@ export async function GET(req: Request) {
     const appointments = await prisma.appointment.findMany({
       where,
       include: {
-        service: { select: { name: true, price: true } },
-        salon: { select: { name: true, slug: true } },
-        employee: { select: { name: true } },
+        service: { select: { id: true, name: true, price: true } },
+        salon: { select: { id: true, name: true, slug: true, timezone: true } },
+        employee: { select: { id: true, name: true } },
       },
       orderBy: { startAt: "asc" },
       take: from || to ? 2000 : 200,
@@ -59,10 +59,15 @@ export async function GET(req: Request) {
         status: a.status,
         channel: a.channel,
         service: a.service?.name,
+        serviceId: a.service?.id,
         servicePrice: a.service?.price,
+        salonId: a.salon?.id,
         salonName: a.salon?.name,
         salonSlug: a.salon?.slug,
+        salonTimezone: a.salon?.timezone,
         employee: a.employee?.name,
+        employeeId: a.employee?.id,
+        branchId: a.branchId,
         note: a.note,
         depositAmount: a.depositAmount,
         depositPaid: a.depositPaid,
@@ -95,24 +100,38 @@ export async function POST(req: Request) {
     const salon = await prisma.salon.findUnique({ where: { id: body.salonId } });
     if (!salon) return json({ success: false, error: "سالن یافت نشد" }, { status: 404 });
 
-    // رزرو چند خدمت: مجموع زمان خدمت‌ها
-    let primaryServiceId = body.serviceId;
+    // خدمات انتخاب‌شده (تک‌خدمتی یا چندخدمتی) — همیشه از دیتابیس خوانده می‌شوند
+    const requestedIds = Array.from(
+      new Set(
+        body.serviceIds && body.serviceIds.length > 0
+          ? body.serviceIds
+          : body.serviceId
+            ? [body.serviceId]
+            : []
+      )
+    );
+    const selectedServices = requestedIds.length
+      ? await prisma.service.findMany({
+          where: { id: { in: requestedIds }, salonId: salon.id, isActive: true },
+        })
+      : [];
+    if (selectedServices.length !== requestedIds.length) {
+      return json({ success: false, error: "یکی از خدمت‌ها یافت نشد یا غیرفعال است" }, { status: 404 });
+    }
+
+    let primaryServiceId = selectedServices[0]?.id;
     let duration = body.durationMin ?? 60;
+    let buffer: number | undefined;
     let combinedNote = body.note;
-    if (body.serviceIds && body.serviceIds.length > 0) {
-      const services = await prisma.service.findMany({ where: { id: { in: body.serviceIds }, salonId: salon.id } });
-      if (services.length !== body.serviceIds.length) {
-        return json({ success: false, error: "یکی از خدمت‌ها یافت نشد" }, { status: 400 });
+    if (selectedServices.length > 0) {
+      const totals = combinedBooking(selectedServices);
+      duration = totals.durationMin;
+      buffer = totals.bufferMin > 0 ? totals.bufferMin : salon.bufferMinutes;
+      if (selectedServices.length > 1) {
+        combinedNote = [body.note, selectedServices.map((s) => s.name).join("، ")]
+          .filter(Boolean)
+          .join(" — ");
       }
-      duration = services.reduce((sum, s) => sum + serviceDuration(s), 0);
-      primaryServiceId = services[0].id;
-      combinedNote = [body.note, services.map((s) => s.name).join("، ")].filter(Boolean).join(" — ");
-    } else if (body.serviceId) {
-      // مدت‌زمان همیشه از خود خدمت خوانده می‌شود، نه از ورودی کلاینت
-      const service = await prisma.service.findFirst({ where: { id: body.serviceId, salonId: salon.id, isActive: true } });
-      if (!service) return json({ success: false, error: "خدمت یافت نشد" }, { status: 404 });
-      duration = service.durationMin;
-      primaryServiceId = service.id;
     } else {
       // نوبت بدون خدمت (مثلاً مراجعه سرخود): مدت باید منطقی باشد
       const raw = body.durationMin ?? 60;
@@ -124,9 +143,20 @@ export async function POST(req: Request) {
 
     // اعتبارسنجی تعلق کارمند و شعبه به همین سالن (جلوگیری از ثبت متقاطع)
     if (body.employeeId) {
-      const staff = await prisma.staff.findUnique({ where: { id: body.employeeId }, select: { salonId: true } });
-      if (!staff || staff.salonId !== salon.id) {
+      const staff = await prisma.staff.findUnique({
+        where: { id: body.employeeId },
+        select: { salonId: true, isActive: true, services: { select: { id: true } } },
+      });
+      if (!staff || staff.salonId !== salon.id || !staff.isActive) {
         return json({ success: false, error: "آرایشگر یافت نشد" }, { status: 400 });
+      }
+      // اگر برای آرایشگر خدمات مشخصی تعریف شده، فقط همان‌ها قابل ارائه‌اند
+      const offered = staff.services.map((s) => s.id);
+      if (offered.length > 0 && requestedIds.some((id) => !offered.includes(id))) {
+        return json(
+          { success: false, error: "این آرایشگر همه خدمات انتخاب‌شده را ارائه نمی‌دهد" },
+          { status: 400 }
+        );
       }
     }
     if (body.branchId) {
@@ -148,6 +178,7 @@ export async function POST(req: Request) {
       customerPhone: body.customerPhone,
       startAt: new Date(body.startAt),
       durationMin: duration,
+      bufferMin: buffer,
       channel: body.channel,
       voiceCallId: body.voiceCallId,
       note: combinedNote,
@@ -169,6 +200,16 @@ export async function POST(req: Request) {
       message: confirmMsg,
       uniqueKey: `confirm:${appointment.id}`,
     });
+    if (user?.id) {
+      await enqueueInApp({
+        type: "APPOINTMENT_CONFIRM",
+        userId: user.id,
+        message: `نوبت شما در «${salon.name}» برای ${appointment.startAt.toLocaleDateString("fa-IR", {
+          timeZone: salon.timezone,
+        })} ساعت ${time} ثبت شد.`,
+        uniqueKey: `inapp-confirm:${appointment.id}`,
+      }).catch(() => {});
+    }
     await processPendingNotifications(5).catch(() => {});
 
     return json({ success: true, appointment }, { status: 201 });

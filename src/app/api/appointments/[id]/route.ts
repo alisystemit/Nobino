@@ -2,7 +2,7 @@ import { z } from "zod";
 import { prisma } from "@/lib/prisma";
 import { requireRole } from "@/lib/auth/guards";
 import { dispatchWebhook } from "@/lib/webhooks";
-import { enqueueSms } from "@/lib/notifications/queue";
+import { enqueueInApp, enqueueSms } from "@/lib/notifications/queue";
 import { credit } from "@/lib/financial/wallet";
 import { syncCustomerProfile } from "@/lib/crm";
 import { json, apiError } from "@/lib/utils";
@@ -72,6 +72,24 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
             description: `کمیسیون ${employee.commissionPercent}٪ از «${service.name}»`,
           }).catch(() => {});
         }
+      }
+    }
+
+    // اعلان داخل برنامه برای مشتری (بدون پیامک تکراری)
+    if (prev.customerId) {
+      const statusText: Record<string, string> = {
+        CONFIRMED: "تأیید شد",
+        COMPLETED: "انجام شد",
+        CANCELLED: "لغو شد",
+        NO_SHOW: "به‌عنوان عدم حضور ثبت شد",
+      };
+      if (statusText[body.status]) {
+        await enqueueInApp({
+          type: "APPOINTMENT_STATUS",
+          userId: prev.customerId,
+          message: `وضعیت نوبت شما در «${prev.salon.name}» ${statusText[body.status]}.`,
+          uniqueKey: `inapp-status:${id}:${body.status}`,
+        }).catch(() => {});
       }
     }
 

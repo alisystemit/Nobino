@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { toPersianDigits, toJalali } from "@/lib/utils";
 import DashboardShell from "@/components/DashboardShell";
+import RescheduleModal from "@/components/RescheduleModal";
 
 type Appointment = {
   id: string;
@@ -12,8 +13,14 @@ type Appointment = {
   status: string;
   channel: string;
   service?: string;
+  serviceId?: string | null;
+  salonId?: string;
   salonName?: string;
   salonSlug?: string;
+  salonTimezone?: string;
+  employee?: string;
+  employeeId?: string | null;
+  branchId?: string | null;
 };
 
 const statusLabel: Record<string, string> = {
@@ -36,6 +43,8 @@ export default function AppointmentsPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [role, setRole] = useState("");
+  const [rescheduleTarget, setRescheduleTarget] = useState<Appointment | null>(null);
+  const [notice, setNotice] = useState("");
 
   async function load() {
     try {
@@ -104,17 +113,8 @@ export default function AppointmentsPage() {
     else setError(data.error || "خطا");
   }
 
-  async function rescheduleMine(id: string) {
-    const raw = prompt("زمان جدید را وارد کنید (مثال: 2026-10-25T16:00)"); 
-    if (!raw) return;
-    const res = await fetch(`/api/appointments/${id}/reschedule`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ startAt: new Date(raw).toISOString() }),
-    });
-    const data = await res.json();
-    if (data.success) load();
-    else setError(data.error || "خطا");
+  function reschedule(a: Appointment) {
+    setRescheduleTarget(a);
   }
 
   if (loading) return <DashboardShell role={role} title="نوبت‌ها"><p className="py-10 text-center text-neutral-400">در حال بارگیری...</p></DashboardShell>;
@@ -161,8 +161,8 @@ export default function AppointmentsPage() {
                   {role === "CUSTOMER" ? (
                     a.salonSlug ? (
                       <div className="flex flex-col gap-1.5">
-                        {a.status === "REQUESTED" && (
-                          <button onClick={() => rescheduleMine(a.id)} className="rounded-lg bg-amber-500 px-3 py-1.5 text-xs font-bold text-white hover:bg-amber-600">
+                        {(a.status === "REQUESTED" || a.status === "CONFIRMED") && (
+                          <button onClick={() => reschedule(a)} className="rounded-lg bg-amber-500 px-3 py-1.5 text-xs font-bold text-white hover:bg-amber-600">
                             تغییر زمان
                           </button>
                         )}
@@ -190,6 +190,12 @@ export default function AppointmentsPage() {
                       )}
                       {(a.status === "REQUESTED" || a.status === "CONFIRMED") && (
                         <>
+                          <button
+                            onClick={() => reschedule(a)}
+                            className="rounded-lg bg-amber-500 px-3 py-1.5 text-xs font-bold text-white hover:bg-amber-600"
+                          >
+                            جابه‌جایی
+                          </button>
                           <button
                             onClick={() => updateStatus(a.id, "COMPLETED")}
                             className="rounded-lg bg-sky-600 px-3 py-1.5 text-xs font-bold text-white hover:bg-sky-700"

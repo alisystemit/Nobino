@@ -1,9 +1,11 @@
 import { redirect } from "next/navigation";
-import { requireRole } from "@/lib/auth/guards";
+import { getCurrentUser } from "@/lib/auth/guards";
 
 export const instant = false;
 
 export default async function OldAdminRedirect() {
-  await requireRole(["ADMIN"]);
+  const user = await getCurrentUser();
+  if (!user) redirect("/login");
+  if (user.role !== "ADMIN") redirect("/dashboard");
   redirect("/admin");
 }

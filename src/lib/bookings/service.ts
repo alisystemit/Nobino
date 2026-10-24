@@ -19,3 +19,34 @@ export function serviceDuration(service: Pick<Service, "durationMin" | "steps">)
 export function servicesTotalDuration(services: Pick<Service, "durationMin" | "steps">[]): number {
   return services.reduce((sum, svc) => sum + serviceDuration(svc), 0);
 }
+
+export type BookableService = Pick<Service, "durationMin" | "steps"> &
+  Partial<Pick<Service, "bufferMin" | "price">>;
+
+/**
+ * بافر مؤثر برای یک یا چند خدمت:
+ * اگر یکی از خدمت‌ها بافر اختصاصی داشته باشد، بزرگ‌ترین بافر ملاک است؛
+ * وگرنه بافر پیش‌فرض سالن استفاده می‌شود.
+ */
+export function effectiveBuffer(
+  services: Pick<Service, "bufferMin">[],
+  salonBufferMinutes: number
+): number {
+  const specific = services.reduce((max, s) => Math.max(max, Number(s.bufferMin) || 0), 0);
+  return specific > 0 ? specific : salonBufferMinutes;
+}
+
+/**
+ * اطلاعات ترکیبی یک رزرو چندخدمتی:
+ * مجموع مدت، مجموع قیمت و بزرگ‌ترین بافر اختصاصی خدمات.
+ */
+export function combinedBooking(services: BookableService[]): {
+  durationMin: number;
+  price: number;
+  bufferMin: number;
+} {
+  const durationMin = servicesTotalDuration(services);
+  const price = services.reduce((sum, s) => sum + (Number(s.price) || 0), 0);
+  const bufferMin = services.reduce((max, s) => Math.max(max, Number(s.bufferMin) || 0), 0);
+  return { durationMin, price, bufferMin };
+}

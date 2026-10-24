@@ -29,6 +29,8 @@ export async function createAppointmentSafe(input: {
   customerPhone: string;
   startAt: Date;
   durationMin: number;
+  /** بافر محاسبه‌شده برای رزرو چندخدمتی؛ اگر ارسال نشود از خدمت/سالن خوانده می‌شود. */
+  bufferMin?: number;
   channel: CreationChannel;
   note?: string;
   customerId?: string;
@@ -46,7 +48,12 @@ export async function createAppointmentSafe(input: {
 
     const start = new Date(input.startAt);
     const duration = input.durationMin ?? (service ? serviceDuration(service) : 60);
-    const buffer = service?.bufferMin && service.bufferMin > 0 ? service.bufferMin : salon.bufferMinutes;
+    const buffer =
+      input.bufferMin !== undefined && input.bufferMin >= 0
+        ? input.bufferMin
+        : service?.bufferMin && service.bufferMin > 0
+          ? service.bufferMin
+          : salon.bufferMinutes;
     const end = new Date(start.getTime() + duration * 60 * 1000);
     const serviceEnd = new Date(end.getTime() + buffer * 60 * 1000);
     const now = new Date();

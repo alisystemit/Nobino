@@ -1,0 +1,298 @@
+﻿
+> nobino@0.1.0 build
+> next build
+
+Γû▓ Next.js 16.4.2 (Turbopack)
+- Environments: .env
+Γ£ô Running next.config.ts took 64ms
+- Cache Components enabled
+- Partial Prefetching enabled
+
+  Creating an optimized production build ...
+Γ£ô Compiled successfully in 11.0s
+  Running TypeScript ...
+  Finished TypeScript in 11.9s ...
+  Collecting page data using 3 workers ...
+  Generating static pages using 3 workers (0/70) ...
+npm.cmd : [error] Error: During prerendering, `cookies()` rejects when the prerender is complete. Typically these 
+errors are handled by React but if you move `cookies()` to a different context by using `setTimeout`, `after`, or 
+similar functions you may observe this error and you should handle it in that context. This occurred at route 
+"/api/commission".
+At line:1 char:1
++ npm.cmd run build 2>&1 | Out-File -Encoding utf8 build.log; Get-Conte ...
++ ~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: ([error] Error: ...pi/commission".:String) [], RemoteException
+    + FullyQualifiedErrorId : NativeCommandError
+ 
+    at ew (src\lib\auth\guards.ts:12:23)
+    at eS (src\lib\auth\guards.ts:43:22)
+    at ev (src\lib\auth\guards.ts:50:22)
+    at n (src\app\api\commission\route.ts:7:24)
+  10 |  */
+  11 | export async function getCurrentUser() {
+> 12 |   const store = await cookies();
+     |                       ^
+  13 |   const token = store.get(AUTH_COOKIE)?.value;
+  14 |   if (!token) return null;
+  15 | {
+  route: '/api/commission',
+  expression: '`cookies()`',
+  digest: 'HANGING_PROMISE_REJECTION'
+} { status: 500 }
+  Generating static pages using 3 workers (17/70) 
+[error] Error: During prerendering, `cookies()` rejects when the prerender is complete. Typically these errors are 
+handled by React but if you move `cookies()` to a different context by using `setTimeout`, `after`, or similar 
+functions you may observe this error and you should handle it in that context. This occurred at route 
+"/api/dashboard/stats".
+    at ew (src\lib\auth\guards.ts:12:23)
+    at eS (src\lib\auth\guards.ts:43:22)
+    at i (src\app\api\dashboard\stats\route.ts:8:24)
+  10 |  */
+  11 | export async function getCurrentUser() {
+> 12 |   const store = await cookies();
+     |                       ^
+  13 |   const token = store.get(AUTH_COOKIE)?.value;
+  14 |   if (!token) return null;
+  15 | {
+  route: '/api/dashboard/stats',
+  expression: '`cookies()`',
+  digest: 'HANGING_PROMISE_REJECTION'
+} { status: 500 }
+[error] Error: During prerendering, `cookies()` rejects when the prerender is complete. Typically these errors are 
+handled by React but if you move `cookies()` to a different context by using `setTimeout`, `after`, or similar 
+functions you may observe this error and you should handle it in that context. This occurred at route "/api/favorites".
+    at ew (src\lib\auth\guards.ts:12:23)
+    at eS (src\lib\auth\guards.ts:43:22)
+    at n (src\app\api\favorites\route.ts:7:24)
+  10 |  */
+  11 | export async function getCurrentUser() {
+> 12 |   const store = await cookies();
+     |                       ^
+  13 |   const token = store.get(AUTH_COOKIE)?.value;
+  14 |   if (!token) return null;
+  15 | {
+  route: '/api/favorites',
+  expression: '`cookies()`',
+  digest: 'HANGING_PROMISE_REJECTION'
+} { status: 500 }
+[error] Error: During prerendering, `cookies()` rejects when the prerender is complete. Typically these errors are 
+handled by React but if you move `cookies()` to a different context by using `setTimeout`, `after`, or similar 
+functions you may observe this error and you should handle it in that context. This occurred at route 
+"/api/account/reviews".
+    at ew (src\lib\auth\guards.ts:12:23)
+    at eS (src\lib\auth\guards.ts:43:22)
+    at n (src\app\api\account\reviews\route.ts:8:24)
+  10 |  */
+  11 | export async function getCurrentUser() {
+> 12 |   const store = await cookies();
+     |                       ^
+  13 |   const token = store.get(AUTH_COOKIE)?.value;
+  14 |   if (!token) return null;
+  15 | {
+  route: '/api/account/reviews',
+  expression: '`cookies()`',
+  digest: 'HANGING_PROMISE_REJECTION'
+} { status: 500 }
+[error] Error: During prerendering, `cookies()` rejects when the prerender is complete. Typically these errors are 
+handled by React but if you move `cookies()` to a different context by using `setTimeout`, `after`, or similar 
+functions you may observe this error and you should handle it in that context. This occurred at route 
+"/api/admin/audit".
+    at ew (src\lib\auth\guards.ts:12:23)
+    at eS (src\lib\auth\guards.ts:43:22)
+    at ev (src\lib\auth\guards.ts:50:22)
+    at i (src\app\api\admin\audit\route.ts:8:11)
+  10 |  */
+  11 | export async function getCurrentUser() {
+> 12 |   const store = await cookies();
+     |                       ^
+  13 |   const token = store.get(AUTH_COOKIE)?.value;
+  14 |   if (!token) return null;
+  15 | {
+  route: '/api/admin/audit',
+  expression: '`cookies()`',
+  digest: 'HANGING_PROMISE_REJECTION'
+} { status: 500 }
+[error] Error: During prerendering, `cookies()` rejects when the prerender is complete. Typically these errors are 
+handled by React but if you move `cookies()` to a different context by using `setTimeout`, `after`, or similar 
+functions you may observe this error and you should handle it in that context. This occurred at route 
+"/api/admin/charts".
+    at ew (src\lib\auth\guards.ts:12:23)
+    at eS (src\lib\auth\guards.ts:43:22)
+    at ev (src\lib\auth\guards.ts:50:22)
+    at n (src\app\api\admin\charts\route.ts:8:11)
+  10 |  */
+  11 | export async function getCurrentUser() {
+> 12 |   const store = await cookies();
+     |                       ^
+  13 |   const token = store.get(AUTH_COOKIE)?.value;
+  14 |   if (!token) return null;
+  15 | {
+  route: '/api/admin/charts',
+  expression: '`cookies()`',
+  digest: 'HANGING_PROMISE_REJECTION'
+} { status: 500 }
+  Generating static pages using 3 workers (34/70) 
+[error] Error: During prerendering, `cookies()` rejects when the prerender is complete. Typically these errors are 
+handled by React but if you move `cookies()` to a different context by using `setTimeout`, `after`, or similar 
+functions you may observe this error and you should handle it in that context. This occurred at route 
+"/api/admin/invoices".
+    at ew (src\lib\auth\guards.ts:12:23)
+    at eS (src\lib\auth\guards.ts:43:22)
+    at ev (src\lib\auth\guards.ts:50:22)
+    at n (src\app\api\admin\invoices\route.ts:8:11)
+  10 |  */
+  11 | export async function getCurrentUser() {
+> 12 |   const store = await cookies();
+     |                       ^
+  13 |   const token = store.get(AUTH_COOKIE)?.value;
+  14 |   if (!token) return null;
+  15 | {
+  route: '/api/admin/invoices',
+  expression: '`cookies()`',
+  digest: 'HANGING_PROMISE_REJECTION'
+} { status: 500 }
+[error] Error: During prerendering, `cookies()` rejects when the prerender is complete. Typically these errors are 
+handled by React but if you move `cookies()` to a different context by using `setTimeout`, `after`, or similar 
+functions you may observe this error and you should handle it in that context. This occurred at route 
+"/api/admin/saas-metrics".
+    at ew (src\lib\auth\guards.ts:12:23)
+    at eS (src\lib\auth\guards.ts:43:22)
+    at ev (src\lib\auth\guards.ts:50:22)
+    at n (src\app\api\admin\saas-metrics\route.ts:8:11)
+  10 |  */
+  11 | export async function getCurrentUser() {
+> 12 |   const store = await cookies();
+     |                       ^
+  13 |   const token = store.get(AUTH_COOKIE)?.value;
+  14 |   if (!token) return null;
+  15 | {
+  route: '/api/admin/saas-metrics',
+  expression: '`cookies()`',
+  digest: 'HANGING_PROMISE_REJECTION'
+} { status: 500 }
+  Generating static pages using 3 workers (52/70) 
+Γ£ô Generating static pages using 3 workers (70/70) in 2.0s
+  Finalizing page optimization ...
+
+Route (app)
+Γöî Γùï /
+Γö£ Γùï /_not-found
+Γö£ ╞Æ /admin
+Γö£ ╞Æ /api/account/reviews
+Γö£ ╞Æ /api/admin/audit
+Γö£ ╞Æ /api/admin/broadcast
+Γö£ ╞Æ /api/admin/charts
+Γö£ ╞Æ /api/admin/discounts
+Γö£ ╞Æ /api/admin/discounts/[id]
+Γö£ ╞Æ /api/admin/invoices
+Γö£ ╞Æ /api/admin/packages
+Γö£ ╞Æ /api/admin/reviews
+Γö£ ╞Æ /api/admin/saas-metrics
+Γö£ ╞Æ /api/admin/salons/[id]
+Γö£ ╞Æ /api/admin/salons/[id]/status
+Γö£ ╞Æ /api/admin/settings
+Γö£ ╞Æ /api/admin/sms/test
+Γö£ ╞Æ /api/admin/subscriptions
+Γö£ ╞Æ /api/admin/users
+Γö£ ╞Æ /api/ai/analyze
+Γö£ ╞Æ /api/ai/chat
+Γö£ ╞Æ /api/ai/generate-content
+Γö£ ╞Æ /api/appointments
+Γö£ ╞Æ /api/appointments/[id]
+Γö£ ╞Æ /api/appointments/[id]/cancel
+Γö£ ╞Æ /api/appointments/[id]/reschedule
+Γö£ ╞Æ /api/appointments/hold
+Γö£ ╞Æ /api/appointments/hold/confirm
+Γö£ ╞Æ /api/auth/email/request
+Γö£ ╞Æ /api/auth/email/verify
+Γö£ ╞Æ /api/auth/logout
+Γö£ ╞Æ /api/auth/me
+Γö£ Γùï /api/auth/otp/dev-last
+Γö£ ╞Æ /api/auth/otp/request
+Γö£ ╞Æ /api/auth/otp/verify
+Γö£ ╞Æ /api/auth/sessions
+Γö£ ╞Æ /api/commission
+Γö£ ╞Æ /api/cron/holds
+Γö£ ╞Æ /api/cron/notifications
+Γö£ ╞Æ /api/cron/reminders
+Γö£ ╞Æ /api/cron/subscriptions
+Γö£ ╞Æ /api/cron/waitlist
+Γö£ ╞Æ /api/dashboard/salons/[id]
+Γö£ ╞Æ /api/dashboard/salons/[id]/appointments.csv
+Γö£ ╞Æ /api/dashboard/salons/[id]/blocks
+Γö£ ╞Æ /api/dashboard/salons/[id]/blocks/[blockId]
+Γö£ ╞Æ /api/dashboard/salons/[id]/branches
+Γö£ ╞Æ /api/dashboard/salons/[id]/branches/[branchId]
+Γö£ ╞Æ /api/dashboard/salons/[id]/campaigns
+Γö£ ╞Æ /api/dashboard/salons/[id]/campaigns/[campaignId]/run
+Γö£ ╞Æ /api/dashboard/salons/[id]/cash
+Γö£ ╞Æ /api/dashboard/salons/[id]/customers
+Γö£ ╞Æ /api/dashboard/salons/[id]/customers/[customerId]/notes
+Γö£ ╞Æ /api/dashboard/salons/[id]/domain
+Γö£ ╞Æ /api/dashboard/salons/[id]/domain/verify
+Γö£ ╞Æ /api/dashboard/salons/[id]/excel
+Γö£ ╞Æ /api/dashboard/salons/[id]/financial
+Γö£ ╞Æ /api/dashboard/salons/[id]/holidays
+Γö£ ╞Æ /api/dashboard/salons/[id]/holidays/[holidayId]
+Γö£ ╞Æ /api/dashboard/salons/[id]/hours
+Γö£ ╞Æ /api/dashboard/salons/[id]/import/appointments
+Γö£ ╞Æ /api/dashboard/salons/[id]/import/customers
+Γö£ ╞Æ /api/dashboard/salons/[id]/invoices
+Γö£ ╞Æ /api/dashboard/salons/[id]/report
+Γö£ ╞Æ /api/dashboard/salons/[id]/revenue
+Γö£ ╞Æ /api/dashboard/salons/[id]/services
+Γö£ ╞Æ /api/dashboard/salons/[id]/services/[serviceId]
+Γö£ ╞Æ /api/dashboard/salons/[id]/staff
+Γö£ ╞Æ /api/dashboard/salons/[id]/staff/[staffId]
+Γö£ ╞Æ /api/dashboard/salons/[id]/webhooks
+Γö£ ╞Æ /api/dashboard/salons/[id]/webhooks/[webhookId]
+Γö£ ╞Æ /api/dashboard/stats
+Γö£ ╞Æ /api/favorites
+Γö£ ╞Æ /api/favorites/[salonId]
+Γö£ ╞Æ /api/giftcards
+Γö£ ╞Æ /api/giftcards/redeem
+Γö£ ╞Æ /api/loyalty/redeem
+Γö£ ╞Æ /api/notifications
+Γö£ ╞Æ /api/packages
+Γö£ ╞Æ /api/payments/callback/[gateway]
+Γö£ ╞Æ /api/payments/create
+Γö£ Γùï /api/payments/gateways
+Γö£ ╞Æ /api/payments/mock-pay
+Γö£ ╞Æ /api/public/announcement
+Γö£ ╞Æ /api/salons
+Γö£ ╞Æ /api/salons/[slug]
+Γö£ ╞Æ /api/salons/[slug]/ai/suggest
+Γö£ ╞Æ /api/salons/[slug]/availability
+Γö£ ╞Æ /api/salons/[slug]/reviews
+Γö£ ╞Æ /api/salons/[slug]/waitlist
+Γö£ ╞Æ /api/salons/[slug]/waitlist/[id]
+Γö£ ╞Æ /api/salons/search
+Γö£ ╞Æ /api/voice/transcribe
+Γö£ ╞Æ /api/wallet
+Γö£ ╞Æ /dashboard
+Γö£ ╞Æ /dashboard/account
+Γö£ ╞Æ /dashboard/admin
+Γö£ Γùï /dashboard/appointments
+Γö£ Γùï /dashboard/commission
+Γö£ ╞Æ /dashboard/salon
+Γö£ ╞Æ /dashboard/voice-booking
+Γö£ Γùï /dashboard/wallet
+Γö£ Γùï /login
+Γö£ Γùï /packages
+Γö£ ╞Æ /payment/result
+Γö£ Γùï /robots.txt
+Γö£   /s/[slug]
+Γöé Γöö ΓùÉ /s/[slug]
+Γö£ Γùï /salons
+Γö£ ╞Æ /sitemap.xml
+Γö£ Γùï /wa
+Γöö   /wa/salon/[slug]
+  Γöö ΓùÉ /wa/salon/[slug]
+
+
+╞Æ Proxy (Middleware)
+
+Γùï  (Static)             prerendered as static content
+ΓùÉ  (Partial Prerender)  prerendered as static HTML with dynamic server-streamed content
+╞Æ  (Dynamic)            server-rendered on demand
+

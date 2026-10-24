@@ -49,21 +49,21 @@ export default function SalonsDirectoryPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const input = "w-full rounded-xl border border-neutral-300 px-4 py-3 text-sm outline-none focus:border-pink-500";
+  const input = "w-full rounded-xl border border-neutral-300 bg-neutral-50/60 px-4 py-3 text-sm outline-none transition focus:border-pink-400 focus:bg-white dark:border-neutral-700 dark:bg-neutral-800 dark:focus:bg-neutral-800";
 
   return (
     <main className="mx-auto max-w-6xl px-6 py-12">
-      <h1 className="text-3xl font-black text-neutral-900">جستجوی آرایشگاه‌ها</h1>
-      <p className="mt-2 text-neutral-500">بر اساس منطقه، خدمت و قیمت، سالن مناسب خود را پیدا کنید.</p>
+      <h1 className="text-3xl font-black text-neutral-900 dark:text-neutral-100">جستجوی آرایشگاه‌ها</h1>
+      <p className="mt-2 text-neutral-500 dark:text-neutral-400">بر اساس منطقه، خدمت و قیمت، سالن مناسب خود را پیدا کنید.</p>
 
       {/* Search bar */}
-      <div className="mt-8 rounded-3xl border border-neutral-200 bg-white p-5 shadow-sm">
+      <div className="mt-8 rounded-3xl border border-neutral-200 bg-white p-5 shadow-sm dark:border-neutral-800 dark:bg-neutral-900">
         <div className="grid gap-3 sm:grid-cols-[1fr_1fr_1fr_1fr_auto]">
           <input className={input} placeholder="نام سالن..." value={q} onChange={(e) => setQ(e.target.value)} />
           <input className={input} placeholder="شهر..." value={city} onChange={(e) => setCity(e.target.value)} />
           <input className={input} placeholder="خدمت (مثلاً رنگ مو)..." value={service} onChange={(e) => setService(e.target.value)} />
           <input className={input} type="number" placeholder="حداکثر قیمت (تومان)" value={maxPrice} onChange={(e) => setMaxPrice(e.target.value)} />
-          <button onClick={search} className="rounded-xl bg-pink-600 px-6 py-3 font-bold text-white transition hover:bg-pink-700">
+          <button onClick={search} className="rounded-xl bg-gradient-to-l from-pink-600 to-purple-600 px-6 py-3 font-bold text-white shadow-lg shadow-pink-500/25 transition hover:scale-[1.02]">
             جستجو
           </button>
         </div>
@@ -79,25 +79,25 @@ export default function SalonsDirectoryPage() {
             <Link
               key={s.id}
               href={`/s/${s.slug}`}
-              className="group overflow-hidden rounded-3xl border border-neutral-200 bg-white shadow-sm transition hover:shadow-md"
+              className="group overflow-hidden rounded-3xl border border-neutral-200 bg-white shadow-sm transition hover:shadow-md dark:border-neutral-800 dark:bg-neutral-900"
             >
               <div className="flex h-32 items-center justify-center text-5xl" style={{ background: `linear-gradient(135deg, ${s.coverColor}, #7c3aed)` }}>
                 🪞
               </div>
               <div className="p-5">
                 <div className="flex items-center justify-between">
-                  <h3 className="text-lg font-extrabold text-neutral-900">{s.name}</h3>
+                  <h3 className="text-lg font-extrabold text-neutral-900 dark:text-neutral-100">{s.name}</h3>
                   {s.rating != null && (
                     <span className="rounded-full bg-amber-50 px-2.5 py-1 text-xs font-bold text-amber-700">
                       ★ {s.rating.toFixed(1)} ({s.reviewCount})
                     </span>
                   )}
                 </div>
-                <p className="mt-1 text-sm text-neutral-500">
+                <p className="mt-1 text-sm text-neutral-500 dark:text-neutral-400">
                   {s.city} {s.address ?? ""}
                 </p>
                 {s.description && (
-                  <p className="mt-2 line-clamp-2 text-sm text-neutral-400">{s.description}</p>
+                  <p className="mt-2 line-clamp-2 text-sm text-neutral-400 dark:text-neutral-500">{s.description}</p>
                 )}
               </div>
             </Link>

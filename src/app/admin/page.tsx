@@ -1,5 +1,6 @@
+import { redirect } from "next/navigation";
 import { prisma } from "@/lib/prisma";
-import { requireRole } from "@/lib/auth/guards";
+import { getCurrentUser } from "@/lib/auth/guards";
 import { formatToman, toPersianDigits } from "@/lib/utils";
 import AdminShell from "@/components/AdminShell";
 import AdminExtras from "@/components/AdminExtras";
@@ -7,7 +8,9 @@ import AdminExtras from "@/components/AdminExtras";
 export const instant = false;
 
 export default async function AdminPage({ searchParams }: { searchParams: Promise<Record<string, string>> }) {
-  await requireRole(["ADMIN"]);
+  const user = await getCurrentUser();
+  if (!user) redirect("/login");
+  if (user.role !== "ADMIN") redirect("/dashboard");
   const sp = await searchParams;
   const tab = sp.tab ?? "metrics";
 

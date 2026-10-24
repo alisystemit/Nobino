@@ -1,7 +1,7 @@
 import { z } from "zod";
 import { prisma } from "@/lib/prisma";
 import { requireAuth } from "@/lib/auth/guards";
-import { enqueueSms } from "@/lib/notifications/queue";
+import { enqueueInApp, enqueueSms } from "@/lib/notifications/queue";
 import { renderSmsTemplate } from "@/lib/notifications/templates";
 import { dispatchWebhook } from "@/lib/webhooks";
 import { json, apiError } from "@/lib/utils";
@@ -55,6 +55,14 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
       message: cancelMsg,
       uniqueKey: `cancel:${id}`,
     });
+    if (appointment.customerId) {
+      await enqueueInApp({
+        type: "APPOINTMENT_CANCEL",
+        userId: appointment.customerId,
+        message: `نوبت شما در «${appointment.salon.name}» لغو شد.`,
+        uniqueKey: `inapp-cancel:${id}`,
+      }).catch(() => {});
+    }
     await dispatchWebhook(appointment.salonId, "appointment.cancelled", { appointmentId: id, customerName: appointment.customerName, reason: body.reason });
 
     return json({ success: true, appointment: updated });

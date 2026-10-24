@@ -32,7 +32,7 @@ export async function GET(req: Request) {
 
     const slots = await computeFreeSlots({
       salon: w.salon,
-      service,
+      services: [service],
       employeeId: w.employeeId ?? undefined,
       dayISO: today,
     }).catch(() => []);

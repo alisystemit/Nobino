@@ -23,7 +23,7 @@ export async function suggestAlternatives(params: {
 
   const allSlots = [];
   for (const day of nextDays) {
-    const slots = await computeFreeSlots({ salon, service, employeeId: params.employeeId, dayISO: day });
+    const slots = await computeFreeSlots({ salon, services: [service], employeeId: params.employeeId, dayISO: day });
     allSlots.push(...slots.map((s) => ({ day, startAt: s.startAt.toISOString(), endAt: s.endAt.toISOString() })));
   }
 
