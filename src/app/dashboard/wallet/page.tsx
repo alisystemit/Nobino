@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { formatToman } from "@/lib/utils";
+import DashboardShell from "@/components/DashboardShell";
 
 type Tx = { id: string; kind: string; reason: string; amount: number; balanceAfter: number; description?: string; createdAt: string };
 
@@ -16,6 +17,7 @@ const reasonLabels: Record<string, string> = {
 };
 
 export default function WalletPage() {
+  const [role, setRole] = useState("");
   const [balance, setBalance] = useState(0);
   const [transactions, setTransactions] = useState<Tx[]>([]);
   const [amount, setAmount] = useState("");
@@ -36,6 +38,12 @@ export default function WalletPage() {
 
   useEffect(() => {
     load();
+    (async () => {
+      try {
+        const me = await (await fetch("/api/auth/me")).json();
+        setRole(me.user?.role ?? "");
+      } catch {}
+    })();
   }, []);
 
   async function requestPayout() {
@@ -60,13 +68,11 @@ export default function WalletPage() {
     }
   }
 
-  if (loading) return <main className="mx-auto max-w-6xl px-6 py-12 text-center text-neutral-400">در حال بارگیری...</main>;
+  if (loading) return <DashboardShell role={role} title="کیف پول"><p className="py-10 text-center text-neutral-400">در حال بارگیری...</p></DashboardShell>;
 
   return (
-    <main className="mx-auto max-w-6xl px-6 py-12">
-      <h1 className="text-2xl font-black text-neutral-900">کیف پول</h1>
-
-      <div className="mt-6 grid gap-6 lg:grid-cols-[320px_1fr]">
+    <DashboardShell role={role} title="کیف پول">
+      <div className="grid gap-5 lg:grid-cols-[320px_1fr]">
         <div className="rounded-3xl bg-gradient-to-bl from-pink-500 to-purple-600 p-6 text-white shadow-lg">
           <p className="text-sm text-white/80">موجودی قابل تسویه</p>
           <p className="mt-2 text-3xl font-black">{formatToman(balance)}</p>
@@ -99,16 +105,16 @@ export default function WalletPage() {
           </div>
         </div>
 
-        <div className="rounded-3xl border border-neutral-200 bg-white p-6 shadow-sm">
-          <h2 className="text-lg font-extrabold text-neutral-900">تراکنش‌ها</h2>
+        <div className="rounded-3xl border border-neutral-200 bg-white p-6 shadow-sm dark:border-neutral-800 dark:bg-neutral-900">
+          <h2 className="text-lg font-extrabold text-neutral-900 dark:text-neutral-100">تراکنش‌ها</h2>
           <div className="mt-4 max-h-[560px] space-y-2 overflow-y-auto">
             {transactions.length === 0 && (
               <p className="py-10 text-center text-neutral-400">تراکنشی ثبت نشده است.</p>
             )}
             {transactions.map((t) => (
-              <div key={t.id} className="flex items-center justify-between rounded-xl border border-neutral-100 px-4 py-3">
+              <div key={t.id} className="flex items-center justify-between rounded-xl border border-neutral-100 px-4 py-3 dark:border-neutral-800">
                 <div>
-                  <div className="text-sm font-bold text-neutral-800">{reasonLabels[t.reason] ?? t.reason}</div>
+                  <div className="text-sm font-bold text-neutral-800 dark:text-neutral-100">{reasonLabels[t.reason] ?? t.reason}</div>
                   <div className="text-xs text-neutral-400">
                     {t.createdAt} — {t.description}
                   </div>
@@ -124,6 +130,6 @@ export default function WalletPage() {
           </div>
         </div>
       </div>
-    </main>
+    </DashboardShell>
   );
 }

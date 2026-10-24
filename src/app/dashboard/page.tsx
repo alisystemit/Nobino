@@ -2,7 +2,7 @@ import { redirect } from "next/navigation";
 import Link from "next/link";
 import { getCurrentUser } from "@/lib/auth/guards";
 import { toPersianDigits } from "@/lib/utils";
-import DashboardNav from "@/components/DashboardNav";
+import DashboardShell from "@/components/DashboardShell";
 
 // دسترسی به cookies و دیتابیس در هنگام درخواست (نه در prerender)
 export const instant = false;
@@ -42,38 +42,31 @@ export default async function DashboardPage() {
   const isEmailAccount = user.phone.startsWith("email:");
 
   return (
-    <main className="mx-auto max-w-7xl px-4 py-8 sm:px-6">
-      <DashboardNav role={user.role} />
-
-      <div className="relative mt-8 overflow-hidden rounded-[2rem] bg-gradient-to-bl from-pink-600 via-rose-600 to-purple-700 p-8 text-white shadow-2xl shadow-pink-500/20">
+    <DashboardShell role={user.role} title="داشبورد">
+      <div className="relative mb-6 overflow-hidden rounded-3xl bg-gradient-to-bl from-pink-600 via-rose-600 to-purple-700 p-6 text-white shadow-lg shadow-pink-500/15 sm:p-8">
         <div className="absolute inset-0 bg-hero-pattern" />
         <div className="relative">
-          <h1 className="text-3xl font-black">سلام، {displayName} 👋</h1>
+          <h1 className="text-2xl font-black">سلام، {displayName} 👋</h1>
           <p className="mt-1 text-white/80">
             نقش: {roleLabels[user.role] ?? user.role} — {isEmailAccount ? `ایمیل: ${user.email ?? "—"}` : `شماره: ${toPersianDigits(user.phone)}`}
           </p>
-          <div className="mt-4 inline-flex items-center gap-2 rounded-full border border-white/25 bg-white/10 px-4 py-1.5 text-xs font-semibold backdrop-blur">
-            <span className="h-2 w-2 rounded-full bg-emerald-400" />
-            حساب شما فعال است
-          </div>
         </div>
       </div>
 
-      <div className="mt-8 grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
+      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
         {cards.map((c) => (
           <Link
             key={c.title}
             href={c.href}
-            className="group card-hover relative overflow-hidden rounded-3xl border border-neutral-200 bg-white p-6 shadow-sm dark:border-neutral-800 dark:bg-neutral-900"
+            className="group card-hover relative overflow-hidden rounded-2xl border border-neutral-200 bg-white p-5 shadow-sm dark:border-neutral-800 dark:bg-neutral-900"
           >
-            <div className="absolute -right-6 -top-6 h-20 w-20 rounded-full bg-gradient-to-br from-pink-100 to-purple-100 opacity-0 transition group-hover:opacity-100 dark:from-pink-900/40 dark:to-purple-900/40" />
-            <div className="text-3xl">{c.icon}</div>
+            <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-gradient-to-br from-pink-100 to-purple-100 text-xl dark:from-pink-900/40 dark:to-purple-900/40">{c.icon}</div>
             <h3 className="mt-3 font-extrabold text-neutral-900 dark:text-neutral-100">{c.title}</h3>
             <p className="mt-1 text-sm text-neutral-500 dark:text-neutral-400">{c.desc}</p>
-            <div className="mt-3 text-sm font-bold text-pink-600 opacity-0 transition group-hover:opacity-100">مشاهده ←</div>
+            <span className="mt-3 inline-block text-sm font-bold text-pink-600">مشاهده ←</span>
           </Link>
         ))}
       </div>
-    </main>
+    </DashboardShell>
   );
 }

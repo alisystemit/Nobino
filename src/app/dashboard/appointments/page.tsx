@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { toPersianDigits, toJalali } from "@/lib/utils";
+import DashboardShell from "@/components/DashboardShell";
 
 type Appointment = {
   id: string;
@@ -116,17 +117,16 @@ export default function AppointmentsPage() {
     else setError(data.error || "خطا");
   }
 
-  if (loading) return <main className="mx-auto max-w-6xl px-6 py-12 text-center text-neutral-400">در حال بارگیری...</main>;
+  if (loading) return <DashboardShell role={role} title="نوبت‌ها"><p className="py-10 text-center text-neutral-400">در حال بارگیری...</p></DashboardShell>;
 
   return (
-    <main className="mx-auto max-w-6xl px-6 py-12">
-      <h1 className="text-2xl font-black text-neutral-900">نوبت‌ها</h1>
-      {error && <p className="mt-4 rounded-lg bg-red-50 px-4 py-3 text-sm text-red-600">{error}</p>}
+    <DashboardShell role={role} title="نوبت‌ها">
+      {error && <p className="mb-4 rounded-lg bg-red-50 px-4 py-3 text-sm text-red-600">{error}</p>}
 
-      <div className="mt-6 overflow-x-auto rounded-3xl border border-neutral-200 bg-white shadow-sm">
+      <div className="overflow-x-auto rounded-2xl border border-neutral-200 bg-white shadow-sm dark:border-neutral-800 dark:bg-neutral-900">
         <table className="w-full min-w-[720px] text-right text-sm">
           <thead>
-            <tr className="border-b border-neutral-200 bg-neutral-50 text-neutral-500">
+            <tr className="border-b border-neutral-200 bg-neutral-50 text-neutral-500 dark:border-neutral-800 dark:bg-neutral-950">
               <th className="px-5 py-3">مشتری</th>
               <th className="px-5 py-3">خدمت</th>
               <th className="px-5 py-3">زمان</th>
@@ -143,9 +143,9 @@ export default function AppointmentsPage() {
               </tr>
             )}
             {appointments.map((a) => (
-              <tr key={a.id} className="border-b border-neutral-100 last:border-0">
+              <tr key={a.id} className="border-b border-neutral-100 last:border-0 dark:border-neutral-800">
                 <td className="px-5 py-4">
-                  <div className="font-bold text-neutral-800">{a.customerName}</div>
+                  <div className="font-bold text-neutral-800 dark:text-neutral-100">{a.customerName}</div>
                   <div className="text-xs text-neutral-400" dir="ltr">
                     {toPersianDigits(a.customerPhone)}
                   </div>
@@ -218,6 +218,6 @@ export default function AppointmentsPage() {
           </tbody>
         </table>
       </div>
-    </main>
+    </DashboardShell>
   );
 }

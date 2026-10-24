@@ -7,6 +7,7 @@ import SalonSettings from "@/components/SalonSettings";
 import CreateSalon from "@/components/CreateSalon";
 import SalonManager from "@/components/SalonManager";
 import DailyStats from "@/components/DailyStats";
+import DashboardShell from "@/components/DashboardShell";
 
 export const instant = false;
 
@@ -19,45 +20,42 @@ export default async function SalonDashboardPage() {
 
   if (!salon) {
     return (
-      <main className="mx-auto max-w-3xl px-6 py-12">
-        <h1 className="text-2xl font-black text-neutral-900">ساخت سالن</h1>
-        <p className="mt-2 text-neutral-500">هنوز سالنی ندارید. همین حالا بسازید:</p>
-        <div className="mt-6 rounded-3xl border border-neutral-200 bg-white p-8 shadow-sm">
-          <CreateSalon />
+      <DashboardShell role={user.role} title="ساخت سالن">
+        <div className="mx-auto max-w-lg">
+          <h1 className="text-2xl font-black text-neutral-900 dark:text-neutral-100">ساخت سالن</h1>
+          <p className="mt-2 text-neutral-500 dark:text-neutral-400">هنوز سالنی ندارید. همین حالا بسازید:</p>
+          <div className="mt-6 rounded-3xl border border-neutral-200 bg-white p-8 shadow-sm dark:border-neutral-800 dark:bg-neutral-900">
+            <CreateSalon />
+          </div>
         </div>
-      </main>
+      </DashboardShell>
     );
   }
 
   return (
-    <main className="mx-auto max-w-6xl px-6 py-12">
+    <DashboardShell role={user.role} title="سالن من">
       <DailyStats role={user.role} />
-      <div className="flex flex-wrap items-center justify-between gap-4">
+
+      <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
         <div>
-          <h1 className="text-2xl font-black text-neutral-900">سالن من</h1>
-          <p className="mt-1 text-neutral-500">
-            بسیاریلاگ: <span dir="ltr" className="font-mono">{salon.slug}</span> — تلفن: {toPersianDigits(salon.phone)}
+          <p className="text-sm text-neutral-500 dark:text-neutral-400">
+            اسلاگ: <span dir="ltr" className="font-mono">/{salon.slug}</span> — تلفن: {toPersianDigits(salon.phone)}
           </p>
         </div>
-        <Link
-          href={`/s/${salon.slug}`}
-          className="rounded-xl bg-neutral-900 px-5 py-2.5 text-sm font-bold text-white transition hover:bg-neutral-800"
-        >
+        <Link href={`/s/${salon.slug}`} className="rounded-xl bg-neutral-900 px-4 py-2.5 text-sm font-bold text-white transition hover:bg-neutral-800 dark:bg-neutral-100 dark:text-neutral-900">
           مشاهده صفحه عمومی
         </Link>
       </div>
 
-      <div className="mt-8 grid gap-6 lg:grid-cols-3">
-        {/* Statistics */}
+      <div className="grid gap-5 lg:grid-cols-3">
         <div className="grid gap-4 lg:col-span-1">
           <Stat label="مجموع نوبت‌ها" value={toPersianDigits(salon._count.appointments)} />
           <Stat label="خدمات" value={toPersianDigits(salon.services.length)} />
           <Stat label="آثار گالری" value={toPersianDigits(salon._count.galleryItems)} />
         </div>
 
-        {/* Settings */}
-        <div className="rounded-3xl border border-neutral-200 bg-white p-6 shadow-sm lg:col-span-2">
-          <h2 className="text-lg font-extrabold text-neutral-900">تنظیمات سالن</h2>
+        <div className="rounded-3xl border border-neutral-200 bg-white p-6 shadow-sm dark:border-neutral-800 dark:bg-neutral-900 lg:col-span-2">
+          <h2 className="text-lg font-extrabold text-neutral-900 dark:text-neutral-100">تنظیمات سالن</h2>
           <div className="mt-6">
             <SalonSettings
               salon={{
@@ -76,14 +74,13 @@ export default async function SalonDashboardPage() {
         </div>
       </div>
 
-      {/* مدیریت (خدمات/کارکنان/مسدودسازی/نوبت دستی) */}
-      <div className="mt-10 rounded-3xl border border-neutral-200 bg-white p-6 shadow-sm">
-        <h2 className="text-lg font-extrabold text-neutral-900">مدیریت سالن</h2>
+      <div className="mt-6 rounded-3xl border border-neutral-200 bg-white p-6 shadow-sm dark:border-neutral-800 dark:bg-neutral-900">
+        <h2 className="text-lg font-extrabold text-neutral-900 dark:text-neutral-100">مدیریت سالن</h2>
         <div className="mt-6">
           <SalonManager salonId={salon.id} salonSlug={salon.slug} />
         </div>
       </div>
-    </main>
+    </DashboardShell>
   );
 }
 
