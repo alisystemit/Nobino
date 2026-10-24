@@ -1,6 +1,7 @@
 import { prisma } from "@/lib/prisma";
 import type { CreationChannel } from "@prisma/client";
 import { assertBookableWindow } from "@/lib/bookings/availability";
+import { serviceDuration } from "@/lib/bookings/service";
 
 /**
  * ثبت نوبت با حفظ قطعیت در برابر رزرو هم‌زمان.
@@ -44,7 +45,7 @@ export async function createAppointmentSafe(input: {
     const service = input.serviceId ? await tx.service.findUnique({ where: { id: input.serviceId } }) : null;
 
     const start = new Date(input.startAt);
-    const duration = input.durationMin;
+    const duration = input.durationMin ?? (service ? serviceDuration(service) : 60);
     const buffer = service?.bufferMin && service.bufferMin > 0 ? service.bufferMin : salon.bufferMinutes;
     const end = new Date(start.getTime() + duration * 60 * 1000);
     const serviceEnd = new Date(end.getTime() + buffer * 60 * 1000);

@@ -1,5 +1,6 @@
 import { prisma } from "@/lib/prisma";
 import { localMidnightUTC, localParts } from "@/lib/timezone";
+import { serviceDuration } from "@/lib/bookings/service";
 import type { Salon, Service } from "@prisma/client";
 
 export type Slot = { startAt: Date; endAt: Date };
@@ -184,7 +185,7 @@ export async function computeFreeSlots(params: {
 }): Promise<Slot[]> {
   const now = params.now ?? new Date();
   const { salon, service } = params;
-  const duration = service.durationMin;
+  const duration = serviceDuration(service);
   const buffer = service.bufferMin && service.bufferMin > 0 ? service.bufferMin : salon.bufferMinutes;
 
   const win = params.employeeId

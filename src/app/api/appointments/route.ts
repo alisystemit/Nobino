@@ -3,6 +3,7 @@ import { prisma } from "@/lib/prisma";
 import { requireAuth } from "@/lib/auth/guards";
 import { json, apiError } from "@/lib/utils";
 import { createAppointmentSafe } from "@/lib/bookings/create";
+import { serviceDuration } from "@/lib/bookings/service";
 import { enqueueSms, processPendingNotifications } from "@/lib/notifications/queue";
 import { renderSmsTemplate } from "@/lib/notifications/templates";
 
@@ -99,7 +100,7 @@ export async function POST(req: Request) {
       if (services.length !== body.serviceIds.length) {
         return json({ success: false, error: "یکی از خدمت‌ها یافت نشد" }, { status: 400 });
       }
-      duration = services.reduce((sum, s) => sum + s.durationMin, 0);
+      duration = services.reduce((sum, s) => sum + serviceDuration(s), 0);
       primaryServiceId = services[0].id;
       combinedNote = [body.note, services.map((s) => s.name).join("، ")].filter(Boolean).join(" — ");
     } else if (body.serviceId) {
