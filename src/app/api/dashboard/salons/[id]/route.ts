@@ -1,5 +1,6 @@
 import { z } from "zod";
-import { requireRole } from "@/lib/auth/guards";
+import { randomUUID } from "node:crypto";
+import { requireSalonManage } from "@/lib/auth/guards";
 import { prisma } from "@/lib/prisma";
 import { json, apiError } from "@/lib/utils";
 
@@ -23,17 +24,21 @@ const patchSchema = z.object({
 
 export async function PATCH(req: Request, { params }: { params: Promise<{ id: string }> }) {
   try {
-    const user = await requireRole(["SALON_OWNER", "ADMIN"]);
     const { id } = await params;
+    await requireSalonManage(id);
     const body = patchSchema.parse(await req.json());
 
     const salon = await prisma.salon.findUnique({ where: { id } });
-    if (!salon) return json({ success: false, error: "سالن یافت نشد" }, { status: 404 });
-    if (user.role !== "ADMIN" && salon.ownerId !== user.id) {
-      return json({ success: false, error: "دسترسی غیرمجاز" }, { status: 403 });
+    if (!salon) return json({ success: false, error: "salon not found" }, { status: 404 });
+
+    const data: Record<string, unknown> = { ...body };
+    if (body.customDomain && body.customDomain !== salon.customDomain) {
+      data.customDomain = body.customDomain.toLowerCase();
+      data.domainToken = `nobino-verify-${randomUUID()}`;
+      data.domainStatus = "PENDING";
     }
 
-    const updated = await prisma.salon.update({ where: { id }, data: body });
+    const updated = await prisma.salon.update({ where: { id }, data });
     return json({ success: true, salon: updated });
   } catch (err) {
     return apiError(err);
@@ -42,14 +47,11 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
 
 export async function DELETE(_req: Request, { params }: { params: Promise<{ id: string }> }) {
   try {
-    const user = await requireRole(["SALON_OWNER", "ADMIN"]);
     const { id } = await params;
+    await requireSalonManage(id);
 
     const salon = await prisma.salon.findUnique({ where: { id } });
-    if (!salon) return json({ success: false, error: "سالن یافت نشد" }, { status: 404 });
-    if (user.role !== "ADMIN" && salon.ownerId !== user.id) {
-      return json({ success: false, error: "دسترسی غیرمجاز" }, { status: 403 });
-    }
+    if (!salon) return json({ success: false, error: "salon not found" }, { status: 404 });
 
     await prisma.salon.delete({ where: { id } });
     return json({ success: true });

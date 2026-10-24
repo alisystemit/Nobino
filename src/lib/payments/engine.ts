@@ -1,4 +1,5 @@
 import { prisma } from "@/lib/prisma";
+import { generateInvoiceForOrder } from "@/lib/invoices";
 import { getGateway } from "@/lib/payments/registry";
 import type { PaymentOrder } from "@/lib/payments/types";
 import { env } from "@/lib/env";
@@ -115,6 +116,11 @@ export async function handlePaymentCallback(params: {
     if (order.salonId && order.packageId) {
       const { activateSubscription } = await import("@/lib/subscriptions");
       await activateSubscription({ salonId: order.salonId, packageId: order.packageId, period: order.period, autoRenew: order.autoRenew });
+      const activeSubscription = await prisma.subscription.findFirst({
+        where: { salonId: order.salonId, status: "ACTIVE" },
+        orderBy: { createdAt: "desc" },
+      });
+      await generateInvoiceForOrder(order.id, activeSubscription?.id ?? null).catch(() => {});
     }
 
     return { success: true, companyId: result.refId };

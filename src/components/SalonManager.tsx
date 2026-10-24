@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import RevenueChart from "@/components/RevenueChart";
+import { useI18n } from "@/lib/i18n";
 
 type Service = { id: string; name: string; durationMin: number; price: number; description?: string | null; isActive: boolean };
 type StaffItem = {
@@ -20,9 +21,10 @@ type Block = { id: string; startAt: string; endAt: string; reason?: string | nul
 type Branch = { id: string; name: string; city?: string | null; address?: string | null; phone?: string | null; isActive: boolean };
 type CashEntry = { id: string; branch?: { name: string } | null; cashAmount: number; cardAmount: number; onlineAmount: number; expenseAmount: number; note?: string | null; createdAt: string };
 
-type Tab = "services" | "staff" | "blocks" | "booking" | "branches" | "cash" | "report" | "waitlist" | "calendar" | "holidays" | "customers";
+type Tab = "services" | "staff" | "blocks" | "booking" | "branches" | "cash" | "report" | "waitlist" | "calendar" | "holidays" | "customers" | "invoices" | "campaigns" | "domain" | "data";
 
 export default function SalonManager({ salonId, salonSlug }: { salonId: string; salonSlug?: string }) {
+  const { t } = useI18n();
   const [tab, setTab] = useState<Tab>("services");
   const [services, setServices] = useState<Service[]>([]);
   const [staff, setStaff] = useState<StaffItem[]>([]);
@@ -774,6 +776,175 @@ export default function SalonManager({ salonId, salonSlug }: { salonId: string; 
     );
   }
 
+  function BillingView() {
+    const [invoices, setInvoices] = useState<any[]>([]);
+
+    const load = useCallback(async () => {
+      const r = await fetch(`${base}/invoices`);
+      const d = await r.json();
+      if (d.success) setInvoices(d.invoices);
+    }, [base]);
+
+    useEffect(() => {
+      load();
+    }, [load]);
+
+    return (
+      <div>
+        <p className="mb-3 text-sm text-neutral-500">{t("invoices.title")}</p>
+        <div className="space-y-2">
+          {invoices.length === 0 && <p className="py-6 text-center text-sm text-neutral-400">{t("invoices.empty")}</p>}
+          {invoices.map((i) => (
+            <div key={i.id} className="flex flex-wrap items-center justify-between gap-2 rounded-2xl border border-neutral-200 px-4 py-3">
+              <div>
+                <div className="font-bold text-neutral-800" dir="ltr">{i.number}</div>
+                <div className="text-xs text-neutral-500">{new Date(i.issuedAt).toLocaleDateString("fa-IR")} - {i.period}</div>
+              </div>
+              <div className="text-sm font-bold text-neutral-800">{Number(i.amount).toLocaleString("fa-IR")} تومان</div>
+              <span className={`rounded-full px-2 py-1 text-xs font-bold ${i.status === "PAID" ? "bg-green-50 text-green-700" : "bg-amber-50 text-amber-700"}`}>
+                {i.status}
+              </span>
+            </div>
+          ))}
+        </div>
+      </div>
+    );
+  }
+
+  function CampaignsView() {
+    const [campaigns, setCampaigns] = useState<any[]>([]);
+    const [name, setName] = useState("");
+    const [message, setMessage] = useState("");
+    const [segment, setSegment] = useState("ALL");
+    const [channel, setChannel] = useState("SMS");
+
+    const load = useCallback(async () => {
+      const r = await fetch(`${base}/campaigns`);
+      const d = await r.json();
+      if (d.success) setCampaigns(d.campaigns);
+    }, [base]);
+
+    useEffect(() => {
+      load();
+    }, [load]);
+
+    async function create() {
+      if (!name || !message) return setMsg({ ok: false, text: t("campaigns.required") });
+      await api(`${base}/campaigns`, "POST", { name, channel, segment, message });
+      setName("");
+      setMessage("");
+      load();
+    }
+
+    async function run(id: string) {
+      const res = await api(`${base}/campaigns/${id}/run`, "POST");
+      if (res) {
+        setMsg({ ok: true, text: t("campaigns.queued") });
+        load();
+      }
+    }
+
+    return (
+      <div>
+        <div className="grid gap-3 rounded-2xl border border-neutral-200 p-4 sm:grid-cols-[1fr_1fr_auto]">
+          <input className={input} aria-label={t("campaigns.name")} placeholder={t("campaigns.name")} value={name} onChange={(e) => setName(e.target.value)} />
+          <input className={input} aria-label={t("campaigns.message")} placeholder={t("campaigns.message")} value={message} onChange={(e) => setMessage(e.target.value)} />
+          <select className={input} value={channel} onChange={(e) => setChannel(e.target.value)}>
+            <option value="SMS">{t("campaigns.sms")}</option>
+            <option value="EMAIL">{t("campaigns.email")}</option>
+          </select>
+          <select className={input} value={segment} onChange={(e) => setSegment(e.target.value)}>
+            <option value="ALL">{t("campaigns.all")}</option>
+            <option value="RETURNING">{t("campaigns.returning")}</option>
+          </select>
+          <button onClick={create} className="rounded-xl bg-pink-600 px-5 py-2.5 text-sm font-bold text-white hover:bg-pink-700">{t("campaigns.create")}</button>
+        </div>
+        <div className="mt-4 space-y-2">
+          {campaigns.length === 0 && <p className="py-4 text-center text-sm text-neutral-400">{t("campaigns.empty")}</p>}
+          {campaigns.map((c) => (
+            <div key={c.id} className="flex flex-wrap items-center justify-between gap-2 rounded-2xl border border-neutral-200 px-4 py-3">
+              <div>
+                <div className="font-bold text-neutral-800">{c.name}</div>
+                <div className="text-xs text-neutral-500">{c.channel} - {c.segment} - {c.status} - ارسال: {c.sentCount}</div>
+              </div>
+              <button onClick={() => run(c.id)} className="rounded-lg bg-neutral-900 px-3 py-1.5 text-xs font-bold text-white hover:bg-neutral-800">{t("campaigns.run")}</button>
+            </div>
+          ))}
+        </div>
+      </div>
+    );
+  }
+
+  function DomainView() {
+    const [domain, setDomain] = useState("");
+    const [result, setResult] = useState<any>(null);
+
+    async function init() {
+      const r = await api(`${base}/domain`, "POST", { customDomain: domain || undefined });
+      if (r) {
+        setResult(r.instructions);
+        setMsg({ ok: true, text: t("domain.pending") });
+      }
+    }
+
+    async function verify() {
+      const res = await api(`${base}/domain/verify`, "POST");
+      if (res) setMsg({ ok: true, text: t("domain.verified") });
+    }
+
+    return (
+      <div className="space-y-3">
+        <div className="grid gap-3 rounded-2xl border border-neutral-200 p-4 sm:grid-cols-[1fr_auto_auto]">
+          <input className={input} aria-label={t("domain.placeholder")} dir="ltr" placeholder={t("domain.placeholder")} value={domain} onChange={(e) => setDomain(e.target.value)} />
+          <button onClick={init} className="rounded-xl bg-neutral-900 px-4 py-2.5 text-sm font-bold text-white hover:bg-neutral-800">{t("domain.submit")}</button>
+          <button onClick={verify} className="rounded-xl bg-green-600 px-4 py-2.5 text-sm font-bold text-white hover:bg-green-700">{t("domain.verify")}</button>
+        </div>
+        {result && (
+          <div className="rounded-2xl border border-neutral-200 p-4 text-sm">
+            <div>{t("domain.txt")}</div>
+            <div className="mt-2 font-mono" dir="ltr">{`${result.host} TXT ${result.value}`}</div>
+          </div>
+        )}
+      </div>
+    );
+  }
+
+  function DataView() {
+    const [importType, setImportType] = useState("customers");
+    const [raw, setRaw] = useState("");
+
+    async function importData() {
+      try {
+        const parsed = JSON.parse(raw);
+        const rows = Array.isArray(parsed) ? parsed : parsed.rows;
+        const res = await api(`${base}/import/${importType === "customers" ? "customers" : "appointments"}`, "POST", { rows });
+        if (res) setMsg({ ok: true, text: t("data.imported") });
+      } catch {
+        setMsg({ ok: false, text: t("data.invalidJson") });
+      }
+    }
+
+    return (
+      <div className="space-y-4">
+        <div className="grid gap-2 sm:grid-cols-2">
+          <a className="rounded-2xl border border-neutral-200 px-4 py-3 text-center text-sm font-bold text-neutral-700 hover:bg-neutral-50" href={`${base}/excel?type=appointments`}>{t("data.exportAppointments")}</a>
+          <a className="rounded-2xl border border-neutral-200 px-4 py-3 text-center text-sm font-bold text-neutral-700 hover:bg-neutral-50" href={`${base}/excel?type=customers`}>{t("data.exportCustomers")}</a>
+        </div>
+
+        <div className="rounded-2xl border border-neutral-200 p-4">
+          <div className="mb-2 flex gap-2">
+            <select className={input} value={importType} onChange={(e) => setImportType(e.target.value)}>
+              <option value="customers">{t("data.customers")}</option>
+              <option value="appointments">{t("data.appointments")}</option>
+            </select>
+          </div>
+          <textarea className={`${input} min-h-[160px] font-mono`} aria-label={t("data.import")} placeholder={t("data.placeholder")} value={raw} onChange={(e) => setRaw(e.target.value)} />
+          <button onClick={importData} className="mt-3 rounded-xl bg-pink-600 px-5 py-2.5 text-sm font-bold text-white hover:bg-pink-700">{t("data.import")}</button>
+        </div>
+      </div>
+    );
+  }
+
   // ─── ردیف خدمات با ویرایش/غیرفعال‌سازی ─────────────────────────────────
   function ServiceRow({ service }: { service: Service }) {
     const [editing, setEditing] = useState(false);
@@ -938,17 +1109,21 @@ export default function SalonManager({ salonId, salonSlug }: { salonId: string; 
   }
 
   const tabs: { id: Tab; label: string }[] = [
-    { id: "services", label: "خدمات" },
-    { id: "calendar", label: "تقویم نوبت" },
-    { id: "staff", label: "کارکنان" },
-    { id: "customers", label: "مشتریان" },
-    { id: "holidays", label: "تعطیلات" },
-    { id: "branches", label: "شعبه‌ها" },
-    { id: "cash", label: "صندوق" },
-    { id: "report", label: "گزارش عملکرد" },
-    { id: "waitlist", label: "صف انتظار" },
-    { id: "blocks", label: "مسدودسازی" },
-    { id: "booking", label: "ثبت نوبت" },
+    { id: "services", label: t("manager.tabs.services") },
+    { id: "calendar", label: t("manager.tabs.calendar") },
+    { id: "staff", label: t("manager.tabs.staff") },
+    { id: "customers", label: t("manager.tabs.customers") },
+    { id: "holidays", label: t("manager.tabs.holidays") },
+    { id: "branches", label: t("manager.tabs.branches") },
+    { id: "cash", label: t("manager.tabs.cash") },
+    { id: "report", label: t("manager.tabs.report") },
+    { id: "waitlist", label: t("manager.tabs.waitlist") },
+    { id: "blocks", label: t("manager.tabs.blocks") },
+    { id: "invoices", label: t("manager.tabs.invoices") },
+    { id: "campaigns", label: t("manager.tabs.campaigns") },
+    { id: "domain", label: t("manager.tabs.domain") },
+    { id: "data", label: t("manager.tabs.data") },
+    { id: "booking", label: t("manager.tabs.booking") },
   ];
 
   return (
@@ -1037,6 +1212,10 @@ export default function SalonManager({ salonId, salonSlug }: { salonId: string; 
         )}
 
         {tab === "report" && <ReportView />}
+        {tab === "invoices" && <BillingView />}
+        {tab === "campaigns" && <CampaignsView />}
+        {tab === "domain" && <DomainView />}
+        {tab === "data" && <DataView />}
         {tab === "waitlist" && <WaitlistView />}
         {tab === "calendar" && <CalendarView />}
 

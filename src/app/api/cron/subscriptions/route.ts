@@ -1,5 +1,5 @@
 import { prisma } from "@/lib/prisma";
-import { renewSubscription } from "@/lib/subscriptions";
+import { chargeRenewal } from "@/lib/billing";
 import { enqueueSms, processPendingNotifications } from "@/lib/notifications/queue";
 import { json } from "@/lib/utils";
 
@@ -28,12 +28,23 @@ export async function GET(req: Request) {
   let renewed = 0;
   let expired = 0;
   let reminded = 0;
+  let failedRenewals = 0;
 
   for (const sub of due) {
     if (sub.endsAt <= now) {
       if (sub.autoRenew) {
-        await renewSubscription(sub.id);
-        renewed++;
+        const charge = await chargeRenewal(sub.id);
+        if (charge.success) {
+          renewed++;
+        } else {
+          failedRenewals++;
+          await enqueueSms({
+            type: "SUBSCRIPTION_PAYMENT_FAILED",
+            recipient: sub.salon.phone,
+            message: `پرداخت تمدید اشتراک «${sub.package.name}» ناموفق بود. برای ادامه، لطفاً پرداخت را تکرار کنید.`,
+            uniqueKey: `subfailed:${sub.id}:${charge.orderId ?? ""}`,
+          });
+        }
       } else {
         await prisma.subscription.update({ where: { id: sub.id }, data: { status: "EXPIRED" } });
         await prisma.salon.update({ where: { id: sub.salonId }, data: { plan: "FREE", subscriptionEndsAt: null } });
@@ -58,5 +69,5 @@ export async function GET(req: Request) {
 
   const result = await processPendingNotifications(30);
 
-  return json({ success: true, scanned: due.length, renewed, expired, reminded, ...result });
+  return json({ success: true, scanned: due.length, renewed, failedRenewals, expired, reminded, ...result });
 }
