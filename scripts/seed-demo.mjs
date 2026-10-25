@@ -3,6 +3,7 @@
 // اجرا: node scripts/seed-demo.mjs  (Idempotent — با خیال راحت چندبار اجرا کنید)
 import { PrismaClient } from "@prisma/client";
 import { mkdir, writeFile } from "node:fs/promises";
+import { readFileSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -13,22 +14,41 @@ const ASSETS = path.join(ROOT, "public", "uploads", "seed");
 /* ─────────────────────── ابزار تولید تصویر (SVG) ─────────────────────── */
 const esc = (s) => String(s).replaceAll("&", "&amp;").replaceAll("<", "&lt;").replaceAll(">", "&gt;");
 
+// ── فونت‌های جاسازی‌شده — تا متن داخل SVG در هر محیطی با فونت فارسی دیده شود ──
+// (SVG وقتی به‌صورت <img> یا تصویر دیده می‌شود نمی‌تواند فونت بیرونی بار کند؛
+//  برای همین فایل فونت را به‌صورت base64 داخل خود SVG قرار می‌دهیم.)
+const fontB64 = (name) => {
+  try { return readFileSync(path.join(ROOT, "public", "fonts", name)).toString("base64"); }
+  catch { return ""; }
+};
+const _YekanBold = fontB64("Yekan-Bold.woff2");
+const _IranSans = fontB64("IRANSans-Regular.woff2");
+const SVG_FONTS =
+  (_YekanBold || _IranSans)
+    ? `<style><![CDATA[` +
+      (_YekanBold ? `@font-face{font-family:"Yekan";src:url(data:font/woff2;base64,${_YekanBold}) format("woff2");font-weight:700;}` : "") +
+      (_IranSans ? `@font-face{font-family:"IranSans";src:url(data:font/woff2;base64,${_IranSans}) format("woff2");font-weight:400;}` : "") +
+      `]]></style>`
+    : "";
+const F_YEKAN = '"Yekan","Vazirmatn",Tahoma,sans-serif';
+const F_IRANSANS = '"IranSans","Vazirmatn",Tahoma,sans-serif';
+
 function svgLogo(letter, c1, c2) {
-  return `<svg xmlns="http://www.w3.org/2000/svg" width="256" height="256" viewBox="0 0 256 256"><defs><linearGradient id="g" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="${c1}"/><stop offset="1" stop-color="${c2}"/></linearGradient></defs><rect width="256" height="256" rx="64" fill="url(#g)"/><circle cx="64" cy="52" r="30" fill="#fff" opacity="0.18"/><circle cx="204" cy="196" r="44" fill="#fff" opacity="0.10"/><text x="128" y="140" text-anchor="middle" dominant-baseline="central" font-size="112" font-weight="bold" fill="#fff" font-family="Vazirmatn,Tahoma,sans-serif">${esc(letter)}</text></svg>`;
+  return `<svg xmlns="http://www.w3.org/2000/svg" width="256" height="256" viewBox="0 0 256 256">${SVG_FONTS}<defs><linearGradient id="g" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="${c1}"/><stop offset="1" stop-color="${c2}"/></linearGradient></defs><rect width="256" height="256" rx="64" fill="url(#g)"/><circle cx="64" cy="52" r="30" fill="#fff" opacity="0.18"/><circle cx="204" cy="196" r="44" fill="#fff" opacity="0.10"/><text x="128" y="140" text-anchor="middle" dominant-baseline="central" font-size="112" font-weight="bold" fill="#fff" font-family="${F_YEKAN}">${esc(letter)}</text></svg>`;
 }
 
 function svgBanner(name, tagline, c1, c2) {
-  return `<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="400" viewBox="0 0 1200 400"><defs><linearGradient id="g" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="${c1}"/><stop offset="1" stop-color="${c2}"/></linearGradient></defs><rect width="1200" height="400" fill="url(#g)"/><circle cx="1030" cy="60" r="130" fill="#fff" opacity="0.10"/><circle cx="150" cy="360" r="100" fill="#fff" opacity="0.10"/><circle cx="1120" cy="330" r="70" fill="#fff" opacity="0.08"/><text x="600" y="170" text-anchor="middle" font-size="68" font-weight="bold" fill="#fff" font-family="Vazirmatn,Tahoma,sans-serif">${esc(name)}</text><text x="600" y="245" text-anchor="middle" font-size="32" fill="#ffffffd9" font-family="Vazirmatn,Tahoma,sans-serif">${esc(tagline)}</text></svg>`;
+  return `<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="400" viewBox="0 0 1200 400">${SVG_FONTS}<defs><linearGradient id="g" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="${c1}"/><stop offset="1" stop-color="${c2}"/></linearGradient></defs><rect width="1200" height="400" fill="url(#g)"/><circle cx="1030" cy="60" r="130" fill="#fff" opacity="0.10"/><circle cx="150" cy="360" r="100" fill="#fff" opacity="0.10"/><circle cx="1120" cy="330" r="70" fill="#fff" opacity="0.08"/><text x="600" y="170" text-anchor="middle" font-size="68" font-weight="bold" fill="#fff" font-family="${F_YEKAN}">${esc(name)}</text><text x="600" y="245" text-anchor="middle" font-size="32" fill="#ffffffd9" font-family="${F_IRANSANS}">${esc(tagline)}</text></svg>`;
 }
 
 function svgGallery(title, label, c1, c2, idx) {
   const x = 400;
   const y = 210 + idx * 30;
-  return `<svg xmlns="http://www.w3.org/2000/svg" width="800" height="600" viewBox="0 0 800 600"><defs><linearGradient id="g" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="${c1}"/><stop offset="1" stop-color="${c2}"/></linearGradient></defs><rect width="800" height="600" fill="url(#g)"/><circle cx="640" cy="110" r="90" fill="#fff" opacity="0.12"/><circle cx="160" cy="480" r="70" fill="#fff" opacity="0.12"/><text x="${x}" y="${y}" text-anchor="middle" dominant-baseline="central" font-size="170" font-weight="bold" fill="#ffffff4d" font-family="Vazirmatn,Tahoma,sans-serif">${esc(label)}</text><rect x="0" y="470" width="800" height="130" fill="#00000033"/><text x="400" y="540" text-anchor="middle" font-size="42" font-weight="bold" fill="#fff" font-family="Vazirmatn,Tahoma,sans-serif">${esc(title)}</text></svg>`;
+  return `<svg xmlns="http://www.w3.org/2000/svg" width="800" height="600" viewBox="0 0 800 600">${SVG_FONTS}<defs><linearGradient id="g" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="${c1}"/><stop offset="1" stop-color="${c2}"/></linearGradient></defs><rect width="800" height="600" fill="url(#g)"/><circle cx="640" cy="110" r="90" fill="#fff" opacity="0.12"/><circle cx="160" cy="480" r="70" fill="#fff" opacity="0.12"/><text x="${x}" y="${y}" text-anchor="middle" dominant-baseline="central" font-size="170" font-weight="bold" fill="#ffffff4d" font-family="${F_YEKAN}">${esc(label)}</text><rect x="0" y="470" width="800" height="130" fill="#00000033"/><text x="400" y="540" text-anchor="middle" font-size="42" font-weight="bold" fill="#fff" font-family="${F_YEKAN}">${esc(title)}</text></svg>`;
 }
 
 function svgAvatar(initials, c1, c2) {
-  return `<svg xmlns="http://www.w3.org/2000/svg" width="256" height="256" viewBox="0 0 256 256"><defs><linearGradient id="g" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="${c1}"/><stop offset="1" stop-color="${c2}"/></linearGradient></defs><circle cx="128" cy="128" r="128" fill="url(#g)"/><text x="128" y="138" text-anchor="middle" dominant-baseline="central" font-size="86" font-weight="bold" fill="#fff" font-family="Vazirmatn,Tahoma,sans-serif">${esc(initials)}</text></svg>`;
+  return `<svg xmlns="http://www.w3.org/2000/svg" width="256" height="256" viewBox="0 0 256 256">${SVG_FONTS}<defs><linearGradient id="g" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="${c1}"/><stop offset="1" stop-color="${c2}"/></linearGradient></defs><circle cx="128" cy="128" r="128" fill="url(#g)"/><text x="128" y="138" text-anchor="middle" dominant-baseline="central" font-size="86" font-weight="bold" fill="#fff" font-family="${F_YEKAN}">${esc(initials)}</text></svg>`;
 }
 
 async function writeAsset(file, content) {
@@ -239,7 +259,12 @@ async function cleanupJunk() {
   });
   for (let i = 0; i < junkCrm.length; i++) {
     const w = WALKINS[(i + 2) % WALKINS.length];
-    await prisma.salonCustomer.update({ where: { id: junkCrm[i].id }, data: { name: w.name, phone: w.phone } });
+    try {
+      await prisma.salonCustomer.update({ where: { id: junkCrm[i].id }, data: { name: w.name, phone: w.phone } });
+    } catch (e) {
+      // اگر شماره تکراری در همان سالن وجود داشت، از این رد می‌شویم (جلوگیری از کرش).
+      if (e.code !== "P2002") throw e;
+    }
   }
   if (junkCrm.length) console.log(`🧹 ${junkCrm.length} مشتری CRM آزمایشی اصلاح شد`);
 }
@@ -385,11 +410,14 @@ async function seedSalon(def, idx) {
   // گالری (برای سالن‌های جدید)
   if (def.gallery) {
     const existingGallery = await prisma.galleryItem.count({ where: { salonId: salon.id } });
-    for (let g = existingGallery; g < def.gallery.length; g++) {
+    for (let g = 0; g < def.gallery.length; g++) {
       const title = def.gallery[g];
       const file = `${def.slug}-gallery-${g}.svg`;
+      // همیشه خود تصویر را بازنویسی می‌کنیم تا فونت‌های جدید اعمال شوند
       await writeAsset(file, svgGallery(title, [...title][0], def.c1, def.c2, g));
-      await prisma.galleryItem.create({ data: { salonId: salon.id, title, imageUrl: `/uploads/seed/${file}`, sortOrder: g } });
+      if (g >= existingGallery) {
+        await prisma.galleryItem.create({ data: { salonId: salon.id, title, imageUrl: `/uploads/seed/${file}`, sortOrder: g } });
+      }
     }
   }
 
