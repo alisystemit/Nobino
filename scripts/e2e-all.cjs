@@ -8,7 +8,6 @@ function report(module, test, ok, detail = "") {
   const mark = ok ? "✅" : "❌";
   console.log(`${mark} [${module}] ${test}${detail ? " — " + detail : ""}`);
 }
-const assert = (cond, msg) => { if (!cond) throw new Error(msg); };
 
 async function req(path, opts = {}, cookie) {
   const headers = { ...(opts.headers || {}) };
@@ -27,7 +26,17 @@ async function login(phone) {
   const log = fs.readFileSync(logFile, "utf8");
   const matches = [...log.matchAll(new RegExp(`OTP به ${phone}: کد (\\d{4})`, "g"))];
   const v = await req("/api/auth/otp/verify", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ phone, code: matches[matches.length - 1][1] }) });
-  return v.setCookie.split(";")[0];
+  let cookie = v.setCookie ? v.setCookie.split(";")[0] : "";
+  // ادمین با رمز عبور وارد می‌شود (ورود دومرحله‌ای)
+  if (!cookie && v.json?.requiresPassword) {
+    const p = await req("/api/auth/password/login", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ login: v.json.login, password: process.env.ADMIN_PASSWORD || "Admin@1234" }),
+    });
+    cookie = p.setCookie ? p.setCookie.split(";")[0] : "";
+  }
+  return cookie;
 }
 
 async function main() {
@@ -35,6 +44,11 @@ async function main() {
   console.log("\n== ۱) احراز هویت ==");
   const admin = await login("09120000000");
   report("Auth", "ورود ادمین", !!admin, admin?.slice(0, 15));
+  // ورود با رمز عبور (اشتباه → ۴۰۱، صحیح → ۲۰۰)
+  const wrongPw = await req("/api/auth/password/login", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ login: "09120000000", password: "WrongPassword1" }) });
+  report("Auth", "رد رمز اشتباه", wrongPw.status === 401, String(wrongPw.status));
+  const okPw = await req("/api/auth/password/login", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ login: "09120000000", password: process.env.ADMIN_PASSWORD || "Admin@1234" }) });
+  report("Auth", "ورود ادمین با رمز عبور", okPw.status === 200 && !!okPw.setCookie && okPw.json?.user?.role === "ADMIN", String(okPw.status));
   const owner = await login("09120000001");
   report("Auth", "ورود آرایشگر", !!owner);
   const agentC = await login("09120000002");
@@ -164,6 +178,40 @@ async function main() {
     report("Payments", "تکمیل پرداخت", txt.includes("پرداخت موفق"), txt.includes("پرداخت موفق") ? "موفق" : "ناموفق");
   }
 
+  // ═══════════ ۹/ب) فاکتور آنلاین ═══════════
+  console.log("\n== ۹/ب) فاکتور آنلاین ==");
+  const invCreate = await req(
+    `/api/dashboard/salons/${salon.id}/invoices`,
+    {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ customerName: "مریم احمدی", customerPhone: "۰۹۱۲ ۸۷۶ ۵۴۳۲", description: "کوتاهی مو + ماسک", amount: 450000 }),
+    },
+    owner
+  );
+  report("Invoice", "صدور فاکتور خدماتی", invCreate.status === 201 && !!invCreate.json?.payLink, JSON.stringify(invCreate.json?.invoice?.number));
+  const invToken = invCreate.json?.payLink?.split("/").pop();
+  const invList = await req(`/api/dashboard/salons/${salon.id}/invoices`, {}, owner);
+  report("Invoice", "لیست فاکتورها", invList.status === 200 && invList.json.invoices.some((i) => i.kind === "SERVICE"), `تعداد=${invList.json?.invoices?.length}`);
+  if (invToken) {
+    const payPage = await fetch(`${BASE}/pay/${invToken}`);
+    const payHtml = await payPage.text();
+    report("Invoice", "صفحه پرداخت عمومی", payPage.status === 200 && payHtml.includes("پرداخت آنلاین فاکتور"), payPage.status);
+    const payReq = await fetch(`${BASE}/api/pay/${invToken}`, { method: "POST", headers: { "content-type": "application/json" }, body: "{}" });
+    const payJson = await payReq.json();
+    report("Invoice", "ایجاد درخواست پرداخت فاکتور", payReq.status === 200 && !!payJson.redirectUrl, payJson.gateway);
+    if (payJson.redirectUrl) {
+      const step1 = await fetch(BASE + payJson.redirectUrl, { redirect: "manual" });
+      const loc1 = step1.headers.get("location");
+      const step2 = await fetch(loc1, { redirect: "manual" });
+      const loc2 = step2.headers.get("location");
+      report("Invoice", "پرداخت فاکتور از طریق درگاه", !!loc2 && loc2.includes("status=success"), loc2?.slice(0, 90));
+      const after = await req(`/api/dashboard/salons/${salon.id}/invoices`, {}, owner);
+      const mine = after.json.invoices.find((i) => i.payLink?.includes(invToken));
+      report("Invoice", "تغییر وضعیت فاکتور به پرداخت‌شده", mine?.status === "PAID", mine?.status);
+    }
+  }
+
   // ═══════════ ۱۰) پنل سالن ═══════════
   console.log("\n== ۱۰) پنل سالن ==");
   const branches = await req(`/api/dashboard/salons/${salon.id}/branches`, {}, owner);
@@ -232,6 +280,55 @@ async function main() {
   console.log("\n== ۱۵) اعلان عمومی ==");
   const ann = await req("/api/public/announcement");
   report("Announcement", "دریافت اعلان", ann.status === 200, ann.json?.announcement);
+
+  // ═══════════ ۱۶) PWA ═══════════
+  console.log("\n== ۱۶) PWA ==");
+  const manifest = await req("/manifest.webmanifest");
+  const mJson = manifest.json ?? {};
+  report("PWA", "مانیفست معتبر", manifest.status === 200 && mJson.display === "standalone" && mJson.theme_color, JSON.stringify(mJson.name));
+  report("PWA", "آیکون‌های PWA", (mJson.icons ?? []).length >= 3, `تعداد=${mJson.icons?.length}`);
+  const sw = await req("/sw.js");
+  report("PWA", "سرویس‌ورکر", sw.status === 200, sw.status);
+  const icon192 = await req("/icons/icon-192.png");
+  report("PWA", "آیکون ۱۹۲", icon192.status === 200, icon192.status);
+  const maskable = await req("/icons/icon-maskable-512.png");
+  report("PWA", "آیکون maskable", maskable.status === 200, maskable.status);
+  const offline = await req("/offline");
+  report("PWA", "صفحه آفلاین", offline.status === 200 && offline.text.includes("آفلاین"), offline.status);
+
+  // ═══════════ ۱۷) آپلود تصویر ═══════════
+  console.log("\n== ۱۷) آپلود تصویر ==");
+  const noAuthUp = await req("/api/upload/avatar", { method: "POST" });
+  report("Upload", "بدون لاگین → 401", noAuthUp.status === 401, noAuthUp.status);
+  const png = Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==", "base64");
+  const fd = new FormData();
+  fd.append("file", new Blob([png], { type: "image/png" }), "avatar.png");
+  const up = await fetch(BASE + "/api/upload/avatar", { method: "POST", headers: { cookie: owner }, body: fd });
+  const upJson = await up.json().catch(() => null);
+  report("Upload", "آپلود آواتار", up.status === 201 && !!upJson?.url, upJson?.url);
+  if (upJson?.url) {
+    const stList = await req(`/api/dashboard/salons/${salon.id}/staff`, {}, owner);
+    const st = stList.json?.staff?.[0];
+    if (st) {
+      const patch = await req(
+        `/api/dashboard/salons/${salon.id}/staff/${st.id}`,
+        { method: "PATCH", headers: { "content-type": "application/json" }, body: JSON.stringify({ avatarUrl: upJson.url }) },
+        owner
+      );
+      report("Upload", "ست آواتار کارمند", patch.status === 200, patch.status);
+      await req(
+        `/api/dashboard/salons/${salon.id}/staff/${st.id}`,
+        { method: "PATCH", headers: { "content-type": "application/json" }, body: JSON.stringify({ avatarUrl: null }) },
+        owner
+      );
+    }
+    const mePatch = await req("/api/auth/me", { method: "PATCH", headers: { "content-type": "application/json" }, body: JSON.stringify({ avatarUrl: upJson.url }) }, owner);
+    report("Upload", "ست آواتار پروفایل", mePatch.status === 200, mePatch.status);
+    await req("/api/auth/me", { method: "PATCH", headers: { "content-type": "application/json" }, body: JSON.stringify({ avatarUrl: null }) }, owner);
+    const imgUrl = upJson.url.startsWith("http") ? upJson.url : BASE + upJson.url;
+    const imgRes = await fetch(imgUrl);
+    report("Upload", "دسترسی عمومی به فایل", imgRes.status === 200, imgRes.status);
+  }
 
   // ═══════════ خلاصه ═══════════
   const passed = results.filter((r) => r.ok).length;

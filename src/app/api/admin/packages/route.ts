@@ -1,3 +1,5 @@
+﻿
+
 import { z } from "zod";
 import { requireRole } from "@/lib/auth/guards";
 import { prisma } from "@/lib/prisma";
@@ -64,3 +66,40 @@ export async function POST(req: Request) {
     return apiError(err);
   }
 }
+
+/** حذف یا غیرفعال‌سازی پکیج؛ اگر اشتراک/سفارش داشته باشد فقط غیرفعال می‌شود */
+export async function DELETE(req: Request) {
+  try {
+    const user = await requireRole(["ADMIN"]);
+    const url = new URL(req.url);
+    const id = url.searchParams.get("id");
+    if (!id) return json({ success: false, error: "شناسه پکیج الزامی است" }, { status: 400 });
+
+    const pkg = await prisma.package.findUnique({
+      where: { id },
+      include: { _count: { select: { subscriptions: true, orders: true } } },
+    });
+    if (!pkg) return json({ success: false, error: "پکیج یافت نشد" }, { status: 404 });
+
+    if (pkg._count.subscriptions > 0 || pkg._count.orders > 0) {
+      const updated = await prisma.package.update({ where: { id }, data: { isActive: false } });
+      await logAudit({
+        actorId: user.id,
+        actorPhone: user.phone,
+        action: "deactivate_package",
+        entityType: "Package",
+        entityId: id,
+        before: pkg,
+        after: updated,
+      });
+      return json({ success: true, deactivated: true, package: updated });
+    }
+
+    await prisma.package.delete({ where: { id } });
+    await logAudit({ actorId: user.id, actorPhone: user.phone, action: "delete_package", entityType: "Package", entityId: id, before: pkg });
+    return json({ success: true, deleted: true });
+  } catch (err) {
+    return apiError(err);
+  }
+}
+

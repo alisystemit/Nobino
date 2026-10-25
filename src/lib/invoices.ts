@@ -1,3 +1,4 @@
+import { randomBytes } from "node:crypto";
 import { prisma } from "@/lib/prisma";
 import type { PaymentStatus } from "@prisma/client";
 
@@ -8,6 +9,44 @@ function invoiceNumber() {
   const d = String(now.getDate()).padStart(2, "0");
   const rand = Math.floor(Math.random() * 1_000_000).toString().padStart(6, "0");
   return `INV-${y}${m}${d}-${rand}`;
+}
+
+/** ساخت فاکتور خدماتی برای مشتری (قابل پرداخت آنلاین با لینک پیامکی) */
+export async function createServiceInvoice(params: {
+  salonId: string;
+  customerName?: string;
+  customerPhone?: string;
+  description?: string;
+  amount: number;
+}) {
+  if (!Number.isFinite(params.amount) || params.amount <= 0) {
+    throw new Error("مبلغ فاکتور نامعتبر است");
+  }
+  return prisma.invoice.create({
+    data: {
+      number: invoiceNumber(),
+      salonId: params.salonId,
+      kind: "SERVICE",
+      customerName: params.customerName?.trim() || null,
+      customerPhone: params.customerPhone?.trim() || null,
+      description: params.description?.trim() || null,
+      payToken: randomBytes(16).toString("hex"),
+      amount: Math.round(params.amount),
+      period: "ONCE",
+      status: "PENDING",
+      issuedAt: new Date(),
+      dueAt: new Date(Date.now() + 7 * 864e5),
+    },
+  });
+}
+
+/** یافتن فاکتور از روی توکن پرداخت عمومی */
+export async function getInvoiceByPayToken(token: string) {
+  if (!token) return null;
+  return prisma.invoice.findUnique({
+    where: { payToken: token },
+    include: { salon: { select: { id: true, name: true, slug: true, city: true } } },
+  });
 }
 
 /** ساخت فاکتور برای یک سفارش پرداخت‌شده یا در انتظار پرداخت */

@@ -3,9 +3,19 @@
 import { useEffect, useState } from "react";
 import { toPersianDigits } from "@/lib/utils";
 
+type Stats = {
+  hasSalon: boolean;
+  salonId?: string;
+  slug?: string;
+  total: number;
+  today: number;
+  pending: number;
+  balance: number;
+};
+
 /** داشبورد روزانه سالن: نوبت امروز، درآمد، لغوها، در انتظار */
 export default function DailyStats({ role }: { role: string }) {
-  const [stats, setStats] = useState<any>(null);
+  const [stats, setStats] = useState<Stats | null>(null);
   const [error, setError] = useState("");
 
   useEffect(() => {

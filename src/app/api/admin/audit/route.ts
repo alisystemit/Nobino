@@ -1,6 +1,9 @@
+﻿
+
 import { requireRole } from "@/lib/auth/guards";
 import { prisma } from "@/lib/prisma";
 import { json, apiError } from "@/lib/utils";
+import type { Prisma } from "@prisma/client";
 
 /** لاگ حسابرسی با فیلتر (اقدام / نوع موجودیت) */
 export async function GET(req: Request) {
@@ -10,7 +13,7 @@ export async function GET(req: Request) {
     const action = url.searchParams.get("action")?.trim();
     const entity = url.searchParams.get("entity")?.trim();
 
-    const where: any = {};
+    const where: Prisma.AuditLogWhereInput = {};
     if (action) where.action = { contains: action, mode: "insensitive" };
     if (entity) where.entityType = { contains: entity, mode: "insensitive" };
 
@@ -20,3 +23,4 @@ export async function GET(req: Request) {
     return apiError(err);
   }
 }
+

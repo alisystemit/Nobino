@@ -17,11 +17,10 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
     });
     if (!salon) return json({ success: false, error: "سالن یافت نشد" }, { status: 404 });
 
-    const [revenueAgg, subscription, recentAppointments, planRevenue] = await Promise.all([
+    const [revenueAgg, subscription, recentAppointments] = await Promise.all([
       prisma.order.aggregate({ where: { salonId: id, status: "PAID" }, _sum: { amount: true } }),
       prisma.subscription.findFirst({ where: { salonId: id, status: "ACTIVE" }, orderBy: { createdAt: "desc" }, include: { package: { select: { name: true, plan: true } } } }),
       prisma.appointment.findMany({ where: { salonId: id }, orderBy: { startAt: "desc" }, take: 10, select: { id: true, customerName: true, startAt: true, status: true } }),
-      prisma.order.aggregate({ where: { salonId: id, status: "PAID" }, _sum: { amount: true } }),
     ]);
 
     return json({

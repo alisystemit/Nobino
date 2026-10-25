@@ -34,6 +34,8 @@ class MockEmailSender implements EmailSender {
     return true;
   }
   async sendEmail(to: string, subject: string, html: string) {
+    // در حالت mock متن ایمیل فقط لاگ می‌شود.
+    void html;
     console.log(`[EMAIL:MOCK] به ${to} — موضوع: ${subject}`);
   }
 }

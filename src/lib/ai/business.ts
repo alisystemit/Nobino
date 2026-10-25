@@ -5,7 +5,7 @@ import { llmChat } from "@/lib/ai/llm";
 export async function getBusinessData(salonId: string) {
   const appointments = await prisma.appointment.findMany({
     where: { salonId },
-    select: { startAt: true, status: true, createdAt: true },
+    select: { startAt: true, status: true, createdAt: true, customerPhone: true },
     take: 5000,
   });
 
@@ -28,8 +28,7 @@ export async function getBusinessData(salonId: string) {
   const peakHour = Object.entries(hourCount).sort((a, b) => b[1] - a[1])[0];
 
   // مشتریان بازگشتی
-  const customers = appointments.map((a) => a.status);
-  const uniquePhones = new Set(appointments.map((a) => (a as any).customerPhone)).size;
+  const uniquePhones = new Set(appointments.map((a) => a.customerPhone)).size;
 
   return {
     total,

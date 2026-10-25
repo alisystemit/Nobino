@@ -2,6 +2,14 @@
  * ابزارهای کمکی مشترک
  */
 
+import { clsx } from "clsx";
+import { twMerge } from "tailwind-merge";
+
+/** ترکیب کلاس‌های tailwind */
+export function cn(...inputs: (string | undefined | null | false)[]) {
+  return twMerge(clsx(inputs));
+}
+
 /** پاسخ JSON استاندارد برای Route Handlers */
 export function json(data: unknown, init?: ResponseInit) {
   return Response.json(data, {

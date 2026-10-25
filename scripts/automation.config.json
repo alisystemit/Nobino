@@ -1,0 +1,43 @@
+{
+  "baseUrl": "http://localhost:3000",
+  "timezone": "Asia/Tehran",
+  "requestTimeoutMs": 60000,
+  "logFile": "logs/automation.log",
+  "jobs": [
+    {
+      "id": "notifications",
+      "label": "پردازش صف اعلان‌ها (پیامک/ایمیل)",
+      "path": "/api/cron/notifications",
+      "schedule": "*/5 * * * *",
+      "enabled": true
+    },
+    {
+      "id": "holds",
+      "label": "آزادسازی قفل‌های موقت منقضی‌شده",
+      "path": "/api/cron/holds",
+      "schedule": "*/10 * * * *",
+      "enabled": true
+    },
+    {
+      "id": "reminders",
+      "label": "یادآوری نوبت‌های نزدیک",
+      "path": "/api/cron/reminders",
+      "schedule": "0 * * * *",
+      "enabled": true
+    },
+    {
+      "id": "waitlist",
+      "label": "اطلاع‌رسانی لیست انتظار",
+      "path": "/api/cron/waitlist",
+      "schedule": "15 * * * *",
+      "enabled": true
+    },
+    {
+      "id": "subscriptions",
+      "label": "تمدید و انقضای اشتراک‌ها",
+      "path": "/api/cron/subscriptions",
+      "schedule": "0 2 * * *",
+      "enabled": true
+    }
+  ]
+}

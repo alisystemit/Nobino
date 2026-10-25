@@ -38,10 +38,11 @@ export abstract class BaseGateway implements PaymentGateway {
   // ─── رفتار شبیه‌سازی (سندباکس) ────────────────────────────────────────
   private sandboxRequest(order: PaymentOrder): Promise<PaymentRequestResult> {
     const authority = `SB-${this.id.toUpperCase()}-${Date.now()}`;
+    const invoiceParam = order.invoiceId ? `&invoice=${order.invoiceId}` : "";
     return Promise.resolve({
       success: true,
       authority,
-      redirectUrl: `/api/payments/mock-pay?authority=${authority}&order=${order.id}&gateway=${this.id}`,
+      redirectUrl: `/api/payments/mock-pay?authority=${authority}&order=${order.id}&gateway=${this.id}${invoiceParam}`,
       message: `درگاه ${this.name} (تست)`,
     });
   }

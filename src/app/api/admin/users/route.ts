@@ -1,8 +1,11 @@
+﻿
+
 import { z } from "zod";
 import { requireRole } from "@/lib/auth/guards";
 import { prisma } from "@/lib/prisma";
 import { logAudit } from "@/lib/audit";
 import { json, apiError } from "@/lib/utils";
+import type { Prisma, Role } from "@prisma/client";
 
 export async function GET(req: Request) {
   try {
@@ -11,9 +14,9 @@ export async function GET(req: Request) {
     const q = url.searchParams.get("q")?.trim();
     const roleFilter = url.searchParams.get("role")?.trim();
 
-    const where: any = {};
+    const where: Prisma.UserWhereInput = {};
     if (q) where.OR = [{ phone: { contains: q } }, { name: { contains: q } }, { email: { contains: q } }];
-    if (roleFilter) where.role = roleFilter;
+    if (roleFilter) where.role = roleFilter as Role;
 
     const users = await prisma.user.findMany({
       where,
@@ -49,3 +52,4 @@ export async function PATCH(req: Request) {
     return apiError(err);
   }
 }
+

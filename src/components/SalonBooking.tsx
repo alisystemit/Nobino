@@ -12,9 +12,49 @@ type Service = {
   bufferMin?: number;
 };
 type Staff = { id: string; name: string; title?: string | null; services?: { id: string }[] };
-type Extracted = { name?: string; phone?: string; service?: string; time?: string; note?: string };
+type Extracted = { name?: string; phone?: string; service?: string; date?: string; time?: string; note?: string };
 type Slot = { startAt: string; endAt: string };
 type Branch = { id: string; name: string; city?: string | null; address?: string | null };
+type FieldKey = "name" | "phone" | "service" | "date" | "time";
+
+const FIELD_LABELS: Record<FieldKey, string> = {
+  name: "نام",
+  phone: "شماره موبایل",
+  service: "نام خدمت",
+  date: "تاریخ",
+  time: "ساعت",
+};
+
+const SAMPLE_SCRIPT =
+  "سلام، می‌خوام نوبت رزرو کنم: برای فردا ساعت ده صبح، خدمت کوتاهی مو، به نام سارا احمدی، شماره موبایل ۰۹۱۲۳۴۵۶۷۸";
+
+const REQUIRED_FIELDS: FieldKey[] = ["name", "phone", "date", "time"];
+
+/** تبدیل ارقام فارسی به لاتین برای مقایسه ساعت */
+function toLatinDigits(s: string): string {
+  return s.replace(/[۰-۹]/g, (d) => String("۰۱۲۳۴۵۶۷۸۹".indexOf(d)));
+}
+
+/** ساعت محلی سالن یک اسلات به شکل HH:MM لاتین */
+function localHHMM(iso: string, timeZone: string): string {
+  try {
+    return new Intl.DateTimeFormat("en-GB", {
+      timeZone,
+      hour: "2-digit",
+      minute: "2-digit",
+      hour12: false,
+    }).format(new Date(iso));
+  } catch {
+    return iso.slice(11, 16);
+  }
+}
+
+/** انتخاب اسلات آزادِ مطابق با ساعت استخراج‌شده از صدا */
+function matchSlot(wanted: string | null | undefined, list: Slot[], timeZone: string): string | null {
+  if (!wanted || list.length === 0) return null;
+  const hit = list.find((s) => toLatinDigits(localHHMM(s.startAt, timeZone)) === wanted) ?? list[0];
+  return hit.startAt;
+}
 
 /** تاریخ امروز در منطقه‌زمان سالن (نه منطقه‌زمان مرورگر) */
 function todayISO(timeZone: string): string {
@@ -76,11 +116,18 @@ export default function SalonBooking({
   const [loadingSlots, setLoadingSlots] = useState(false);
   const [recording, setRecording] = useState(false);
   const [transcript, setTranscript] = useState("");
+  const [extracted, setExtracted] = useState<Extracted | null>(null);
+  const [recField, setRecField] = useState<FieldKey | "">("");
+  const [fragments, setFragments] = useState<{ field: FieldKey; text: string }[]>([]);
+  const [voiceCallId, setVoiceCallId] = useState("");
   const [sending, setSending] = useState(false);
+  const [showScript, setShowScript] = useState(false);
+  const [copied, setCopied] = useState(false);
   const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null);
 
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const chunksRef = useRef<Blob[]>([]);
+  const voiceTimeRef = useRef<string | null>(null);
 
   const today = todayISO(timezone);
   const maxDate = addDaysISO(today, Math.max(1, maxAdvanceDays));
@@ -105,21 +152,24 @@ export default function SalonBooking({
   );
   const compatibleIdsKey = compatibleStaff.map((s) => s.id).join(",");
 
-  useEffect(() => {
+  // اگر آرایشگر انتخاب‌شده دیگر خدمات انتخابی را ارائه ندهد، انتخاب پاک می‌شود
+  const [prevCompatibleIdsKey, setPrevCompatibleIdsKey] = useState(compatibleIdsKey);
+  if (compatibleIdsKey !== prevCompatibleIdsKey) {
+    setPrevCompatibleIdsKey(compatibleIdsKey);
     if (employeeId && !compatibleIdsKey.split(",").includes(employeeId)) setEmployeeId("");
-  }, [employeeId, compatibleIdsKey]);
+  }
 
   // بارگیری اسلات‌های آزاد وقتی خدمات + تاریخ انتخاب شد
   useEffect(() => {
-    setSlotISO("");
-    if (!serviceIdsKey || !date) {
-      setSlots([]);
-      setLoadingSlots(false);
-      return;
-    }
     let cancelled = false;
-    setLoadingSlots(true);
     (async () => {
+      setSlotISO("");
+      if (!serviceIdsKey || !date) {
+        setSlots([]);
+        setLoadingSlots(false);
+        return;
+      }
+      setLoadingSlots(true);
       try {
         const q = new URLSearchParams({ serviceIds: serviceIdsKey, date });
         if (employeeId) q.set("employeeId", employeeId);
@@ -127,7 +177,14 @@ export default function SalonBooking({
         const res = await fetch(`/api/salons/${slug}/availability?${q}`);
         const data = await res.json();
         if (!cancelled) {
-          setSlots(data.success ? data.slots : []);
+          const list: Slot[] = data.success ? data.slots : [];
+          setSlots(list);
+          // اگر صدا ساعتی استخراج کرده بود، اسلات آزاد همان ساعت انتخاب می‌شود
+          const hit = matchSlot(voiceTimeRef.current, list, timezone);
+          if (hit) {
+            setSlotISO(hit);
+            voiceTimeRef.current = null;
+          }
           if (!data.success && data.error) setMsg({ ok: false, text: data.error });
         }
       } catch {
@@ -142,16 +199,17 @@ export default function SalonBooking({
     return () => {
       cancelled = true;
     };
-  }, [serviceIdsKey, date, employeeId, branchId, slug]);
+  }, [serviceIdsKey, date, employeeId, branchId, slug, timezone]);
 
   function toggleService(id: string) {
     setMsg(null);
     setServiceIds((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]));
   }
 
-  async function startRecording() {
+  async function startRecording(field: FieldKey | "") {
     setMsg(null);
-    setTranscript("");
+    if (!field) setTranscript("");
+    setRecField(field);
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
       const mr = new MediaRecorder(stream);
@@ -159,11 +217,15 @@ export default function SalonBooking({
       mr.ondataavailable = (e) => {
         if (e.data.size > 0) chunksRef.current.push(e.data);
       };
-      mr.onstop = () => sendAudio();
+      mr.onstop = () => {
+        if (field) void sendFieldAudio(field);
+        else void sendAudio();
+      };
       mr.start();
       mediaRecorderRef.current = mr;
       setRecording(true);
     } catch {
+      setRecField("");
       setMsg({ ok: false, text: "دسترسی به میکروفون ممکن نیست." });
     }
   }
@@ -172,6 +234,26 @@ export default function SalonBooking({
     mediaRecorderRef.current?.stop();
     mediaRecorderRef.current?.stream.getTracks().forEach((t) => t.stop());
     setRecording(false);
+  }
+
+  async function copyScript() {
+    try {
+      await navigator.clipboard.writeText(SAMPLE_SCRIPT);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    } catch {}
+  }
+
+  function applyExtracted(ex: Extracted) {
+    setExtracted(ex);
+    if (ex.name) setName(ex.name);
+    if (ex.phone) setPhone(ex.phone);
+    if (ex.date) setDate(ex.date);
+    if (ex.time) voiceTimeRef.current = ex.time;
+    if (ex.service) {
+      const matched = services.find((s) => ex.service && (s.name.includes(ex.service) || ex.service.includes(s.name)));
+      if (matched) setServiceIds([matched.id]);
+    }
   }
 
   async function sendAudio() {
@@ -188,17 +270,63 @@ export default function SalonBooking({
       if (!data.success) throw new Error(data.error || "خطا در پردازش صدا");
 
       setTranscript(data.transcript);
+      if (data.voiceCallId) setVoiceCallId(data.voiceCallId);
       const ex: Extracted = data.extracted ?? {};
-      if (ex.name) setName(ex.name);
-      if (ex.phone) setPhone(ex.phone);
-      if (ex.service) {
-        const matched = services.find((s) => ex.service && (s.name.includes(ex.service) || ex.service.includes(s.name)));
-        if (matched) setServiceIds([matched.id]);
+      applyExtracted(ex);
+      const missing = REQUIRED_FIELDS.filter((f) => !ex[f]);
+      if (missing.length > 0) {
+        setMsg({
+          ok: false,
+          text: `متن شما استخراج شد؛ ${missing.map((f) => FIELD_LABELS[f]).join("، ")} پیدا نشد. فقط همان موارد را بگویید یا در فرم تایپ کنید.`,
+        });
+      } else {
+        setMsg({ ok: true, text: "همه اطلاعات استخراج شد. خدمت، تاریخ و ساعت را بررسی و تأیید کنید." });
       }
-      setMsg({ ok: true, text: "متن شما استخراج شد. خدمت، تاریخ و ساعت را بررسی و تأیید کنید." });
     } catch (e) {
       setMsg({ ok: false, text: e instanceof Error ? e.message : "خطا" });
     } finally {
+      setSending(false);
+    }
+  }
+
+  /** مشتری فقط همان فیلدِ نامفهوم را دوباره می‌گوید */
+  async function sendFieldAudio(field: FieldKey) {
+    const blob = new Blob(chunksRef.current, { type: "audio/webm" });
+    const form = new FormData();
+    form.append("audio", blob, "recording.webm");
+    form.append("salonId", salonId);
+    form.append("phone", phone);
+    form.append("field", field);
+    form.append("partial", JSON.stringify(extracted ?? {}));
+    if (voiceCallId) form.append("voiceCallId", voiceCallId);
+
+    setSending(true);
+    try {
+      const res = await fetch("/api/voice/transcribe", { method: "POST", body: form });
+      const data = await res.json();
+      if (!data.success) throw new Error(data.error || "خطا در پردازش صدا");
+
+      setFragments((prev) => [...prev, { field, text: data.transcript }]);
+      if (data.voiceCallId) setVoiceCallId(data.voiceCallId);
+      const ex: Extracted = data.extracted ?? {};
+      applyExtracted(ex);
+      // اگر ساعت تازه کامل شد و اسلات‌ها از قبل بارگیری شده‌اند، ساعت مطابق انتخاب می‌شود
+      if (field === "time" && data.fieldValue) {
+        const iso = matchSlot(data.fieldValue, slots, timezone);
+        if (iso) {
+          setSlotISO(iso);
+          voiceTimeRef.current = null;
+        }
+      }
+      if (data.fieldValue) {
+        setMsg({ ok: true, text: `${FIELD_LABELS[field]} دریافت شد: ${data.fieldValue}` });
+      } else {
+        setMsg({ ok: false, text: `${FIELD_LABELS[field]} باز هم قابل تشخیص نبود؛ لطفاً آن را تایپ کنید.` });
+      }
+    } catch (e) {
+      setMsg({ ok: false, text: e instanceof Error ? e.message : "خطا" });
+    } finally {
+      setRecField("");
       setSending(false);
     }
   }
@@ -254,26 +382,100 @@ export default function SalonBooking({
       <div className="p-6">
         {/* Voice AI */}
         <div className="rounded-2xl bg-gradient-to-bl from-pink-50 to-purple-50 p-4">
-          <p className="text-sm font-bold text-neutral-700">🎙️ نوبت‌دهی با صدا</p>
+          <div className="flex items-center justify-between gap-2">
+            <p className="text-sm font-bold text-neutral-700">🎙️ نوبت‌دهی با صدا</p>
+            <button
+              onClick={() => setShowScript((v) => !v)}
+              className="rounded-lg bg-white/80 px-2.5 py-1.5 text-[11px] font-bold text-purple-700 shadow-sm transition hover:bg-white"
+            >
+              {showScript ? "بستن متن نمونه" : "متن نمونه برای خواندن"}
+            </button>
+          </div>
           <p className="mt-1 text-xs text-neutral-500">
-            میکروفون را بزنید و با صدای فارسی بگویید چه زمانی برای چه خدمتی نوبت می‌خواهید.
+            میکروفون را بزنید و با صدای فارسی بگویید چه زمانی برای چه خدمتی نوبت می‌خواهید. اگر ربات بخشی را نفهمید، فقط همان بخش را دوباره می‌پرسد.
           </p>
+
+          {showScript && (
+            <div className="mt-3 rounded-xl border border-purple-200 bg-white/80 p-3">
+              <div className="flex items-center justify-between gap-2">
+                <span className="text-[11px] font-black text-purple-700">متن نمونه — مشخصات را با اطلاعات خودتان عوض کنید</span>
+                <button
+                  onClick={copyScript}
+                  className="rounded-lg bg-purple-100 px-2 py-1 text-[10px] font-bold text-purple-700 hover:bg-purple-200"
+                >
+                  {copied ? "کپی شد ✓" : "کپی"}
+                </button>
+              </div>
+              <p className="mt-2 text-xs leading-relaxed text-neutral-700">«{SAMPLE_SCRIPT}»</p>
+            </div>
+          )}
+
           <div className="mt-3 flex items-center gap-3">
             <button
-              onClick={recording ? stopRecording : startRecording}
-              disabled={sending}
-              className="relative flex h-14 w-14 items-center justify-center rounded-full bg-pink-600 text-white transition hover:bg-pink-700 disabled:opacity-50"
+              onClick={() => (recording ? stopRecording() : startRecording(""))}
+              disabled={sending || recField !== ""}
+              className={`relative flex h-14 w-14 shrink-0 items-center justify-center rounded-full text-white transition disabled:opacity-50 ${
+                recording ? "bg-red-500 hover:bg-red-600" : "bg-pink-600 hover:bg-pink-700"
+              }`}
               aria-label={recording ? "پایان ضبط" : "شروع ضبط صدا"}
             >
-              {recording && <span className="absolute inset-0 rounded-full bg-pink-500 animate-ping-slow" />}
+              {recording && <span className="absolute inset-0 rounded-full bg-red-400 animate-ping-slow" />}
               <span className="relative text-xl">{recording ? "⏹️" : "🎤"}</span>
             </button>
             <div className="text-xs text-neutral-500">
-              {recording ? "در حال ضبط... برای پایان کلیک کنید" : sending ? "در حال پردازش..." : "برای شروع کلیک کنید"}
+              {recording ? "در حال ضبط... برای پایان کلیک کنید" : sending ? "در حال پردازش هوش مصنوعی..." : "برای شروع کلیک کنید"}
             </div>
           </div>
           {transcript && (
             <p className="mt-3 rounded-xl bg-white/70 p-3 text-sm leading-relaxed text-neutral-700">“{transcript}”</p>
+          )}
+          {fragments.map((fr, i) => (
+            <p key={i} className="mt-2 rounded-xl border border-dashed border-purple-200 bg-white/60 p-2.5 text-xs text-neutral-500">
+              <span className="font-bold text-neutral-700">{FIELD_LABELS[fr.field]}:</span> “{fr.text}”
+            </p>
+          ))}
+
+          {extracted && (
+            <div className="mt-3 rounded-xl border border-purple-200 bg-white/80 p-3">
+              <div className="text-[11px] font-black text-purple-700">🤖 خروجی هوش مصنوعی</div>
+              <div className="mt-1.5 flex flex-wrap gap-1.5 text-[11px]">
+                {(
+                  [
+                    ["name", extracted.name],
+                    ["phone", extracted.phone],
+                    ["service", extracted.service],
+                    ["date", extracted.date],
+                    ["time", extracted.time],
+                  ] as [FieldKey, string | undefined][]
+                )
+                  .filter(([, v]) => Boolean(v))
+                  .map(([k, v]) => (
+                    <span key={k} className="rounded-full bg-purple-50 px-2.5 py-1 font-bold text-purple-700">
+                      ✓ {FIELD_LABELS[k]}: {v}
+                    </span>
+                  ))}
+              </div>
+              {REQUIRED_FIELDS.filter((f) => !extracted[f]).map((f) => (
+                <div key={f} className="mt-2 flex flex-wrap items-center justify-between gap-2 rounded-lg border border-amber-200 bg-amber-50 p-2.5">
+                  <span className="text-[11px] font-bold text-amber-700">ربات «{FIELD_LABELS[f]}» را متوجه نشد</span>
+                  <button
+                    onClick={() => (recField === f ? stopRecording() : startRecording(f))}
+                    disabled={sending || (recField !== "" && recField !== f)}
+                    className={`inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-[11px] font-black transition disabled:opacity-50 ${
+                      recField === f ? "bg-red-500 text-white" : "bg-amber-100 text-amber-800 hover:bg-amber-200"
+                    }`}
+                  >
+                    {recField === f ? (
+                      <>
+                        <span className="h-2 w-2 animate-pulse rounded-full bg-white" /> در حال ضبط... پایان
+                      </>
+                    ) : (
+                      <>🎤 فقط {FIELD_LABELS[f]} را بگویید</>
+                    )}
+                  </button>
+                </div>
+              ))}
+            </div>
           )}
         </div>
 
@@ -402,7 +604,10 @@ export default function SalonBooking({
                       <button
                         key={s.startAt}
                         type="button"
-                        onClick={() => setSlotISO(s.startAt)}
+                        onClick={() => {
+                          voiceTimeRef.current = null;
+                          setSlotISO(s.startAt);
+                        }}
                         className={`rounded-lg border px-2 py-2 text-xs font-bold transition ${
                           active
                             ? "border-pink-600 bg-pink-600 text-white"

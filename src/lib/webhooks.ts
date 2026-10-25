@@ -20,7 +20,6 @@ export async function dispatchWebhook(salonId: string, event: string, payload: u
 }
 
 export async function attemptDelivery(deliveryId: string, cfg: { url: string; secret?: string | null }) {
-  const body = JSON.stringify({ event: "appointment.confirmed", data: {}, ts: Date.now() });
   try {
     const delivery = await prisma.webhookDelivery.findUnique({ where: { id: deliveryId } });
     if (!delivery) return;

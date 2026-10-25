@@ -1,5 +1,5 @@
 import { prisma } from "@/lib/prisma";
-import type { CreationChannel } from "@prisma/client";
+import type { CreationChannel, Prisma } from "@prisma/client";
 import { assertBookableWindow } from "@/lib/bookings/availability";
 import { serviceDuration } from "@/lib/bookings/service";
 
@@ -76,7 +76,7 @@ export async function createAppointmentSafe(input: {
     });
 
     // تداخل با نوبت‌های موجود (پوشش بافر)
-    const clashWhere: any = {
+    const clashWhere: Prisma.AppointmentWhereInput = {
       salonId: salon.id,
       status: { in: ["REQUESTED", "CONFIRMED"] },
       startAt: { lt: serviceEnd },
@@ -99,7 +99,7 @@ export async function createAppointmentSafe(input: {
     if (clash) throw new BookingConflictError();
 
     // تداخل با بازه‌های مسدود
-    const blockWhere: any = {
+    const blockWhere: Prisma.TimeBlockWhereInput = {
       salonId: salon.id,
       startAt: { lt: serviceEnd },
       endAt: { gt: start },

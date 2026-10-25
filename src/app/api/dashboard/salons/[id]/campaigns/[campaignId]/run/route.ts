@@ -11,6 +11,10 @@ export async function POST(_req: Request, { params }: { params: Promise<{ id: st
     const campaign = await prisma.campaign.findUnique({ where: { id: campaignId } });
     if (!campaign || campaign.salonId !== id) return json({ success: false, error: "campaign not found" }, { status: 404 });
 
+    // جایگزینی {salon} با نام سالن در قالب‌های آماده
+    const salon = await prisma.salon.findUnique({ where: { id }, select: { name: true } });
+    const message = salon ? campaign.message.replaceAll("{salon}", salon.name) : campaign.message;
+
     const appointments = await prisma.appointment.findMany({
       where: { salonId: id, status: "COMPLETED" },
       select: { customerPhone: true },
@@ -21,7 +25,7 @@ export async function POST(_req: Request, { params }: { params: Promise<{ id: st
     for (const a of appointments) counts.set(a.customerPhone, (counts.get(a.customerPhone) ?? 0) + 1);
 
     const recipients = [...counts.entries()]
-      .filter(([phone, count]) => (campaign.segment === "RETURNING" ? count > 1 : count >= 1))
+      .filter(([, count]) => (campaign.segment === "RETURNING" ? count > 1 : count >= 1))
       .map(([phone]) => phone)
       .filter((phone) => /^0?9\d{9}$/.test(phone))
       .slice(0, 500);
@@ -34,7 +38,7 @@ export async function POST(_req: Request, { params }: { params: Promise<{ id: st
       await enqueueSms({
         type: "MARKETING",
         recipient: phone,
-        message: campaign.message,
+        message,
         uniqueKey: `campaign:${campaign.id}:${phone}`,
       });
     }

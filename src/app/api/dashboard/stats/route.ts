@@ -1,3 +1,5 @@
+﻿
+
 import { requireAuth } from "@/lib/auth/guards";
 import { prisma } from "@/lib/prisma";
 import { getWalletSummary } from "@/lib/financial/summary";
@@ -59,3 +61,4 @@ export async function GET() {
     return apiError(err);
   }
 }
+

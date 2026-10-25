@@ -1,60 +1,239 @@
-import { getSetting } from "@/lib/settings";
+import { getSetting, settingOrEnv } from "@/lib/settings";
 
 /**
  * زنجیره ربات‌های تبدیل گفتار به متن (STT) با fallback.
- * ترتیب تلاش: OpenAI Whisper → Groq (Whisper رایگان) → Mock.
- * اگر یکی در دسترس نبود (کلید نداشت یا خطا داد) به بعدی می‌رویم.
+ *
+ * ترتیب پیش‌فرض: ربات‌های رایگان اول (Groq → HuggingFace → Cloudflare → Deepgram)
+ * و بعد سرویس‌های پولی (OpenAI). اگر هر ربات در دسترس نبود (کلید نداشت،
+ * محدودیت نرخ داشت یا خطا داد) به ربات بعدی می‌رود و در پایان از Mock محلی
+ * استفاده می‌کند تا ثبت نوبت هرگز به‌خاطر قطعی سرویس شکست نخورد.
+ *
+ * ترتیب را می‌توان از تنظیمات `stt.order` (با کاما) تغییر داد.
+ * فعال/غیرفعال کردن هر ربات: `stt.<id>.enabled` = true|false
  */
 
-export type SttProvider = "openai" | "groq" | "mock";
+export type SttProvider = "openai" | "groq" | "huggingface" | "cloudflare" | "deepgram" | "mock";
 
-async function isConfigured(id: SttProvider): Promise<boolean> {
-  const key = await getSetting(`stt.${id}.key`);
-  return Boolean(key);
+type ProviderDef = {
+  id: Exclude<SttProvider, "mock">;
+  label: string;
+  free: boolean;
+  envKey: string;
+  /** کلیدهای لازم؛ اگر همه خالی باشند ربات نادیده گرفته می‌شود */
+  requiredSettings: string[];
+  transcribe: (audio: Uint8Array, filename: string, mime: string) => Promise<string>;
+};
+
+async function secret(key: string, envKey?: string): Promise<string | undefined> {
+  return settingOrEnv(key, envKey ? process.env[envKey] : undefined);
 }
 
-async function callProvider(id: SttProvider, audio: Uint8Array, filename: string, mime: string): Promise<string> {
-  const key = await getSetting(`stt.${id}.key`);
-  const form = new FormData();
-  form.append("file", new Blob([new Uint8Array(audio)], { type: mime }), filename);
-  form.append("model", id === "groq" ? "whisper-large-v3-turbo" : "whisper-1");
-  form.append("language", "fa");
+const PROVIDERS: ProviderDef[] = [
+  {
+    id: "groq",
+    label: "Groq Whisper (رایگان)",
+    free: true,
+    envKey: "GROQ_API_KEY",
+    requiredSettings: ["stt.groq.key"],
+    async transcribe(audio, filename, mime) {
+      const key = await secret("stt.groq.key", "GROQ_API_KEY");
+      if (!key) throw new Error("کلید Groq تنظیم نشده است");
+      const form = new FormData();
+      form.append("file", new Blob([new Uint8Array(audio)], { type: mime }), filename);
+      form.append("model", (await getSetting("stt.groq.model")) || "whisper-large-v3-turbo");
+      form.append("language", "fa");
+      form.append("response_format", "json");
+      const res = await fetch("https://api.groq.com/openai/v1/audio/transcriptions", {
+        method: "POST",
+        headers: { Authorization: `Bearer ${key}` },
+        body: form,
+      });
+      if (!res.ok) throw new Error(`groq HTTP ${res.status}`);
+      const data = (await res.json()) as { text?: string };
+      return data.text ?? "";
+    },
+  },
+  {
+    id: "huggingface",
+    label: "HuggingFace Inference (رایگان)",
+    free: true,
+    envKey: "HF_TOKEN",
+    requiredSettings: ["stt.huggingface.key"],
+    async transcribe(audio, _filename, mime) {
+      const key = await secret("stt.huggingface.key", "HF_TOKEN") || (await secret("stt.huggingface.key", "HUGGINGFACE_API_KEY"));
+      if (!key) throw new Error("توکن HuggingFace تنظیم نشده است");
+      const model = (await getSetting("stt.huggingface.model")) || "openai/whisper-large-v3";
+      const res = await fetch(`https://router.huggingface.co/hf-inference/models/${model}`, {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${key}`,
+          "Content-Type": mime || "application/octet-stream",
+          "x-wait-for-model": "true",
+        },
+        body: new Uint8Array(audio),
+      });
+      if (!res.ok) throw new Error(`huggingface HTTP ${res.status}`);
+      const data = (await res.json()) as { text?: string } | { error?: string };
+      if ("error" in data && data.error) throw new Error(`huggingface: ${data.error}`);
+      return (data as { text?: string }).text ?? "";
+    },
+  },
+  {
+    id: "cloudflare",
+    label: "Cloudflare Workers AI (رایگان)",
+    free: true,
+    envKey: "CLOUDFLARE_API_TOKEN",
+    requiredSettings: ["stt.cloudflare.key", "stt.cloudflare.account"],
+    async transcribe(audio, _filename, mime) {
+      const token = await secret("stt.cloudflare.key", "CLOUDFLARE_API_TOKEN");
+      const account = await secret("stt.cloudflare.account", "CLOUDFLARE_ACCOUNT_ID");
+      if (!token || !account) throw new Error("حساب/توکن Cloudflare تنظیم نشده است");
+      const model = (await getSetting("stt.cloudflare.model")) || "@cf/openai/whisper-large-v3-turbo";
+      const res = await fetch(`https://api.cloudflare.com/client/v4/accounts/${account}/ai/run/${model}`, {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "Content-Type": mime || "application/octet-stream",
+        },
+        body: new Uint8Array(audio),
+      });
+      if (!res.ok) throw new Error(`cloudflare HTTP ${res.status}`);
+      const data = (await res.json()) as { result?: { text?: string }; errors?: { message?: string }[] };
+      if (data.errors?.length) throw new Error(`cloudflare: ${data.errors[0]?.message ?? "error"}`);
+      return data.result?.text ?? "";
+    },
+  },
+  {
+    id: "deepgram",
+    label: "Deepgram Nova (اعتبار رایگان)",
+    free: true,
+    envKey: "DEEPGRAM_API_KEY",
+    requiredSettings: ["stt.deepgram.key"],
+    async transcribe(audio, _filename, mime) {
+      const key = await secret("stt.deepgram.key", "DEEPGRAM_API_KEY");
+      if (!key) throw new Error("کلید Deepgram تنظیم نشده است");
+      const model = (await getSetting("stt.deepgram.model")) || "nova-3";
+      const res = await fetch(
+        `https://api.deepgram.com/v1/listen?model=${encodeURIComponent(model)}&language=fa&smart_format=true`,
+        {
+          method: "POST",
+          headers: { Authorization: `Token ${key}`, "Content-Type": mime || "audio/webm" },
+          body: new Uint8Array(audio),
+        }
+      );
+      if (!res.ok) throw new Error(`deepgram HTTP ${res.status}`);
+      const data = (await res.json()) as {
+        results?: { channels?: { alternatives?: { transcript?: string }[] }[] };
+      };
+      return data.results?.channels?.[0]?.alternatives?.[0]?.transcript ?? "";
+    },
+  },
+  {
+    id: "openai",
+    label: "OpenAI Whisper",
+    free: false,
+    envKey: "OPENAI_API_KEY",
+    requiredSettings: ["stt.openai.key"],
+    async transcribe(audio, filename, mime) {
+      const key = await secret("stt.openai.key", "OPENAI_API_KEY");
+      if (!key) throw new Error("کلید OpenAI تنظیم نشده است");
+      const form = new FormData();
+      form.append("file", new Blob([new Uint8Array(audio)], { type: mime }), filename);
+      form.append("model", (await getSetting("stt.openai.model")) || "whisper-1");
+      form.append("language", "fa");
+      const res = await fetch("https://api.openai.com/v1/audio/transcriptions", {
+        method: "POST",
+        headers: { Authorization: `Bearer ${key}` },
+        body: form,
+      });
+      if (!res.ok) throw new Error(`openai HTTP ${res.status}`);
+      const data = (await res.json()) as { text?: string };
+      return data.text ?? "";
+    },
+  },
+];
 
-  const url = id === "groq" ? "https://api.groq.com/openai/v1/audio/transcriptions" : "https://api.openai.com/v1/audio/transcriptions";
+const DEFAULT_ORDER: SttProvider[] = ["groq", "huggingface", "cloudflare", "deepgram", "openai"];
 
-  const res = await fetch(url, {
-    method: "POST",
-    headers: { Authorization: `Bearer ${key}` },
-    body: form,
-  });
-  if (!res.ok) throw new Error(`${id} HTTP ${res.status}`);
-  const data = (await res.json()) as { text?: string };
-  return data.text ?? "";
+async function isAvailable(def: ProviderDef): Promise<boolean> {
+  const enabled = await getSetting(`stt.${def.id}.enabled`);
+  if (enabled === "false") return false;
+  const primary = await secret(def.requiredSettings[0], def.envKey);
+  if (!primary) return false;
+  for (const key of def.requiredSettings.slice(1)) {
+    if (!(await secret(key))) return false;
+  }
+  return true;
 }
 
-/** تبدیل گفتار به متن با fallback بین ربات‌ها */
+async function resolveOrder(): Promise<ProviderDef[]> {
+  const raw = await getSetting("stt.order");
+  if (!raw) return PROVIDERS.filter((p) => DEFAULT_ORDER.includes(p.id)).sort(
+    (a, b) => DEFAULT_ORDER.indexOf(a.id) - DEFAULT_ORDER.indexOf(b.id)
+  );
+  const wanted = raw
+    .split(",")
+    .map((s) => s.trim().toLowerCase())
+    .filter(Boolean);
+  const ordered: ProviderDef[] = [];
+  for (const id of wanted) {
+    const found = PROVIDERS.find((p) => p.id === id);
+    if (found && !ordered.includes(found)) ordered.push(found);
+  }
+  // بقیه ربات‌ها (اگر در لیست نبودند) در انتها
+  for (const p of PROVIDERS) if (!ordered.includes(p)) ordered.push(p);
+  return ordered;
+}
+
+/** فهرست وضعیت ربات‌های STT برای نمایش در پنل تنظیمات */
+export async function listSttProviders(): Promise<
+  { id: SttProvider; label: string; free: boolean; configured: boolean }[]
+> {
+  const out: { id: SttProvider; label: string; free: boolean; configured: boolean }[] = [];
+  for (const def of await resolveOrder()) {
+    out.push({ id: def.id, label: def.label, free: def.free, configured: await isAvailable(def) });
+  }
+  out.push({ id: "mock", label: "Mock محلی (همیشه در دسترس)", free: true, configured: true });
+  return out;
+}
+
+const SAMPLE_TRANSCRIPTS = [
+  "سلام، می‌خواستم برای فردا ساعت ده صبح نوبت کوتاهی مو بگیرم. نام من سارا احمدی است و شماره موبایلم ۰۹۱۲۳۴۵۶۷۸ است.",
+  "برای امروز ساعت شش عصر یک نوبت رنگ مو می‌خواهم. اسم من مریم است.",
+  "دو شنبه ساعت دوازده ظهر برای کاشت ناخن وقت می‌گیرم. شماره من ۰۹۹۱۲۳۴۵۶۷ است.",
+];
+
+/** تبدیل گفتار به متن با fallback بین ربات‌ها (هرگز خطا پرتاب نمی‌کند) */
 export async function transcribeWithFallback(
   audio: Uint8Array,
   opts?: { filename?: string; mimeType?: string }
-): Promise<{ transcript: string; provider: SttProvider }> {
+): Promise<{ transcript: string; provider: SttProvider; errors?: string[] }> {
   const filename = opts?.filename ?? "recording.webm";
   const mime = opts?.mimeType ?? "audio/webm";
+  const errors: string[] = [];
 
-  for (const id of ["openai", "groq"] as SttProvider[]) {
-    if (!(await isConfigured(id))) continue;
-    try {
-      const transcript = await callProvider(id, audio, filename, mime);
-      if (transcript) return { transcript, provider: id };
-    } catch {
-      // به ربات بعدی برو
+  for (const def of await resolveOrder()) {
+    if (!(await isAvailable(def))) {
+      errors.push(`${def.id}: تنظیم نشده`);
+      continue;
+    }
+    // تلاش دوباره کوتاه برای خطاهای موقت (محدودیت نرخ/شبکه)
+    for (let attempt = 0; attempt < 2; attempt++) {
+      try {
+        const transcript = (await def.transcribe(audio, filename, mime)).trim();
+        if (transcript) return { transcript, provider: def.id, errors: errors.length ? errors : undefined };
+        errors.push(`${def.id}: متن خالی`);
+        break;
+      } catch (e) {
+        errors.push(`${def.id}: ${e instanceof Error ? e.message : "خطا"}`);
+        if (attempt === 0) await new Promise((r) => setTimeout(r, 400));
+      }
     }
   }
 
-  // fallback نهایی: Mock (محلی)
-  const samples = [
-    "سلام، می‌خواستم برای فردا ساعت ده صبح نوبت کوتاهی مو بگیرم. نام من سارا احمدی است و شماره موبایلم ۰۹۱۲۳۴۵۶۷۸ است.",
-    "برای امروز ساعت شش عصر یک نوبت رنگ مو می‌خواهم. اسم من مریم است.",
-    "دو شنبه ساعت دوازده ظهر برای کاشت ناخن وقت می‌گیرم. شماره من ۰۹۹۱۲۳۴۵۶۷ است.",
-  ];
-  return { transcript: samples[Math.floor(Math.random() * samples.length)], provider: "mock" };
+  return {
+    transcript: SAMPLE_TRANSCRIPTS[Math.floor(Math.random() * SAMPLE_TRANSCRIPTS.length)],
+    provider: "mock",
+    errors: errors.length ? errors : undefined,
+  };
 }

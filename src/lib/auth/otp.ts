@@ -4,7 +4,8 @@ import { getSmsProvider } from "@/lib/sms/provider";
 import { getEmailSender } from "@/lib/email/provider";
 
 const OTP_TTL_MS = 5 * 60 * 1000; // ۵ دقیقه
-const MAX_ATTEMPTS = 5;
+// در پروداکشن سخت‌گیرانه (ضد اسپم)؛ در توسعه بالاتر تا تست‌های E2E مکرر قفل نشوند
+const MAX_ATTEMPTS = process.env.NODE_ENV === "production" ? 5 : 50;
 
 /** تولید کد ۴ رقمی با مولد امن (نه Math.random) */
 function generateCode(): string {

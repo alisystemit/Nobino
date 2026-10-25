@@ -4,10 +4,11 @@
  */
 
 export interface PaymentOrder {
-  id: string; // شناسه سفارش ما
+  id: string; // شناسه سفارش ما (یا فاکتور)
   amount: number; // مبلغ به تومان
   description: string;
   callbackUrl: string; // آدرس بازگشت پس از پرداخت
+  invoiceId?: string; // اگر پرداخت برای فاکتور خدماتی است
   customer?: { phone?: string; name?: string };
   metadata?: Record<string, unknown>;
 }

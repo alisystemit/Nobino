@@ -4,22 +4,22 @@
 
 Γû▓ Next.js 16.4.2 (Turbopack)
 - Environments: .env
-Γ£ô Running next.config.ts took 64ms
+Γ£ô Running next.config.ts took 59ms
 - Cache Components enabled
 - Partial Prefetching enabled
 
   Creating an optimized production build ...
-Γ£ô Compiled successfully in 11.0s
+Γ£ô Compiled successfully in 20.8s
   Running TypeScript ...
-  Finished TypeScript in 11.9s ...
+  Finished TypeScript in 22.2s ...
   Collecting page data using 3 workers ...
-  Generating static pages using 3 workers (0/70) ...
+  Generating static pages using 3 workers (0/73) ...
 npm.cmd : [error] Error: During prerendering, `cookies()` rejects when the prerender is complete. Typically these 
 errors are handled by React but if you move `cookies()` to a different context by using `setTimeout`, `after`, or 
 similar functions you may observe this error and you should handle it in that context. This occurred at route 
 "/api/commission".
 At line:1 char:1
-+ npm.cmd run build 2>&1 | Out-File -Encoding utf8 build.log; Get-Conte ...
++ npm.cmd run build 2>&1 | Out-File -Encoding utf8 build.log; Select-St ...
 + ~~~~~~~~~~~~~~~~~~~~~~
     + CategoryInfo          : NotSpecified: ([error] Error: ...pi/commission".:String) [], RemoteException
     + FullyQualifiedErrorId : NativeCommandError
@@ -39,25 +39,7 @@ At line:1 char:1
   expression: '`cookies()`',
   digest: 'HANGING_PROMISE_REJECTION'
 } { status: 500 }
-  Generating static pages using 3 workers (17/70) 
-[error] Error: During prerendering, `cookies()` rejects when the prerender is complete. Typically these errors are 
-handled by React but if you move `cookies()` to a different context by using `setTimeout`, `after`, or similar 
-functions you may observe this error and you should handle it in that context. This occurred at route 
-"/api/dashboard/stats".
-    at ew (src\lib\auth\guards.ts:12:23)
-    at eS (src\lib\auth\guards.ts:43:22)
-    at i (src\app\api\dashboard\stats\route.ts:8:24)
-  10 |  */
-  11 | export async function getCurrentUser() {
-> 12 |   const store = await cookies();
-     |                       ^
-  13 |   const token = store.get(AUTH_COOKIE)?.value;
-  14 |   if (!token) return null;
-  15 | {
-  route: '/api/dashboard/stats',
-  expression: '`cookies()`',
-  digest: 'HANGING_PROMISE_REJECTION'
-} { status: 500 }
+  Generating static pages using 3 workers (18/73) 
 [error] Error: During prerendering, `cookies()` rejects when the prerender is complete. Typically these errors are 
 handled by React but if you move `cookies()` to a different context by using `setTimeout`, `after`, or similar 
 functions you may observe this error and you should handle it in that context. This occurred at route "/api/favorites".
@@ -90,6 +72,24 @@ functions you may observe this error and you should handle it in that context. T
   14 |   if (!token) return null;
   15 | {
   route: '/api/account/reviews',
+  expression: '`cookies()`',
+  digest: 'HANGING_PROMISE_REJECTION'
+} { status: 500 }
+[error] Error: During prerendering, `cookies()` rejects when the prerender is complete. Typically these errors are 
+handled by React but if you move `cookies()` to a different context by using `setTimeout`, `after`, or similar 
+functions you may observe this error and you should handle it in that context. This occurred at route 
+"/api/dashboard/stats".
+    at ew (src\lib\auth\guards.ts:12:23)
+    at eS (src\lib\auth\guards.ts:43:22)
+    at i (src\app\api\dashboard\stats\route.ts:8:24)
+  10 |  */
+  11 | export async function getCurrentUser() {
+> 12 |   const store = await cookies();
+     |                       ^
+  13 |   const token = store.get(AUTH_COOKIE)?.value;
+  14 |   if (!token) return null;
+  15 | {
+  route: '/api/dashboard/stats',
   expression: '`cookies()`',
   digest: 'HANGING_PROMISE_REJECTION'
 } { status: 500 }
@@ -131,7 +131,7 @@ functions you may observe this error and you should handle it in that context. T
   expression: '`cookies()`',
   digest: 'HANGING_PROMISE_REJECTION'
 } { status: 500 }
-  Generating static pages using 3 workers (34/70) 
+  Generating static pages using 3 workers (36/73) 
 [error] Error: During prerendering, `cookies()` rejects when the prerender is complete. Typically these errors are 
 handled by React but if you move `cookies()` to a different context by using `setTimeout`, `after`, or similar 
 functions you may observe this error and you should handle it in that context. This occurred at route 
@@ -170,12 +170,12 @@ functions you may observe this error and you should handle it in that context. T
   expression: '`cookies()`',
   digest: 'HANGING_PROMISE_REJECTION'
 } { status: 500 }
-  Generating static pages using 3 workers (52/70) 
-Γ£ô Generating static pages using 3 workers (70/70) in 2.0s
+  Generating static pages using 3 workers (54/73) 
+Γ£ô Generating static pages using 3 workers (73/73) in 2.5s
   Finalizing page optimization ...
 
 Route (app)
-Γöî Γùï /
+Γöî ╞Æ /
 Γö£ Γùï /_not-found
 Γö£ ╞Æ /admin
 Γö£ ╞Æ /api/account/reviews
@@ -185,6 +185,7 @@ Route (app)
 Γö£ ╞Æ /api/admin/discounts
 Γö£ ╞Æ /api/admin/discounts/[id]
 Γö£ ╞Æ /api/admin/invoices
+Γö£ ╞Æ /api/admin/notifications
 Γö£ ╞Æ /api/admin/packages
 Γö£ ╞Æ /api/admin/reviews
 Γö£ ╞Æ /api/admin/saas-metrics
@@ -193,6 +194,7 @@ Route (app)
 Γö£ ╞Æ /api/admin/settings
 Γö£ ╞Æ /api/admin/sms/test
 Γö£ ╞Æ /api/admin/subscriptions
+Γö£ ╞Æ /api/admin/support
 Γö£ ╞Æ /api/admin/users
 Γö£ ╞Æ /api/ai/analyze
 Γö£ ╞Æ /api/ai/chat
@@ -235,6 +237,7 @@ Route (app)
 Γö£ ╞Æ /api/dashboard/salons/[id]/holidays
 Γö£ ╞Æ /api/dashboard/salons/[id]/holidays/[holidayId]
 Γö£ ╞Æ /api/dashboard/salons/[id]/hours
+Γö£ ╞Æ /api/dashboard/salons/[id]/images
 Γö£ ╞Æ /api/dashboard/salons/[id]/import/appointments
 Γö£ ╞Æ /api/dashboard/salons/[id]/import/customers
 Γö£ ╞Æ /api/dashboard/salons/[id]/invoices
@@ -267,6 +270,7 @@ Route (app)
 Γö£ ╞Æ /api/salons/[slug]/waitlist
 Γö£ ╞Æ /api/salons/[slug]/waitlist/[id]
 Γö£ ╞Æ /api/salons/search
+Γö£ ╞Æ /api/support
 Γö£ ╞Æ /api/voice/transcribe
 Γö£ ╞Æ /api/wallet
 Γö£ ╞Æ /dashboard

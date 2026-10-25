@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
+import SalonIcon from "@/components/icons/SalonIcon";
 
 type Salon = {
   id: string;
@@ -15,6 +16,15 @@ type Salon = {
   reviewCount: number;
 };
 
+function joinLocation(city: string | null | undefined, address: string | null | undefined): string {
+  const c = (city ?? "").trim();
+  const a = (address ?? "").trim();
+  if (!c) return a || "—";
+  if (!a) return c;
+  const a2 = (a.startsWith(c + "،") ? a.slice(c.length + 1) : a.startsWith(c + ",") ? a.slice(c.length + 1) : a).trim();
+  return a2 ? `${c} — ${a2}` : c;
+}
+
 export default function SalonsDirectoryPage() {
   const [q, setQ] = useState("");
   const [city, setCity] = useState("");
@@ -24,28 +34,34 @@ export default function SalonsDirectoryPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
+  function fetchSalons() {
+    const params = new URLSearchParams();
+    if (q) params.set("q", q);
+    if (city) params.set("city", city);
+    if (service) params.set("service", service);
+    if (maxPrice) params.set("maxPrice", maxPrice);
+    return fetch(`/api/salons/search?${params}`)
+      .then((res) => res.json())
+      .then((data) => {
+        if (!data.success) throw new Error(data.error || "خطا");
+        setSalons(data.salons);
+      })
+      .catch((e) => {
+        setError(e instanceof Error ? e.message : "خطا");
+      })
+      .finally(() => {
+        setLoading(false);
+      });
+  }
+
   async function search() {
     setLoading(true);
     setError("");
-    try {
-      const params = new URLSearchParams();
-      if (q) params.set("q", q);
-      if (city) params.set("city", city);
-      if (service) params.set("service", service);
-      if (maxPrice) params.set("maxPrice", maxPrice);
-      const res = await fetch(`/api/salons/search?${params}`);
-      const data = await res.json();
-      if (!data.success) throw new Error(data.error || "خطا");
-      setSalons(data.salons);
-    } catch (e) {
-      setError(e instanceof Error ? e.message : "خطا");
-    } finally {
-      setLoading(false);
-    }
+    await fetchSalons();
   }
 
   useEffect(() => {
-    search();
+    fetchSalons();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -81,20 +97,21 @@ export default function SalonsDirectoryPage() {
               href={`/s/${s.slug}`}
               className="group overflow-hidden rounded-3xl border border-neutral-200 bg-white shadow-sm transition hover:shadow-md dark:border-neutral-800 dark:bg-neutral-900"
             >
-              <div className="flex h-32 items-center justify-center text-5xl" style={{ background: `linear-gradient(135deg, ${s.coverColor}, #7c3aed)` }}>
-                🪞
+              <div className="flex h-32 items-center justify-center" style={{ background: `linear-gradient(135deg, ${s.coverColor}, #7c3aed)` }}>
+                <SalonIcon className="h-16 w-16 text-white/90" />
               </div>
               <div className="p-5">
-                <div className="flex items-center justify-between">
+                <div className="flex items-center justify-between gap-2">
                   <h3 className="text-lg font-extrabold text-neutral-900 dark:text-neutral-100">{s.name}</h3>
                   {s.rating != null && (
-                    <span className="rounded-full bg-amber-50 px-2.5 py-1 text-xs font-bold text-amber-700">
+                    <span className="rounded-full bg-amber-50 px-2.5 py-1 text-xs font-bold text-amber-700 dark:bg-amber-900/40 dark:text-amber-300">
                       ★ {s.rating.toFixed(1)} ({s.reviewCount})
                     </span>
                   )}
                 </div>
-                <p className="mt-1 text-sm text-neutral-500 dark:text-neutral-400">
-                  {s.city} {s.address ?? ""}
+                <p className="mt-2 flex items-center gap-1.5 text-sm text-neutral-500 dark:text-neutral-400">
+                  <span aria-hidden>📍</span>
+                  {joinLocation(s.city, s.address)}
                 </p>
                 {s.description && (
                   <p className="mt-2 line-clamp-2 text-sm text-neutral-400 dark:text-neutral-500">{s.description}</p>

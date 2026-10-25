@@ -1,5 +1,6 @@
 import { prisma } from "@/lib/prisma";
 import { json } from "@/lib/utils";
+import type { Prisma } from "@prisma/client";
 
 /** جستجو و فیلتر سالن‌ها بر اساس منطقه، خدمت و قیمت */
 export async function GET(req: Request) {
@@ -10,7 +11,7 @@ export async function GET(req: Request) {
   const maxPrice = Number(url.searchParams.get("maxPrice") ?? 0);
   const limit = Math.min(Number(url.searchParams.get("limit") ?? 50), 100);
 
-  const where: any = { isApproved: true, isActive: true };
+  const where: Prisma.SalonWhereInput = { isApproved: true, isActive: true };
 
   if (city) where.city = { contains: city, mode: "insensitive" };
   if (q) {
@@ -21,7 +22,7 @@ export async function GET(req: Request) {
   }
 
   // فیلتر خدمت / قیمت از طریق رابطه services
-  const serviceFilter: any = {};
+  const serviceFilter: Prisma.ServiceListRelationFilter = {};
   if (service) serviceFilter.some = { name: { contains: service, mode: "insensitive" } };
   if (maxPrice > 0) serviceFilter.some = { ...(serviceFilter.some ?? {}), price: { lte: maxPrice } };
   if (service || maxPrice > 0) where.services = serviceFilter;

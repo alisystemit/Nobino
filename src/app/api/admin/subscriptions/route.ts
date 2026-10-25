@@ -1,3 +1,5 @@
+﻿
+
 import { requireRole } from "@/lib/auth/guards";
 import { prisma } from "@/lib/prisma";
 import { cancelSubscription } from "@/lib/subscriptions";
@@ -22,7 +24,7 @@ const cancelSchema = z.object({ status: z.enum(["CANCELLED", "SUSPENDED"]) });
 
 export async function PATCH(req: Request) {
   try {
-    const user = await requireRole(["ADMIN"]);
+    await requireRole(["ADMIN"]);
     const body = await req.json();
     const subId = body.subscriptionId as string;
     const parsed = cancelSchema.parse(body);
@@ -33,3 +35,4 @@ export async function PATCH(req: Request) {
     return apiError(err);
   }
 }
+

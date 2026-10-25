@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useEffect, useState } from "react";
 import { toJalali } from "@/lib/utils";
 
 type Notification = {
@@ -17,26 +17,26 @@ export default function NotificationBell() {
   const [open, setOpen] = useState(false);
   const [authed, setAuthed] = useState(true);
 
-  const load = useCallback(async () => {
-    try {
-      const res = await fetch("/api/notifications", { cache: "no-store" });
-      const data = await res.json();
-      if (!data.success) {
-        if (res.status === 401) setAuthed(false);
-        return;
-      }
-      setAuthed(true);
-      setItems(data.notifications ?? []);
-    } catch {
-      /* خطای شبکه — در تلاش بعدی دوباره امتحان می‌شود */
-    }
-  }, []);
-
   useEffect(() => {
-    load();
+    const load = () => {
+      fetch("/api/notifications", { cache: "no-store" })
+        .then(async (res) => {
+          const data = await res.json();
+          if (!data.success) {
+            if (res.status === 401) setAuthed(false);
+            return;
+          }
+          setAuthed(true);
+          setItems(data.notifications ?? []);
+        })
+        .catch(() => {
+          /* خطای شبکه — در تلاش بعدی دوباره امتحان می‌شود */
+        });
+    };
     const timer = setInterval(load, 60_000);
+    load();
     return () => clearInterval(timer);
-  }, [load]);
+  }, []);
 
   async function toggle() {
     const next = !open;

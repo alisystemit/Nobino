@@ -10,6 +10,8 @@ const patchSchema = z.object({
   city: z.string().optional(),
   address: z.string().optional(),
   description: z.string().optional(),
+  logoUrl: z.string().optional().nullable(),
+  bannerUrl: z.string().optional().nullable(),
   coverColor: z.string().optional(),
   timezone: z.string().optional(),
   latitude: z.number().optional().nullable(),

@@ -47,3 +47,6 @@ next-env.d.ts
 # uploads (voice/فایل‌های محلی)
 public/voice/
 public/uploads/
+
+# local automation logs
+/logs/

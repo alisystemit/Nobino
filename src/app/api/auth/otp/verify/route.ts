@@ -1,3 +1,5 @@
+﻿
+
 import { z } from "zod";
 import { cookies, headers } from "next/headers";
 import { createHash } from "node:crypto";
@@ -18,6 +20,16 @@ export async function POST(req: Request) {
     const phone = body.phone.startsWith("0") ? body.phone : `0${body.phone}`;
 
     const user = await verifyOtp(phone, body.code);
+
+    // ورود ادمین با رمز عبور الزامی است (اگر رمزی تنظیم شده باشد)
+    if (user.role === "ADMIN" && user.passwordHash) {
+      return json({
+        success: true,
+        requiresPassword: true,
+        login: user.email ?? user.phone,
+      });
+    }
+
     const token = await signToken({ sub: user.id, phone: user.phone, role: user.role });
 
     // O�U.U^O�UO U_U^O'O' O"O O_U^O�UO U_U^O'O' (U.O�O�UO O�U.O�U+U_OO�UO / IP / device)
@@ -56,3 +68,4 @@ export async function POST(req: Request) {
     return apiError(err);
   }
 }
+

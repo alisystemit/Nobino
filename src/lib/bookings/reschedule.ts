@@ -1,5 +1,6 @@
 import { prisma } from "@/lib/prisma";
 import { assertBookableWindow } from "@/lib/bookings/availability";
+import type { Prisma } from "@prisma/client";
 
 export class RescheduleConflictError extends Error {
   status = 409;
@@ -57,7 +58,7 @@ export async function rescheduleAppointmentSafe(
     });
 
     // تداخل با نوبت‌های دیگر (پوشش بافر)
-    const clashWhere: any = {
+    const clashWhere: Prisma.AppointmentWhereInput = {
       salonId: prev.salonId,
       status: { in: ["REQUESTED", "CONFIRMED"] },
       startAt: { lt: serviceEnd },
@@ -78,7 +79,7 @@ export async function rescheduleAppointmentSafe(
     if (clash) throw new RescheduleConflictError();
 
     // تداخل با بازه‌های مسدود (TimeBlock)
-    const blockWhere: any = {
+    const blockWhere: Prisma.TimeBlockWhereInput = {
       salonId: prev.salonId,
       startAt: { lt: serviceEnd },
       endAt: { gt: start },

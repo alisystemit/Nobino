@@ -1,3 +1,5 @@
+﻿
+
 import { requireRole } from "@/lib/auth/guards";
 import { prisma } from "@/lib/prisma";
 import { logAudit } from "@/lib/audit";
@@ -30,3 +32,4 @@ export async function DELETE(req: Request) {
     return apiError(err);
   }
 }
+

@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import SalonIcon from "@/components/icons/SalonIcon";
 
 type Salon = {
   id: string;
@@ -12,6 +13,16 @@ type Salon = {
   description: string | null;
   coverColor: string;
   isActive: boolean;
+  logoUrl?: string | null;
+  bannerUrl?: string | null;
+  timezone?: string;
+  latitude?: number | null;
+  longitude?: number | null;
+  customDomain?: string | null;
+  minNoticeMinutes?: number;
+  maxAdvanceDays?: number;
+  cancelDeadlineHours?: number;
+  bufferMinutes?: number;
 };
 
 type Hour = { id: string; dayOfWeek: number; openTime: string; closeTime: string; isClosed: boolean };
@@ -26,18 +37,83 @@ export default function SalonSettings({ salon }: { salon: Salon }) {
     address: salon.address ?? "",
     description: salon.description ?? "",
     coverColor: salon.coverColor,
-    timezone: (salon as { timezone?: string }).timezone ?? "Asia/Tehran",
-    latitude: (salon as { latitude?: number | null }).latitude ?? "",
-    longitude: (salon as { longitude?: number | null }).longitude ?? "",
-    customDomain: (salon as { customDomain?: string | null }).customDomain ?? "",
-    minNoticeMinutes: 60,
-    maxAdvanceDays: 30,
-    cancelDeadlineHours: 24,
-    bufferMinutes: 10,
+    timezone: salon.timezone ?? "Asia/Tehran",
+    latitude: salon.latitude ?? "",
+    longitude: salon.longitude ?? "",
+    customDomain: salon.customDomain ?? "",
+    minNoticeMinutes: salon.minNoticeMinutes ?? 60,
+    maxAdvanceDays: salon.maxAdvanceDays ?? 30,
+    cancelDeadlineHours: salon.cancelDeadlineHours ?? 24,
+    bufferMinutes: salon.bufferMinutes ?? 10,
   });
   const [hours, setHours] = useState<Hour[]>([]);
+  const [logoUrl, setLogoUrl] = useState(salon.logoUrl ?? "");
+  const [bannerUrl, setBannerUrl] = useState(salon.bannerUrl ?? "");
+  const [gallery, setGallery] = useState<{ id: string; imageUrl: string; title?: string | null }[]>([]);
+  const [galleryTitle, setGalleryTitle] = useState("");
+  const [uploading, setUploading] = useState<"logo" | "banner" | "gallery" | null>(null);
   const [saving, setSaving] = useState(false);
   const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null);
+
+  async function loadImages() {
+    try {
+      const res = await fetch(`/api/dashboard/salons/${salon.id}/images`);
+      const data = await res.json();
+      if (data.success) setGallery(data.items ?? []);
+    } catch {
+      /* بی‌صدا */
+    }
+  }
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await fetch(`/api/dashboard/salons/${salon.id}/images`);
+        const data = await res.json();
+        if (!cancelled && data.success) setGallery(data.items ?? []);
+      } catch {
+        /* بی‌صدا */
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [salon.id]);
+
+  async function uploadImage(kind: "logo" | "banner" | "gallery", file: File) {
+    setUploading(kind);
+    setMsg(null);
+    try {
+      const fd = new FormData();
+      fd.append("file", file);
+      fd.append("kind", kind);
+      if (kind === "gallery" && galleryTitle.trim()) fd.append("title", galleryTitle.trim());
+      const res = await fetch(`/api/dashboard/salons/${salon.id}/images`, { method: "POST", body: fd });
+      const data = await res.json();
+      if (!data.success) throw new Error(data.error || "بارگذاری ناموفق بود");
+      if (kind === "logo") setLogoUrl(data.url);
+      else if (kind === "banner") setBannerUrl(data.url);
+      else {
+        setGalleryTitle("");
+        loadImages();
+      }
+      setMsg({ ok: true, text: "تصویر با موفقیت بارگذاری شد ✅" });
+    } catch (e) {
+      setMsg({ ok: false, text: e instanceof Error ? e.message : "خطا در بارگذاری تصویر" });
+    } finally {
+      setUploading(null);
+    }
+  }
+
+  async function removeGalleryItem(itemId: string) {
+    const res = await fetch(`/api/dashboard/salons/${salon.id}/images?itemId=${encodeURIComponent(itemId)}`, {
+      method: "DELETE",
+    });
+    const data = await res.json();
+    if (data.success) loadImages();
+    else setMsg({ ok: false, text: data.error || "حذف ناموفق بود" });
+  }
 
   useEffect(() => {
     (async () => {
@@ -101,6 +177,108 @@ export default function SalonSettings({ salon }: { salon: Salon }) {
 
   return (
     <div className="space-y-5">
+      {/* تصاویر سالن */}
+      <div className="rounded-2xl border border-neutral-200 p-4 dark:border-neutral-800">
+        <h3 className="text-sm font-extrabold text-neutral-800 dark:text-neutral-100">تصاویر سالن</h3>
+        <p className="mt-1 text-[11px] text-neutral-400">لوگو و بنر در صفحه عمومی سالن نمایش داده می‌شوند (حداکثر ۵ مگابایت).</p>
+        <div className="mt-3 grid grid-cols-2 gap-4">
+          <div>
+            <div className="flex h-24 items-center justify-center overflow-hidden rounded-xl border border-dashed border-neutral-300 bg-neutral-50 dark:border-neutral-700 dark:bg-neutral-800">
+              {logoUrl ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img src={logoUrl} alt="لوگوی سالن" className="h-full w-full object-cover" />
+              ) : (
+                <span className="flex h-8 w-8 items-center justify-center"><SalonIcon className="h-8 w-8 text-neutral-300" /></span>
+              )}
+            </div>
+            <label className="mt-2 block cursor-pointer rounded-lg bg-neutral-100 py-2 text-center text-xs font-bold text-neutral-700 hover:bg-neutral-200 dark:bg-neutral-800 dark:text-neutral-200">
+              {uploading === "logo" ? "در حال بارگذاری..." : "انتخاب لوگو"}
+              <input
+                type="file"
+                accept="image/*"
+                className="hidden"
+                disabled={uploading !== null}
+                onChange={(e) => {
+                  const f = e.target.files?.[0];
+                  if (f) uploadImage("logo", f);
+                  e.target.value = "";
+                }}
+              />
+            </label>
+          </div>
+          <div>
+            <div className="flex h-24 items-center justify-center overflow-hidden rounded-xl border border-dashed border-neutral-300 bg-neutral-50 dark:border-neutral-700 dark:bg-neutral-800">
+              {bannerUrl ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img src={bannerUrl} alt="بنر سالن" className="h-full w-full object-cover" />
+              ) : (
+                <span className="text-xs text-neutral-400">بدون بنر</span>
+              )}
+            </div>
+            <label className="mt-2 block cursor-pointer rounded-lg bg-neutral-100 py-2 text-center text-xs font-bold text-neutral-700 hover:bg-neutral-200 dark:bg-neutral-800 dark:text-neutral-200">
+              {uploading === "banner" ? "در حال بارگذاری..." : "انتخاب بنر"}
+              <input
+                type="file"
+                accept="image/*"
+                className="hidden"
+                disabled={uploading !== null}
+                onChange={(e) => {
+                  const f = e.target.files?.[0];
+                  if (f) uploadImage("banner", f);
+                  e.target.value = "";
+                }}
+              />
+            </label>
+          </div>
+        </div>
+
+        <div className="mt-5 border-t border-neutral-100 pt-4 dark:border-neutral-800">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <h4 className="text-xs font-extrabold text-neutral-700 dark:text-neutral-200">گالری نمونه‌کارها</h4>
+            <span className="text-[11px] text-neutral-400">{gallery.length.toLocaleString("fa-IR")} تصویر</span>
+          </div>
+          <div className="mt-2 grid grid-cols-3 gap-2 sm:grid-cols-4">
+            {gallery.map((g) => (
+              <div key={g.id} className="group relative aspect-square overflow-hidden rounded-xl bg-neutral-100">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src={g.imageUrl} alt={g.title ?? "نمونه‌کار"} className="h-full w-full object-cover" />
+                <button
+                  type="button"
+                  onClick={() => removeGalleryItem(g.id)}
+                  className="absolute left-1 top-1 rounded-md bg-black/60 px-1.5 py-0.5 text-[10px] font-bold text-white opacity-0 transition group-hover:opacity-100"
+                  aria-label="حذف تصویر"
+                >
+                  حذف
+                </button>
+              </div>
+            ))}
+          </div>
+          <div className="mt-3 flex flex-col gap-2 sm:flex-row">
+            <input
+              className={input}
+              placeholder="عنوان تصویر (اختیاری)"
+              value={galleryTitle}
+              onChange={(e) => setGalleryTitle(e.target.value)}
+              maxLength={80}
+            />
+            <label className="cursor-pointer whitespace-nowrap rounded-xl bg-neutral-900 px-4 py-3 text-center text-sm font-bold text-white hover:bg-neutral-800 dark:bg-neutral-100 dark:text-neutral-900">
+              {uploading === "gallery" ? "در حال بارگذاری..." : "افزودن تصویر"}
+              <input
+                type="file"
+                accept="image/*"
+                className="hidden"
+                disabled={uploading !== null}
+                onChange={(e) => {
+                  const f = e.target.files?.[0];
+                  if (f) uploadImage("gallery", f);
+                  e.target.value = "";
+                }}
+              />
+            </label>
+          </div>
+        </div>
+      </div>
+
       <div>
         <label className="text-xs font-medium text-neutral-500">نام سالن</label>
         <input className={input} value={form.name} onChange={set("name")} />

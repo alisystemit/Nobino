@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 import { LangSwitch, useI18n } from "@/lib/i18n";
 import { ThemeToggle } from "@/lib/theme";
+import SalonIcon from "@/components/icons/SalonIcon";
 
 export default function GlobalHeader() {
   const { t } = useI18n();
@@ -31,6 +32,7 @@ export default function GlobalHeader() {
   const links = [
     { href: "/salons", label: t("nav.salons") },
     ...(role === "CUSTOMER" ? [] : [{ href: "/packages", label: t("nav.packages") }]),
+    { href: "/help", label: t("nav.help") },
   ];
 
   return (
@@ -43,8 +45,8 @@ export default function GlobalHeader() {
     >
       <div className="mx-auto flex h-16 max-w-7xl items-center justify-between px-4 sm:px-6">
         <Link href="/" className="group flex items-center gap-2">
-          <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-gradient-to-br from-pink-500 to-purple-600 text-lg text-white shadow-lg shadow-pink-500/30 transition group-hover:scale-110">
-            🪞
+          <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-gradient-to-br from-pink-500 to-purple-600 text-white shadow-lg shadow-pink-500/30 transition group-hover:scale-110">
+            <SalonIcon className="h-5 w-5" />
           </span>
           <span className="text-xl font-black tracking-tight text-neutral-900">
             نوبینو<span className="text-gradient">.</span>

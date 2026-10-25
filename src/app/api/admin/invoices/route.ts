@@ -1,3 +1,5 @@
+﻿
+
 import { requireRole } from "@/lib/auth/guards";
 import { prisma } from "@/lib/prisma";
 import { json, apiError } from "@/lib/utils";
@@ -14,7 +16,12 @@ export async function GET(req: Request) {
       orderBy: { issuedAt: "desc" },
       take: 500,
     });
-    return json({ success: true, invoices });
+    const list = invoices.map((i) => ({
+      ...i,
+      payLink: i.payToken ? `/pay/${i.payToken}` : null,
+      payToken: undefined,
+    }));
+    return json({ success: true, invoices: list });
   } catch (err) {
     return apiError(err);
   }

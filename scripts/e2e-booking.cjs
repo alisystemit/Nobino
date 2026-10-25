@@ -20,7 +20,6 @@ async function main() {
   await new Promise((r) => setTimeout(r, 1500));
   const fs = await import("node:fs");
   const log = fs.readFileSync(logFile, "utf8");
-  const m = log.match(new RegExp(`OTP به ${phone}: کد (\\d{4})`));
   const matches = [...log.matchAll(new RegExp(`OTP به ${phone}: کد (\\d{4})`, "g"))];
   if (!matches.length) throw new Error("کد OTP در لاگ یافت نشد");
   const code = matches[matches.length - 1][1];

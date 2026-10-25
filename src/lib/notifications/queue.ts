@@ -1,5 +1,5 @@
 import { prisma } from "@/lib/prisma";
-import { getSmsProvider, sendSmsWithFallback } from "@/lib/sms/provider";
+import { sendSmsWithFallback } from "@/lib/sms/provider";
 import { getEmailSender } from "@/lib/email/provider";
 
 const MAX_ATTEMPTS = 5;
@@ -100,7 +100,6 @@ export async function processPendingNotifications(limit = 50) {
     take: limit,
   });
 
-  const smsProvider = await getSmsProvider();
   const emailSender = await getEmailSender();
   let sent = 0;
   let failed = 0;

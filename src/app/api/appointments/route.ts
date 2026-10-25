@@ -1,9 +1,13 @@
+﻿
+
 import { z } from "zod";
+import type { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { requireAuth } from "@/lib/auth/guards";
 import { json, apiError } from "@/lib/utils";
 import { createAppointmentSafe } from "@/lib/bookings/create";
 import { combinedBooking } from "@/lib/bookings/service";
+import { localMidnightUTC } from "@/lib/timezone";
 import { enqueueInApp, enqueueSms, processPendingNotifications } from "@/lib/notifications/queue";
 import { renderSmsTemplate } from "@/lib/notifications/templates";
 
@@ -12,10 +16,12 @@ export async function GET(req: Request) {
   try {
     const user = await requireAuth();
 
-    let where: any = { id: "" };
+    let where: Prisma.AppointmentWhereInput = { id: "" };
+    let timezone = "Asia/Tehran";
     if (user.role === "SALON_OWNER") {
-      const salon = await prisma.salon.findUnique({ where: { ownerId: user.id }, select: { id: true } });
+      const salon = await prisma.salon.findUnique({ where: { ownerId: user.id }, select: { id: true, timezone: true } });
       where = salon ? { salonId: salon.id } : { id: "" };
+      if (salon?.timezone) timezone = salon.timezone;
     } else if (user.role === "AGENT") {
       const plans = await prisma.commissionPlan.findMany({ where: { agentId: user.id, isActive: true }, select: { salonId: true } });
       const salonIds = plans.map((p) => p.salonId);
@@ -31,9 +37,25 @@ export async function GET(req: Request) {
     const from = url.searchParams.get("from");
     const to = url.searchParams.get("to");
     if (from || to) {
+      const isDay = (v: string) => /^\d{4}-\d{2}-\d{2}$/.test(v);
+      const start = from
+        ? isDay(from)
+          ? localMidnightUTC(from, timezone)
+          : new Date(from)
+        : undefined;
+      let end: Date | undefined;
+      if (to) {
+        if (isDay(to)) {
+          const d = new Date(`${to}T00:00:00Z`);
+          d.setUTCDate(d.getUTCDate() + 1);
+          end = localMidnightUTC(d.toISOString().slice(0, 10), timezone);
+        } else {
+          end = new Date(to);
+        }
+      }
       where.startAt = {
-        ...(from ? { gte: new Date(from) } : {}),
-        ...(to ? { lt: new Date(to) } : {}),
+        ...(start ? { gte: start } : {}),
+        ...(end ? { lt: end } : {}),
       };
     }
 
@@ -119,7 +141,7 @@ export async function POST(req: Request) {
       return json({ success: false, error: "یکی از خدمت‌ها یافت نشد یا غیرفعال است" }, { status: 404 });
     }
 
-    let primaryServiceId = selectedServices[0]?.id;
+    const primaryServiceId = selectedServices[0]?.id;
     let duration = body.durationMin ?? 60;
     let buffer: number | undefined;
     let combinedNote = body.note;
@@ -217,3 +239,4 @@ export async function POST(req: Request) {
     return apiError(err);
   }
 }
+

@@ -1,5 +1,6 @@
 import { requireRole } from "@/lib/auth/guards";
 import { prisma } from "@/lib/prisma";
+import { withinLimit } from "@/lib/plans/limits";
 
 /** خروجی CSV نوبت‌های سالن (برای گزارش‌گیری/مهاجرت) */
 export async function GET(_req: Request, { params }: { params: Promise<{ id: string }> }) {
@@ -11,6 +12,9 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
     if (!salon) return new Response("سالن یافت نشد", { status: 404 });
     if (user.role !== "ADMIN" && salon.ownerId !== user.id) {
       return new Response("دسترسی غیرمجاز", { status: 403 });
+    }
+    if (!(await withinLimit(id, "csvExport"))) {
+      return new Response("خروجی CSV در پلن فعلی این سالن فعال نیست", { status: 403 });
     }
 
     const rows = await prisma.appointment.findMany({

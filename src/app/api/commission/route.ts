@@ -1,3 +1,5 @@
+﻿
+
 import { requireRole } from "@/lib/auth/guards";
 import { getCommissionSummary } from "@/lib/financial/summary";
 import { json, apiError, formatToman } from "@/lib/utils";
@@ -25,3 +27,4 @@ export async function GET() {
     return apiError(err);
   }
 }
+

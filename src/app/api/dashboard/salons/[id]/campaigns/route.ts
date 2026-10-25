@@ -1,7 +1,6 @@
 import { z } from "zod";
 import { requireSalonManage } from "@/lib/auth/guards";
 import { prisma } from "@/lib/prisma";
-import { enqueueSms } from "@/lib/notifications/queue";
 import { json, apiError } from "@/lib/utils";
 
 const schema = z.object({

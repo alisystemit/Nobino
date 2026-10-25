@@ -23,7 +23,9 @@ export default async function PaymentResultPage({ searchParams }: { searchParams
           {success ? "پرداخت موفق" : "پرداخت ناموفق"}
         </h1>
         <p className="mt-3 text-neutral-600">
-          {success ? "پکیج شما فعال شد. در صورت خرید اشتراک برای سالن، از همین حالا قابل استفاده است." : reason}
+          {success
+            ? "پرداخت شما با موفقیت انجام شد و به‌صورت خودکار ثبت گردید. از شما سپاسگزاریم."
+            : reason}
         </p>
         {success && ref && (
           <div className="mt-5 rounded-xl bg-neutral-50 p-4 text-sm">

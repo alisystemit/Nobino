@@ -1,12 +1,19 @@
 import { requireSalonManage } from "@/lib/auth/guards";
 import { prisma } from "@/lib/prisma";
 import { excelResponse } from "@/lib/export";
+import { withinLimit } from "@/lib/plans/limits";
 
 /** خروجی Excel: appointments یا customers */
 export async function GET(_req: Request, { params }: { params: Promise<{ id: string }> }) {
   try {
     const { id } = await params;
     await requireSalonManage(id);
+    if (!(await withinLimit(id, "csvExport"))) {
+      return Response.json(
+        { success: false, error: "خروجی Excel/CSV در پلن فعلی شما فعال نیست. برای ارتقای پلن به بخش اشتراک مراجعه کنید." },
+        { status: 403 }
+      );
+    }
     const url = new URL(_req.url);
     const type = url.searchParams.get("type") || "appointments";
 

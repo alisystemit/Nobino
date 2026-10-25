@@ -1,101 +1,283 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname } from "next/navigation";
-import { useState } from "react";
+import { usePathname, useRouter } from "next/navigation";
+import { useEffect, useState } from "react";
+import {
+  LayoutDashboard,
+  Store,
+  CalendarDays,
+  Mic,
+  Percent,
+  Wallet,
+  Package,
+  User,
+  ShieldCheck,
+  LogOut,
+  Menu,
+  X,
+  ChevronsLeft,
+  ChevronsRight,
+  HelpCircle,
+  Home,
+} from "lucide-react";
 import { ThemeToggle } from "@/lib/theme";
 import { LangSwitch } from "@/lib/i18n";
 import NotificationBell from "@/components/NotificationBell";
+import SalonIcon from "@/components/icons/SalonIcon";
 
-type NavItem = { href: string; label: string; icon: string; roles?: string[] };
+/**
+ * قاب داشبورد به سبک قالب مدیریتی TailAdmin:
+ * سایدبار تیره با آیکون، بخش‌بندی منو، کارت پروفایل کاربر در پایین،
+ * قابلیت جمع‌شدن سایدبار و هدر با نان‌راهنما.
+ */
+type NavItem = { href: string; label: string; roles?: string[]; icon: React.ComponentType<{ className?: string }> };
 
-const NAV: NavItem[] = [
-  { href: "/dashboard", label: "داشبورد", icon: "M4 3h16a1 1 0 0 1 1 1v16a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1Zm2 4v2h4V7H6Zm6 0v2h6V7h-6Zm-6 4v2h4v-2H6Zm6 0v2h6v-2h-6Zm-6 4v2h4v-2H6Zm6 0v2h6v-2h-6Z" },
-  { href: "/dashboard/salon", label: "سالن من", icon: "M12 2 3 7v10l9 5 9-5V7l-9-5Zm0 2.3 6.5 3.6v6.2L12 17.7 5.5 14.1V7.9L12 4.3ZM11 8h2v6h-2V8Zm0 7h2v2h-2v-2Z", roles: ["SALON_OWNER", "ADMIN"] },
-  { href: "/dashboard/appointments", label: "نوبت‌ها", icon: "M7 2h10v2h3a1 1 0 0 1 1 1v16a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V5a1 1 0 0 1 1-1h3V2Zm0 4H5v14h14V6h-2v2H7V6Zm2 7h2v2H9v-2Zm4 0h2v2h-2v-2Zm4 0h2v2h-2v-2Z", roles: ["SALON_OWNER", "ADMIN"] },
-  { href: "/dashboard/voice-booking", label: "رزرو صوتی", icon: "M12 3a7 7 0 0 0-7 7v4a5 5 0 0 0 10 0v-4a3 3 0 1 0-6 0v4a1 1 0 1 0 2 0v-4a1 1 0 1 1 2 0v4a3 3 0 0 1-6 0v-4a5 5 0 0 1 10 0v4a7 7 0 0 1-14 0v-4a7 7 0 0 1 14 0", roles: ["SALON_OWNER", "ADMIN"] },
-  { href: "/dashboard/wallet", label: "کیف پول", icon: "M2 6a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V6Zm2 0v12h16V6H4Zm11 6a3 3 0 1 1-6 0 3 3 0 0 1 6 0Z" },
-  { href: "/dashboard/commission", label: "کمیسیون", icon: "M4 19V5h3v14H4Zm6 0V9h3v10h-3Zm6 0V3h3v16h-3Z", roles: ["AGENT", "ADMIN"] },
-  { href: "/admin", label: "سوپرادمین", icon: "M12 2 4 5v6c0 5 3.4 9.4 8 11 4.6-1.6 8-6 8-11V5l-8-3Zm0 2.2 6 2.3v4.5c0 3.9-2.5 7.4-6 8.8-3.5-1.4-6-4.9-6-8.8V6.5l6-2.3ZM11 7h2v6h-2V7Zm0 7h2v2h-2v-2Z", roles: ["ADMIN"] },
-  { href: "/dashboard/account", label: "حساب", icon: "M12 12a4 4 0 1 0 0-8 4 4 0 0 0 0 8Zm0-6a2 2 0 1 1 0 4 2 2 0 0 1 0-4Zm4 14v-2a4 4 0 0 0-8 0v2H6v-2a6 6 0 0 1 12 0v2h-2Z" },
-  { href: "/packages", label: "پکیج‌ها", icon: "M4 6h16v2H4V6Zm0 5h16v2H4v-2Zm0 5h10v2H4v-2Zm14-2 3 3-3 3-1.4-1.4L17.2 17H14v-2h3.2l-.6-.6L18 14Z", roles: ["SALON_OWNER", "AGENT", "ADMIN"] },
+const SECTIONS: { title: string; items: NavItem[] }[] = [
+  {
+    title: "منو",
+    items: [
+      { href: "/dashboard", label: "داشبورد", icon: LayoutDashboard },
+      { href: "/dashboard/salon", label: "سالن من", icon: Store, roles: ["SALON_OWNER", "ADMIN"] },
+      { href: "/dashboard/appointments", label: "نوبت‌ها", icon: CalendarDays, roles: ["SALON_OWNER", "ADMIN", "CUSTOMER"] },
+      { href: "/dashboard/voice-booking", label: "رزرو صوتی", icon: Mic, roles: ["SALON_OWNER", "ADMIN"] },
+      { href: "/dashboard/commission", label: "کمیسیون", icon: Percent, roles: ["AGENT", "ADMIN"] },
+    ],
+  },
+  {
+    title: "مالی",
+    items: [
+      { href: "/dashboard/wallet", label: "کیف پول", icon: Wallet },
+      { href: "/packages", label: "پکیج‌ها", icon: Package, roles: ["SALON_OWNER", "AGENT", "ADMIN"] },
+    ],
+  },
+  {
+    title: "حساب",
+    items: [
+      { href: "/dashboard/account", label: "حساب من", icon: User },
+      { href: "/admin", label: "سوپرادمین", icon: ShieldCheck, roles: ["ADMIN"] },
+    ],
+  },
 ];
 
-function Icon({ d }: { d: string }) {
+const roleLabels: Record<string, string> = {
+  ADMIN: "سوپرادمین",
+  SALON_OWNER: "آرایشگر / مالک سالن",
+  AGENT: "نماینده",
+  CUSTOMER: "مشتری",
+};
+
+type Me = { name?: string | null; phone?: string; avatarUrl?: string | null };
+
+function UserAvatar({ me, className }: { me: Me | null; className?: string }) {
+  if (me?.avatarUrl) {
+    return (
+      // eslint-disable-next-line @next/next/no-img-element
+      <img src={me.avatarUrl} alt="آواتار" className={`h-10 w-10 shrink-0 rounded-full object-cover ${className ?? ""}`} />
+    );
+  }
+  const initial = (me?.name ?? me?.phone ?? "؟").trim().slice(0, 1);
   return (
-    <svg viewBox="0 0 24 24" className="h-5 w-5" fill="currentColor" aria-hidden>
-      <path d={d} />
-    </svg>
+    <span className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-pink-500 to-purple-600 text-base font-black text-white ${className ?? ""}`}>
+      {initial}
+    </span>
   );
 }
 
 export default function DashboardShell({ role, title, children }: { role: string; title: string; children: React.ReactNode }) {
   const pathname = usePathname();
+  const router = useRouter();
   const [open, setOpen] = useState(false);
-  const items = NAV.filter((n) => !n.roles || n.roles.includes(role));
+  const [collapsed, setCollapsed] = useState(false);
+  const [me, setMe] = useState<Me | null>(null);
+
+  useEffect(() => {
+    (async () => {
+      try {
+        const res = await fetch("/api/auth/me");
+        const data = await res.json();
+        if (data.user) setMe(data.user);
+      } catch {
+        /* بی‌صدا */
+      }
+    })();
+  }, []);
 
   const isActive = (href: string) => pathname === href || pathname.startsWith(href + "/");
 
+  async function logout() {
+    try {
+      await fetch("/api/auth/logout", { method: "POST" });
+    } finally {
+      router.push("/");
+      router.refresh();
+    }
+  }
+
   const Sidebar = (
-    <aside className="flex h-full w-64 flex-col border-l border-neutral-200 bg-white dark:border-neutral-800 dark:bg-neutral-950">
-      <div className="flex h-16 items-center gap-2 px-5">
-        <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-gradient-to-br from-pink-500 to-purple-600 text-white">🪞</span>
-        <span className="text-lg font-black text-neutral-900 dark:text-neutral-100">نوبینو</span>
+    <aside
+      className={`flex h-full flex-col bg-[#1c2434] text-neutral-300 transition-all duration-300 ${
+        collapsed ? "w-[88px]" : "w-72"
+      }`}
+    >
+      {/* لوگو */}
+      <div className={`flex h-16 items-center gap-3 px-4 ${collapsed ? "justify-center" : "justify-between"}`}>
+        <Link href="/" className="flex min-w-0 items-center gap-3">
+          <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-pink-500 to-purple-600 text-white shadow-lg shadow-pink-900/40">
+            <SalonIcon className="h-5 w-5" />
+          </span>
+          {!collapsed && (
+            <span className="truncate">
+              <span className="block text-base font-black text-white">نوبینو</span>
+              <span className="block text-[10px] text-neutral-400">نوبت‌دهی هوشمند آرایشگاه</span>
+            </span>
+          )}
+        </Link>
+        <button
+          onClick={() => setCollapsed((c) => !c)}
+          className={`hidden items-center justify-center rounded-lg p-1.5 text-neutral-400 transition hover:bg-white/10 hover:text-white lg:flex ${collapsed ? "" : ""}`}
+          aria-label={collapsed ? "باز کردن منو" : "بستن منو"}
+          title={collapsed ? "باز کردن منو" : "بستن منو"}
+        >
+          {collapsed ? <ChevronsLeft className="h-4 w-4" /> : <ChevronsRight className="h-4 w-4" />}
+        </button>
       </div>
-      <nav className="flex-1 space-y-1 overflow-y-auto px-3 py-3">
-        {items.map((n) => (
-          <Link
-            key={n.href}
-            href={n.href}
-            onClick={() => setOpen(false)}
-            className={`flex items-center gap-3 rounded-xl px-3.5 py-2.5 text-sm font-semibold transition ${
-              isActive(n.href)
-                ? "bg-gradient-to-l from-pink-600 to-purple-600 text-white shadow-md shadow-pink-500/25"
-                : "text-neutral-600 hover:bg-neutral-100 dark:text-neutral-300 dark:hover:bg-neutral-900"
-            }`}
-          >
-            <Icon d={n.icon} />
-            {n.label}
-          </Link>
-        ))}
+
+      {/* منو */}
+      <nav className="flex-1 space-y-5 overflow-y-auto px-3 py-4 [scrollbar-width:thin]">
+        {SECTIONS.map((section) => {
+          const items = section.items.filter((n) => !n.roles || n.roles.includes(role));
+          if (!items.length) return null;
+          return (
+            <div key={section.title}>
+              {!collapsed && (
+                <div className="mb-2 px-3 text-[10px] font-bold uppercase tracking-wider text-neutral-500">{section.title}</div>
+              )}
+              <div className="space-y-1">
+                {items.map((n) => {
+                  const active = isActive(n.href);
+                  const Icon = n.icon;
+                  return (
+                    <Link
+                      key={n.href}
+                      href={n.href}
+                      onClick={() => setOpen(false)}
+                      title={collapsed ? n.label : undefined}
+                      className={`relative flex items-center gap-3 rounded-xl px-3.5 py-2.5 text-sm font-semibold transition ${
+                        collapsed ? "justify-center px-2" : ""
+                      } ${
+                        active
+                          ? "bg-white/10 text-white"
+                          : "text-neutral-400 hover:bg-white/5 hover:text-neutral-100"
+                      }`}
+                    >
+                      {active && <span className="absolute right-0 top-1/2 h-6 w-1 -translate-y-1/2 rounded-full bg-gradient-to-b from-pink-500 to-purple-500" />}
+                      <Icon className={`h-5 w-5 shrink-0 ${active ? "text-pink-400" : ""}`} />
+                      {!collapsed && <span className="truncate">{n.label}</span>}
+                    </Link>
+                  );
+                })}
+              </div>
+            </div>
+          );
+        })}
       </nav>
-      <div className="flex items-center justify-between border-t border-neutral-200 px-5 py-3 dark:border-neutral-800">
-        <LangSwitch />
-        <ThemeToggle />
+
+      {/* پروفایل */}
+      <div className={`border-t border-white/10 p-3 ${collapsed ? "flex justify-center" : ""}`}>
+        <div className="flex items-center gap-3">
+          <UserAvatar me={me} />
+          {!collapsed && (
+            <div className="min-w-0 flex-1">
+              <div className="truncate text-sm font-bold text-white">{me?.name ?? me?.phone ?? "کاربر نوبینو"}</div>
+              <div className="truncate text-[11px] text-neutral-400">{roleLabels[role] ?? role}</div>
+            </div>
+          )}
+          {!collapsed && (
+            <button
+              onClick={logout}
+              className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-neutral-400 transition hover:bg-red-500/15 hover:text-red-400"
+              aria-label="خروج از حساب"
+              title="خروج از حساب"
+            >
+              <LogOut className="h-4.5 w-4.5" />
+            </button>
+          )}
+        </div>
       </div>
     </aside>
   );
 
   return (
-    <div className="flex min-h-[calc(100vh-4rem)]">
+    <div className="flex min-h-[calc(100vh-4rem)] bg-[#f3f5f9] dark:bg-neutral-950">
       {/* دسکتاپ */}
-      <div className="hidden lg:block sticky top-16 h-[calc(100vh-4rem)]">{Sidebar}</div>
+      <div className="sticky top-16 hidden h-[calc(100vh-4rem)] shrink-0 lg:block">{Sidebar}</div>
+
       {/* موبایل */}
       {open && (
         <div className="fixed inset-0 z-50 lg:hidden">
-          <div className="absolute inset-0 bg-black/40" onClick={() => setOpen(false)} />
-          <div className="absolute right-0 top-0 h-full shadow-2xl">{Sidebar}</div>
+          <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={() => setOpen(false)} />
+          <div className="absolute right-0 top-0 h-full shadow-2xl">
+            <div className="flex h-16 items-center justify-between bg-[#1c2434] px-4">
+              <span className="text-base font-black text-white">نوبینو</span>
+              <button
+                onClick={() => setOpen(false)}
+                className="flex h-9 w-9 items-center justify-center rounded-lg text-neutral-300 hover:bg-white/10"
+                aria-label="بستن منو"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+            <div className="h-[calc(100%-4rem)]">{Sidebar}</div>
+          </div>
         </div>
       )}
 
       {/* محتوا */}
       <div className="min-w-0 flex-1">
-        <div className="sticky top-16 z-20 flex h-14 items-center justify-between border-b border-neutral-200 bg-[var(--bg)]/85 px-4 backdrop-blur dark:border-neutral-800 sm:px-6">
-          <div className="flex items-center gap-3">
-            <button onClick={() => setOpen(true)} className="flex h-9 w-9 items-center justify-center rounded-lg bg-neutral-100 text-lg lg:hidden dark:bg-neutral-800" aria-label="منو">
-              ☰
+        {/* هدر */}
+        <div className="sticky top-16 z-20 flex h-16 items-center justify-between border-b border-neutral-200 bg-white/85 px-4 backdrop-blur dark:border-neutral-800 dark:bg-neutral-950/85 sm:px-6">
+          <div className="flex min-w-0 items-center gap-3">
+            <button
+              onClick={() => setOpen(true)}
+              className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-neutral-100 text-neutral-600 lg:hidden dark:bg-neutral-800 dark:text-neutral-300"
+              aria-label="باز کردن منو"
+            >
+              <Menu className="h-5 w-5" />
             </button>
-            <h1 className="text-base font-black text-neutral-900 dark:text-neutral-100 sm:text-lg">{title}</h1>
+            <div className="min-w-0">
+              <div className="flex items-center gap-1.5 text-[11px] text-neutral-400">
+                <Link href="/" className="flex items-center gap-1 transition hover:text-pink-600">
+                  <Home className="h-3 w-3" />
+                  نوبینو
+                </Link>
+                <span>/</span>
+                <span className="truncate text-neutral-500 dark:text-neutral-400">{title}</span>
+              </div>
+              <h1 className="truncate text-base font-black text-neutral-900 sm:text-lg dark:text-neutral-100">{title}</h1>
+            </div>
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex shrink-0 items-center gap-1.5 sm:gap-2">
             <NotificationBell />
+            <LangSwitch />
             <ThemeToggle />
-            <Link href="/" className="hidden items-center gap-1.5 rounded-lg bg-neutral-100 px-3 py-1.5 text-xs font-semibold text-neutral-600 hover:bg-neutral-200 sm:flex dark:bg-neutral-800 dark:text-neutral-300">
-              🏠 بازگشت
+            <Link
+              href="/help"
+              className="hidden items-center gap-1.5 rounded-lg bg-neutral-100 px-3 py-2 text-xs font-semibold text-neutral-600 transition hover:bg-neutral-200 md:flex dark:bg-neutral-800 dark:text-neutral-300 dark:hover:bg-neutral-700"
+            >
+              <HelpCircle className="h-4 w-4" />
+              راهنما
+            </Link>
+            <Link
+              href="/"
+              className="hidden items-center gap-1.5 rounded-lg bg-neutral-100 px-3 py-2 text-xs font-semibold text-neutral-600 transition hover:bg-neutral-200 md:flex dark:bg-neutral-800 dark:text-neutral-300 dark:hover:bg-neutral-700"
+            >
+              بازگشت به سایت
             </Link>
           </div>
         </div>
-        <div className="p-4 sm:p-6 lg:p-8">{children}</div>
+
+        <main className="p-4 sm:p-6 lg:p-8">{children}</main>
       </div>
     </div>
   );

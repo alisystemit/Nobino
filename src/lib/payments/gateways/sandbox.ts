@@ -11,10 +11,11 @@ export class SandboxGateway implements PaymentGateway {
 
   async requestPayment(order: PaymentOrder): Promise<PaymentRequestResult> {
     const authority = `SANDBOX-${Date.now()}`;
+    const invoiceParam = order.invoiceId ? `&invoice=${order.invoiceId}` : "";
     return {
       success: true,
       authority,
-      redirectUrl: `/api/payments/mock-pay?authority=${authority}&order=${order.id}`,
+      redirectUrl: `/api/payments/mock-pay?authority=${authority}&order=${order.id}${invoiceParam}`,
       message: "درگاه تست",
     };
   }

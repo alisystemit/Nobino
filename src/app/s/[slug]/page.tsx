@@ -4,6 +4,8 @@ import { toPersianDigits, formatToman } from "@/lib/utils";
 import SalonBooking from "@/components/SalonBooking";
 import AssistantChat from "@/components/AssistantChat";
 import FavoriteButton from "@/components/FavoriteButton";
+import SafeImage from "@/components/SafeImage";
+import SalonIcon from "@/components/icons/SalonIcon";
 import type { Metadata } from "next";
 
 export const instant = false;
@@ -11,9 +13,32 @@ export const instant = false;
 export async function generateMetadata({ params }: { params: Promise<{ slug: string }> }): Promise<Metadata> {
   const { slug } = await params;
   const salon = await prisma.salon.findUnique({ where: { slug } });
+  if (!salon) return { title: "سالن یافت نشد" };
+  const title = `${salon.name}${salon.city ? ` — آرایشگاه در ${salon.city}` : ""}`;
+  const description =
+    salon.description ??
+    `رزرو آنلاین نوبت ${salon.name}${salon.city ? ` در ${salon.city}` : ""}؛ مشاهده خدمات، قیمت‌ها، آرایشگران و زمان‌های آزاد.`;
+  const images = [salon.bannerUrl, salon.logoUrl].filter((u): u is string => Boolean(u));
   return {
-    title: salon?.name ?? "سالن",
-    description: salon?.description ?? undefined,
+    title,
+    description,
+    alternates: { canonical: `/s/${salon.slug}` },
+    openGraph: {
+      type: "website",
+      locale: "fa_IR",
+      title,
+      description,
+      url: `/s/${salon.slug}`,
+      siteName: "نوبینو",
+      images,
+    },
+    twitter: {
+      card: "summary_large_image",
+      title,
+      description,
+      images,
+    },
+    robots: salon.isApproved && salon.isActive ? { index: true, follow: true } : { index: false, follow: false },
   };
 }
 
@@ -43,7 +68,7 @@ export default async function SalonPage({ params }: { params: Promise<{ slug: st
     },
   });
 
-  if (!salon || !salon.isActive) notFound();
+  if (!salon || !salon.isActive || !salon.isApproved) notFound();
 
   const [reviews, reviewAgg] = await Promise.all([
     prisma.review.findMany({
@@ -58,9 +83,69 @@ export default async function SalonPage({ params }: { params: Promise<{ slug: st
   const reviewCount = reviewAgg._count._all;
 
   const days = ["شنبه", "یکشنبه", "دوشنبه", "سه‌شنبه", "چهارشنبه", "پنجشنبه", "جمعه"];
+  const schemaDays = ["Saturday", "Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday"];
+  const siteUrl = process.env.NEXT_PUBLIC_SITE_URL ?? "https://nobino.ir";
+  const salonUrl = `${siteUrl.replace(/\/$/, "")}/s/${salon.slug}`;
+
+  const jsonLd = {
+    "@context": "https://schema.org",
+    "@type": "HairSalon",
+    name: salon.name,
+    description: salon.description ?? undefined,
+    url: salonUrl,
+    telephone: salon.phone || undefined,
+    image: [salon.bannerUrl, salon.logoUrl].filter(Boolean),
+    priceRange: salon.services.length
+      ? `${Math.min(...salon.services.map((s) => s.price)).toLocaleString("fa-IR")} تا ${Math.max(
+          ...salon.services.map((s) => s.price)
+        ).toLocaleString("fa-IR")} تومان`
+      : undefined,
+    address: {
+      "@type": "PostalAddress",
+      addressLocality: salon.city ?? undefined,
+      streetAddress: salon.address ?? undefined,
+      addressCountry: "IR",
+    },
+    openingHoursSpecification: salon.openingHours
+      .filter((h) => !h.isClosed)
+      .map((h) => ({
+        "@type": "OpeningHoursSpecification",
+        dayOfWeek: `https://schema.org/${schemaDays[h.dayOfWeek] ?? "Saturday"}`,
+        opens: h.openTime,
+        closes: h.closeTime,
+      })),
+    makesOffer: salon.services.map((s) => ({
+      "@type": "Offer",
+      itemOffered: { "@type": "Service", name: s.name, description: s.description ?? undefined },
+      price: s.price,
+      priceCurrency: "IRR",
+    })),
+    ...(reviewCount > 0
+      ? {
+          aggregateRating: {
+            "@type": "AggregateRating",
+            ratingValue: averageRating,
+            reviewCount,
+            bestRating: 5,
+            worstRating: 1,
+          },
+          review: reviews.slice(0, 5).map((r) => ({
+            "@type": "Review",
+            author: { "@type": "Person", name: r.customer.name ?? "مشتری" },
+            reviewRating: { "@type": "Rating", ratingValue: r.rating, bestRating: 5 },
+            reviewBody: r.comment ?? undefined,
+            datePublished: r.createdAt.toISOString().slice(0, 10),
+          })),
+        }
+      : {}),
+  };
 
   return (
     <main>
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd).replace(/</g, "\\u003c") }}
+      />
       <AssistantChat salonId={salon.id} />
       {/* Header */}
       <header className="relative h-80 w-full">
@@ -68,21 +153,31 @@ export default async function SalonPage({ params }: { params: Promise<{ slug: st
           className="absolute inset-0 animate-gradient"
           style={
             salon.bannerUrl
-              ? { backgroundImage: `url(${salon.bannerUrl})`, backgroundSize: "cover", backgroundPosition: "center" }
+              ? undefined
               : { background: `linear-gradient(135deg, ${salon.coverColor}, #7c3aed)` }
           }
         />
+        {salon.bannerUrl && (
+          <SafeImage
+            src={salon.bannerUrl}
+            alt={`بنر ${salon.name}`}
+            className="absolute inset-0 h-full w-full object-cover"
+            fallback=""
+            fallbackClassName="absolute inset-0 !bg-gradient-to-br !from-pink-500 !to-purple-700"
+          />
+        )}
         <div className="absolute inset-0 bg-hero-pattern" />
         <div className="absolute inset-0 bg-black/40" />
         <div className="absolute bottom-0 left-0 right-0 mx-auto max-w-6xl px-6 pb-8">
           <div className="flex flex-wrap items-end gap-5">
-            <div className="flex h-28 w-28 items-center justify-center rounded-3xl border-4 border-white/70 bg-white/90 text-5xl shadow-2xl backdrop-blur">
-              {salon.logoUrl ? (
-                // eslint-disable-next-line @next/next/no-img-element
-                <img src={salon.logoUrl} alt={salon.name} className="h-full w-full rounded-2xl object-cover" />
-              ) : (
-                "🪞"
-              )}
+            <div className="flex h-28 w-28 items-center justify-center overflow-hidden rounded-3xl border-4 border-white/70 bg-white/90 text-5xl shadow-2xl backdrop-blur">
+              <SafeImage
+                src={salon.logoUrl}
+                alt={salon.name}
+                className="h-full w-full rounded-2xl object-cover"
+                fallback={<SalonIcon className="h-14 w-14" />}
+                fallbackClassName="h-full w-full rounded-2xl"
+              />
             </div>
             <div className="min-w-0 flex-1 text-white">
               <h1 className="text-3xl font-black drop-shadow sm:text-4xl">{salon.name}</h1>
@@ -164,13 +259,14 @@ export default async function SalonPage({ params }: { params: Promise<{ slug: st
               <div className="mt-4 grid gap-4 sm:grid-cols-2">
                 {salon.staff.map((st) => (
                   <div key={st.id} className="flex items-start gap-4 rounded-2xl border border-neutral-200 bg-white p-5 dark:border-neutral-800 dark:bg-neutral-900">
-                    <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-full bg-pink-100 text-2xl dark:bg-pink-900/40">
-                      {st.avatarUrl ? (
-                        // eslint-disable-next-line @next/next/no-img-element
-                        <img src={st.avatarUrl} alt={st.name} className="h-full w-full rounded-full object-cover" />
-                      ) : (
-                        "✂️"
-                      )}
+                    <div className="flex h-14 w-14 shrink-0 items-center justify-center overflow-hidden rounded-full bg-pink-100 text-2xl dark:bg-pink-900/40">
+                      <SafeImage
+                        src={st.avatarUrl}
+                        alt={st.name}
+                        className="h-full w-full rounded-full object-cover"
+                        fallback="✂️"
+                        fallbackClassName="h-full w-full rounded-full text-2xl"
+                      />
                     </div>
                     <div>
                       <h3 className="font-bold text-neutral-900 dark:text-neutral-100">{st.name}</h3>
@@ -201,10 +297,12 @@ export default async function SalonPage({ params }: { params: Promise<{ slug: st
               <div className="mt-4 grid grid-cols-2 gap-4 sm:grid-cols-3">
                 {salon.galleryItems.map((g) => (
                   <div key={g.id} className="group relative aspect-square overflow-hidden rounded-3xl bg-neutral-100 shadow-sm">
-                    <img
+                    <SafeImage
                       src={g.imageUrl}
-                      alt={g.title ?? ""}
+                      alt={g.title ?? salon.name}
                       className="h-full w-full object-cover transition duration-500 group-hover:scale-110"
+                      fallback="🖼️"
+                      fallbackClassName="h-full w-full text-4xl"
                     />
                     <div className="absolute inset-0 flex items-end bg-gradient-to-t from-black/60 via-transparent to-transparent opacity-0 transition group-hover:opacity-100">
                       <span className="p-3 text-sm font-bold text-white">{g.title ?? ""}</span>

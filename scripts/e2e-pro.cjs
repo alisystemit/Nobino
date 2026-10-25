@@ -19,11 +19,20 @@ async function login(phone) {
   const log = fs.readFileSync(logFile, "utf8");
   const matches = [...log.matchAll(new RegExp(`OTP به ${phone}: کد (\\d{4})`, "g"))];
   const v = await req("/api/auth/otp/verify", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ phone, code: matches[matches.length - 1][1] }) });
-  return v.setCookie.split(";")[0];
+  let cookie = v.setCookie ? v.setCookie.split(";")[0] : "";
+  if (!cookie && v.json?.requiresPassword) {
+    const p = await req("/api/auth/password/login", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ login: v.json.login, password: process.env.ADMIN_PASSWORD || "Admin@1234" }),
+    });
+    cookie = p.setCookie ? p.setCookie.split(";")[0] : "";
+  }
+  return cookie;
 }
 
 async function main() {
-  const adminCookie = await login(phoneAdmin);
+  await login(phoneAdmin);
   console.log("✅ ورود ادمین");
 
   // ۱) لیست انتظار (عمومی، بدون ورود)

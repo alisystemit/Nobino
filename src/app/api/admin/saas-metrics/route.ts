@@ -1,3 +1,5 @@
+﻿
+
 import { requireRole } from "@/lib/auth/guards";
 import { prisma } from "@/lib/prisma";
 import { json, apiError } from "@/lib/utils";
@@ -66,3 +68,4 @@ export async function GET() {
     return apiError(err);
   }
 }
+

@@ -80,14 +80,14 @@ export default function RescheduleModal({
   }, [onClose]);
 
   useEffect(() => {
-    if (!salonSlug || !serviceId || !date) {
-      setSlots([]);
-      return;
-    }
     let cancelled = false;
-    setLoading(true);
-    setError("");
     (async () => {
+      if (!salonSlug || !serviceId || !date) {
+        setSlots([]);
+        return;
+      }
+      setLoading(true);
+      setError("");
       try {
         const q = new URLSearchParams({ serviceId, date });
         if (employeeId) q.set("employeeId", employeeId);

@@ -1,3 +1,5 @@
+﻿
+
 import { z } from "zod";
 import { prisma } from "@/lib/prisma";
 import { getCurrentUser, requireAuth } from "@/lib/auth/guards";
@@ -24,7 +26,12 @@ export async function GET() {
 const patchSchema = z.object({
   name: z.string().trim().min(1).max(80).optional(),
   email: z.string().trim().email().optional(),
-  avatarUrl: z.string().trim().url().optional(),
+  // آواتار می‌تواند URL مطلق (Vercel Blob) یا مسیر نسبی (فایل محلی) باشد
+  avatarUrl: z
+    .string()
+    .trim()
+    .refine((v) => v.startsWith("/") || /^https?:\/\//.test(v), "آدرس تصویر نامعتبر است")
+    .optional(),
 });
 
 /** ویرایش پروفایل کاربر جاری */
@@ -55,3 +62,4 @@ export async function PATCH(req: Request) {
     return apiError(err);
   }
 }
+

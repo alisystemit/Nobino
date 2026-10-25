@@ -1,14 +1,37 @@
 // Seed قابل اجرا بدون وابستگی (JavaScript خالص)
 import { PrismaClient } from "@prisma/client";
+import { randomBytes, scryptSync } from "node:crypto";
 
 const prisma = new PrismaClient();
 
+/** هش رمز عبور با scrypt — همان قالب src/lib/auth/password.ts */
+function hashPassword(password) {
+  const salt = randomBytes(16).toString("hex");
+  const buf = scryptSync(password, salt, 64);
+  return `scrypt:${salt}:${buf.toString("hex")}`;
+}
+
 async function main() {
-  const admin = await prisma.user.upsert({
-    where: { phone: "09120000000" },
-    update: {},
-    create: { phone: "09120000000", name: "مدیر کل", role: "ADMIN", verifiedAt: new Date() },
-  });
+  // ادمین: ایمیل + رمز عبور پیش‌فرض (فقط اگر قبلاً تنظیم نشده باشد)
+  const ADMIN_PASSWORD = "Admin@1234";
+  let admin = await prisma.user.findUnique({ where: { phone: "09120000000" } });
+  if (!admin) {
+    admin = await prisma.user.create({
+      data: {
+        phone: "09120000000",
+        name: "مدیر کل",
+        role: "ADMIN",
+        verifiedAt: new Date(),
+        email: "admin@nobino.ir",
+        passwordHash: hashPassword(ADMIN_PASSWORD),
+      },
+    });
+  } else if (!admin.passwordHash) {
+    admin = await prisma.user.update({
+      where: { phone: "09120000000" },
+      data: { passwordHash: hashPassword(ADMIN_PASSWORD), email: admin.email ?? "admin@nobino.ir" },
+    });
+  }
 
   const owner = await prisma.user.upsert({
     where: { phone: "09120000001" },
@@ -123,7 +146,18 @@ async function main() {
     { key: "openai.api_key", value: "", group: "ai", type: "secret", description: "کلید OpenAI برای قابلیت‌های هوش مصنوعی" },
     { key: "stt.openai.key", value: "", group: "ai", type: "secret", description: "کلید OpenAI برای Whisper (STT)" },
     { key: "stt.groq.key", value: "", group: "ai", type: "secret", description: "کلید Groq برای Whisper رایگان (STT)" },
+    { key: "stt.huggingface.key", value: "", group: "ai", type: "secret", description: "توکن HuggingFace برای Whisper رایگان (STT)" },
+    { key: "stt.cloudflare.key", value: "", group: "ai", type: "secret", description: "توکن Cloudflare Workers AI (STT رایگان)" },
+    { key: "stt.cloudflare.account", value: "", group: "ai", type: "string", description: "Account ID کلادفلر برای Workers AI" },
+    { key: "stt.deepgram.key", value: "", group: "ai", type: "secret", description: "کلید Deepgram (STT با اعتبار رایگان)" },
+    { key: "stt.order", value: "groq,huggingface,cloudflare,deepgram,openai", group: "ai", type: "string", description: "ترتیب تلاش ربات‌های STT (با کاما)" },
     { key: "ai.enabled", value: "true", group: "ai", type: "select", options: JSON.stringify(["true", "false"]), description: "فعال‌سازی قابلیت‌های AI" },
+    { key: "plan.limit.FREE.staff", value: "5", group: "plans", type: "number", description: "حداکثر کارکنان پلن رایگان" },
+    { key: "plan.limit.BASIC.staff", value: "15", group: "plans", type: "number", description: "حداکثر کارکنان پلن پایه" },
+    { key: "plan.limit.PRO.staff", value: "60", group: "plans", type: "number", description: "حداکثر کارکنان پلن حرفه‌ای" },
+    { key: "plan.limit.FREE.branches", value: "2", group: "plans", type: "number", description: "حداکثر شعبه پلن رایگان" },
+    { key: "plan.limit.BASIC.branches", value: "5", group: "plans", type: "number", description: "حداکثر شعبه پلن پایه" },
+    { key: "plan.limit.PRO.branches", value: "20", group: "plans", type: "number", description: "حداکثر شعبه پلن حرفه‌ای" },
   ];
   for (const s of defaultSettings) {
     await prisma.setting.upsert({
@@ -134,7 +168,7 @@ async function main() {
   }
 
   console.log("✅ Seed کامل شد");
-  console.log("   ادمین   : 09120000000");
+  console.log("   ادمین   : 09120000000 (رمز پیش‌فرض: Admin@1234 — ایمیل admin@nobino.ir)");
   console.log("   آرایشگر : 09120000001");
   console.log("   نماینده : 09120000002");
   console.log("   سالن    : /s/mah");

@@ -2,8 +2,9 @@
 
 import Link from "next/link";
 import { useI18n } from "@/lib/i18n";
+import SalonIcon from "@/components/icons/SalonIcon";
 
-const floating = ["✂️", "🎨", "💅", "✨", "🪞", "💄"];
+const floating = ["✂️", "🎨", "💅", "✨", "salon", "💄"];
 
 export default function HomeHero() {
   const { t } = useI18n();
@@ -19,7 +20,7 @@ export default function HomeHero() {
             className={`absolute text-3xl opacity-40 ${i % 2 ? "animate-float" : "animate-float-delay"}`}
             style={{ left: `${8 + i * 15}%`, top: `${15 + (i % 3) * 22}%` }}
           >
-            {e}
+            {e === "salon" ? <SalonIcon className="h-8 w-8" /> : e}
           </span>
         ))}
       </div>

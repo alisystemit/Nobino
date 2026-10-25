@@ -55,6 +55,9 @@ async function transcribeWithMock(
   _audioBuffer: Buffer,
   _options?: { filename?: string; mimeType?: string }
 ): Promise<TranscribeResult> {
+  // پارامترها بخشی از امضای درایور هستند و در حالت شبیه‌سازی استفاده نمی‌شوند.
+  void _audioBuffer;
+  void _options;
   const samples = [
     "سلام، می‌خواستم برای فردا ساعت ده صبح نوبت کوتاهی مو بگیرم. نام من سارا احمدی است و شماره موبایلم ۰۹۱۲۳۴۵۶۷۸ است.",
     "برای امروز ساعت شش عصر یک نوبت رنگ مو می‌خواهم. اسم من مریم است.",

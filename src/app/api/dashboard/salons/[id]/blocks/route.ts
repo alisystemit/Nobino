@@ -28,7 +28,7 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
 export async function POST(req: Request, { params }: { params: Promise<{ id: string }> }) {
   try {
     const { id } = await params;
-    const user = await requireSalonManage(id);
+    await requireSalonManage(id);
 
     const salon = await prisma.salon.findUnique({ where: { id } });
     if (!salon) return json({ success: false, error: "salon not found" }, { status: 404 });

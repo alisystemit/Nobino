@@ -1,4 +1,4 @@
-# ─────────────────────────────────────────────────────────────────────
+﻿# ─────────────────────────────────────────────────────────────────────
 #  راه‌اندازی PostgreSQL قابل‌حمل (embedded) برای توسعه محلی.
 #
 #  روش: ابتدا initdb با رمزنگاری UTF8 ساخته می‌شود (مهم برای فارسی)،
@@ -18,7 +18,7 @@ $pgCtl = Join-Path $bin "pg_ctl.exe"
 $data = Join-Path $root ".pgdata"
 $port = 5433
 $db = "nobino"
-$conn = "postgresql://postgres:postgres@localhost:$port/$db?schema=public"
+$conn = "postgresql://postgres:postgres@localhost:$port/${db}?schema=public"
 
 if (-not (Test-Path (Join-Path $data "PG_VERSION"))) {
   Write-Host "[1/4] مقداردهی اولیه خوشه (UTF8) ..."
@@ -30,14 +30,27 @@ if (-not (Test-Path (Join-Path $data "PG_VERSION"))) {
 if (-not (Get-NetTCPConnection -LocalPort $port -State Listen -ErrorAction SilentlyContinue)) {
   Write-Host "[2/4] بالا آوردن سرور روی پورت $port ..."
   Start-Process -FilePath $pgCtl -ArgumentList @('-D', $data, '-l', "$data\server.log", '-o', "`"-p $port`"", 'start') -WindowStyle Hidden
-  Start-Sleep -Seconds 8
 } else {
   Write-Host "[2/4] سرور از قبل در حال اجراست."
 }
 
+# انتظار برای آماده‌شدن کامل سرور (حداکثر ۳۰ ثانیه)
+$pgIsReady = Join-Path $bin "pg_isready.exe"
+for ($i = 0; $i -lt 30; $i++) {
+  $ok = $false
+  if (Test-Path $pgIsReady) {
+    & $pgIsReady -h localhost -p $port -U postgres *> $null
+    $ok = ($LASTEXITCODE -eq 0)
+  } else {
+    $ok = [bool](Get-NetTCPConnection -LocalPort $port -State Listen -ErrorAction SilentlyContinue)
+  }
+  if ($ok) { break }
+  Start-Sleep -Seconds 1
+}
+
 Write-Host "[3/4] اطمینان از وجود دیتابیس «$db» ..."
 $env:DATABASE_URL = $conn
-node -e "const{Client}=require('pg');(async()=>{const c=new Client({host:'localhost',port:$port,user:'postgres'});await c.connect();await c.query('CREATE DATABASE \"$db\"').catch(()=>{});await c.end();console.log('  دیتابیس آماده است')})()"
+node scripts/create-db.cjs $port $db
 
 Write-Host "[4/4] اجرای prisma db push + seed ..."
 & (Join-Path $root "node_modules\.bin\prisma.cmd") db push --skip-generate | Out-Null

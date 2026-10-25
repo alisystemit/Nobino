@@ -2,6 +2,7 @@ import { notFound } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import SalonBooking from "@/components/SalonBooking";
 import WebAppScript from "@/components/WebAppScript";
+import SalonIcon from "@/components/icons/SalonIcon";
 import type { Metadata } from "next";
 
 export const instant = false;
@@ -33,7 +34,7 @@ export default async function WaSalonPage({ params }: { params: Promise<{ slug: 
             // eslint-disable-next-line @next/next/no-img-element
             <img src={salon.logoUrl} alt="" className="h-full w-full rounded-xl object-cover" />
           ) : (
-            "🪞"
+            <SalonIcon className="h-8 w-8 text-neutral-400" />
           )}
         </div>
         <div>

@@ -1,3 +1,5 @@
+﻿
+
 import { z } from "zod";
 import { requireRole } from "@/lib/auth/guards";
 import { getAllSettings, updateSetting, invalidateSettings } from "@/lib/settings";
@@ -83,3 +85,4 @@ export async function PATCH(req: Request) {
     return apiError(err);
   }
 }
+

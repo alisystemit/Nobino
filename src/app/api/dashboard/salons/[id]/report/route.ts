@@ -1,6 +1,7 @@
 import { requireSalonManage } from "@/lib/auth/guards";
 import { prisma } from "@/lib/prisma";
 import { json, apiError } from "@/lib/utils";
+import type { Prisma } from "@prisma/client";
 
 /**
  * گزارش عملکرد سالن:
@@ -17,7 +18,7 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
     const url = new URL(_req.url);
     const branchId = url.searchParams.get("branchId") || undefined;
 
-    const baseWhere: any = { salonId: id };
+    const baseWhere: Prisma.AppointmentWhereInput = { salonId: id };
     if (branchId) baseWhere.branchId = branchId;
 
     const [total, completed, cancelled, appointments, distinctCustomers, employees] = await Promise.all([
@@ -58,7 +59,7 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
 
     // امروز
     const todayStart = new Date(); todayStart.setHours(0, 0, 0, 0);
-    const newTodayWhere: any = { salonId: id, createdAt: { gte: todayStart } };
+    const newTodayWhere: Prisma.AppointmentWhereInput = { salonId: id, createdAt: { gte: todayStart } };
     if (branchId) newTodayWhere.branchId = branchId;
     const newToday = await prisma.appointment.count({ where: newTodayWhere });
 

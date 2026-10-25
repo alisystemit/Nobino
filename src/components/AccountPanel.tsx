@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import RescheduleModal from "@/components/RescheduleModal";
 import { toJalali, toPersianDigits } from "@/lib/utils";
 
@@ -91,7 +92,18 @@ const tabs = [
 
 type TabId = (typeof tabs)[number]["id"];
 
+/** زمان فعلی با به‌روزرسانی دوره‌ای — برای فیلتر نوبت‌های آینده/گذشته */
+function useNow(): number {
+  const [now, setNow] = useState(() => Date.now());
+  useEffect(() => {
+    const id = setInterval(() => setNow(Date.now()), 30_000);
+    return () => clearInterval(id);
+  }, []);
+  return now;
+}
+
 export default function AccountPanel({ initialMe }: { initialMe: Me }) {
+  const router = useRouter();
   const [me, setMe] = useState<Me>(initialMe);
   const [tab, setTab] = useState<TabId>("appointments");
   const [appointments, setAppointments] = useState<Appointment[]>([]);
@@ -103,40 +115,47 @@ export default function AccountPanel({ initialMe }: { initialMe: Me }) {
   const [loading, setLoading] = useState(true);
   const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null);
 
-  async function loadAll() {
+  /** بارگیری داده‌ها بدون تغییر وضعیت هم‌زمان — قابل فراخوانی از effect */
+  function fetchAllData() {
+    type Api<T> = { success: boolean; error?: string } & Partial<T>;
+    return Promise.all([
+      fetch("/api/appointments"),
+      fetch("/api/favorites"),
+      fetch("/api/account/reviews"),
+      fetch("/api/auth/sessions"),
+      fetch("/api/support"),
+    ])
+      .then(
+        (rs) =>
+          Promise.all(rs.map((r) => r.json())) as Promise<
+            [Api<{ appointments: Appointment[] }>, Api<{ favorites: Favorite[] }>, Api<{ reviews: Review[] }>, Api<{ sessions: SessionInfo[] }>, Api<{ tickets: SupportTicket[] }>]
+          >
+      )
+      .then(([a, f, r, s, t]) => {
+        if (a.success && a.appointments) setAppointments(a.appointments);
+        if (f.success && f.favorites) setFavorites(f.favorites);
+        if (r.success && r.reviews) setReviews(r.reviews);
+        if (s.success && s.sessions) setSessions(s.sessions);
+        if (t.success && t.tickets) setTickets(t.tickets);
+      })
+      .catch(() => {
+        setMsg({ ok: false, text: "خطا در بارگیری اطلاعات. اتصال اینترنت را بررسی کنید." });
+      })
+      .finally(() => {
+        setLoading(false);
+      });
+  }
+
+  function loadAll() {
     setLoading(true);
-    try {
-      const [aRes, fRes, rRes, sRes, tRes] = await Promise.all([
-        fetch("/api/appointments"),
-        fetch("/api/favorites"),
-        fetch("/api/account/reviews"),
-        fetch("/api/auth/sessions"),
-        fetch("/api/support"),
-      ]);
-      const [a, f, r, s, t] = await Promise.all([
-        aRes.json(),
-        fRes.json(),
-        rRes.json(),
-        sRes.json(),
-        tRes.json(),
-      ]);
-      if (a.success) setAppointments(a.appointments);
-      if (f.success) setFavorites(f.favorites);
-      if (r.success) setReviews(r.reviews);
-      if (s.success) setSessions(s.sessions);
-      if (t.success) setTickets(t.tickets);
-    } catch {
-      setMsg({ ok: false, text: "خطا در بارگیری اطلاعات. اتصال اینترنت را بررسی کنید." });
-    } finally {
-      setLoading(false);
-    }
+    fetchAllData();
   }
 
   useEffect(() => {
-    loadAll();
+    fetchAllData();
   }, []);
 
-  const now = Date.now();
+  const now = useNow();
   const upcoming = useMemo(
     () =>
       appointments
@@ -209,11 +228,11 @@ export default function AccountPanel({ initialMe }: { initialMe: Me }) {
     else setMsg({ ok: false, text: data.error || "خطا" });
   }
 
-  async function saveProfile(form: { name: string; email: string }) {
+  async function saveProfile(form: { name: string; email: string; avatarUrl?: string | null }) {
     const res = await fetch("/api/auth/me", {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ name: form.name || undefined, email: form.email || undefined }),
+      body: JSON.stringify({ name: form.name || undefined, email: form.email || undefined, avatarUrl: form.avatarUrl ?? undefined }),
     });
     const data = await res.json();
     setMsg({ ok: !!data.success, text: data.success ? "پروفایل ذخیره شد." : data.error || "خطا" });
@@ -222,7 +241,8 @@ export default function AccountPanel({ initialMe }: { initialMe: Me }) {
 
   async function logout() {
     await fetch("/api/auth/logout", { method: "POST" });
-    window.location.href = "/";
+    router.push("/");
+    router.refresh();
   }
 
   return (
@@ -586,11 +606,61 @@ function ReviewForm({ onSubmit }: { onSubmit: (rating: number, comment: string) 
   );
 }
 
-function ProfileForm({ me, onSave }: { me: Me; onSave: (form: { name: string; email: string }) => void }) {
+function ProfileForm({ me, onSave }: { me: Me; onSave: (form: { name: string; email: string; avatarUrl?: string | null }) => void }) {
   const [name, setName] = useState(me.name ?? "");
   const [email, setEmail] = useState(me.email ?? "");
+  const [avatar, setAvatar] = useState(me.avatarUrl ?? "");
+  const [uploading, setUploading] = useState(false);
+  const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null);
+
+  async function uploadAvatar(file: File) {
+    setUploading(true);
+    setMsg(null);
+    try {
+      const fd = new FormData();
+      fd.append("file", file);
+      const res = await fetch("/api/upload/avatar", { method: "POST", body: fd });
+      const data = await res.json();
+      if (!data.success) throw new Error(data.error || "بارگذاری ناموفق بود");
+      setAvatar(data.url);
+      setMsg({ ok: true, text: "تصویر بارگذاری شد؛ برای ثبت نهایی «ذخیره تغییرات» را بزنید ✅" });
+    } catch (e) {
+      setMsg({ ok: false, text: e instanceof Error ? e.message : "خطا در بارگذاری تصویر" });
+    } finally {
+      setUploading(false);
+    }
+  }
+
   return (
     <div className="max-w-lg space-y-4 rounded-2xl border border-neutral-200 bg-white p-5">
+      <div className="flex items-center gap-4">
+        <div className="flex h-16 w-16 items-center justify-center overflow-hidden rounded-full bg-gradient-to-br from-pink-100 to-purple-100 text-2xl font-black text-pink-600">
+          {avatar ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img src={avatar} alt="آواتار" className="h-full w-full object-cover" />
+          ) : (
+            (me.name ?? "؟").slice(0, 1)
+          )}
+        </div>
+        <div className="flex-1">
+          <p className="text-sm font-bold text-neutral-800">تصویر پروفایل</p>
+          <label className={`mt-1 inline-block cursor-pointer rounded-lg bg-neutral-100 px-3 py-1.5 text-xs font-bold text-neutral-700 hover:bg-neutral-200 ${uploading ? "opacity-60" : ""}`}>
+            {uploading ? "در حال بارگذاری..." : "انتخاب تصویر"}
+            <input
+              type="file"
+              accept="image/jpeg,image/png,image/webp"
+              className="hidden"
+              disabled={uploading}
+              onChange={(e) => {
+                const f = e.target.files?.[0];
+                if (f) uploadAvatar(f);
+                e.target.value = "";
+              }}
+            />
+          </label>
+        </div>
+      </div>
+      {msg && <p className={`rounded-lg px-3 py-2 text-xs ${msg.ok ? "bg-emerald-50 text-emerald-700" : "bg-red-50 text-red-600"}`}>{msg.text}</p>}
       <div>
         <label className="text-xs font-bold text-neutral-500">شماره موبایل</label>
         <input value={me.phone} disabled dir="ltr" className="mt-1 w-full rounded-xl border border-neutral-200 bg-neutral-50 px-3 py-2 text-sm text-neutral-500" />
@@ -603,7 +673,7 @@ function ProfileForm({ me, onSave }: { me: Me; onSave: (form: { name: string; em
         <label className="text-xs font-bold text-neutral-500">ایمیل</label>
         <input value={email} onChange={(e) => setEmail(e.target.value)} dir="ltr" className="mt-1 w-full rounded-xl border border-neutral-200 px-3 py-2 text-sm outline-none focus:border-pink-400" />
       </div>
-      <button onClick={() => onSave({ name, email })} className="rounded-xl bg-pink-600 px-5 py-2.5 text-sm font-bold text-white hover:bg-pink-700">
+      <button onClick={() => onSave({ name, email, avatarUrl: avatar || null })} className="rounded-xl bg-pink-600 px-5 py-2.5 text-sm font-bold text-white hover:bg-pink-700">
         ذخیره تغییرات
       </button>
     </div>

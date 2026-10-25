@@ -9,6 +9,7 @@ const translations: Record<string, { fa: string; en: string }> = {
   "nav.login": { fa: "ورود", en: "Login" },
   "nav.packages": { fa: "پکیج‌ها", en: "Packages" },
   "nav.salons": { fa: "جستجوی آرایشگاه‌ها", en: "Find Salons" },
+  "nav.help": { fa: "راهنما", en: "Help" },
   "hero.badge": { fa: "هوش مصنوعی صوتی", en: "Voice AI" },
   "hero.title1": { fa: "نوبت‌دهی آرایشگاه", en: "Salon Booking" },
   "hero.title2": { fa: "با صدای فارسی", en: "with Voice" },
@@ -97,14 +98,14 @@ interface I18nCtx {
 const Ctx = createContext<I18nCtx>({ lang: "fa", setLang: () => {}, t: (k) => k, dir: "rtl" });
 
 export function I18nProvider({ children }: { children: React.ReactNode }) {
-  const [lang, setLangState] = useState<Lang>("fa");
-
-  useEffect(() => {
+  const [lang, setLangState] = useState<Lang>(() => {
+    if (typeof window === "undefined") return "fa";
     try {
       const saved = localStorage.getItem("nobino_lang") as Lang | null;
-      if (saved === "fa" || saved === "en") setLangState(saved);
+      if (saved === "fa" || saved === "en") return saved;
     } catch {}
-  }, []);
+    return "fa";
+  });
 
   const setLang = (l: Lang) => {
     setLangState(l);

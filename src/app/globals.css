@@ -2,8 +2,51 @@
 
 @custom-variant dark (&:where(.dark, .dark *));
 
+/* ─── فونت‌های محلی (Yekan / IranSans) ─── */
+@font-face {
+  font-family: "Yekan";
+  src: url("/fonts/Yekan-Regular.woff2") format("woff2");
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: "Yekan";
+  src: url("/fonts/Yekan-Bold.woff2") format("woff2");
+  font-weight: 700;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: "IranSans";
+  src: url("/fonts/IRANSans-Regular.woff2") format("woff2");
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+/* Rakh (رخ) و Plak (پلاک) — وقتی فایل وبر در public/fonts قرار گرفت فعال می‌شوند
+   در غیر این صورت به زیباترین جایگزین (Yekan/Vazirmatn) برمی‌گردند. */
+@font-face {
+  font-family: "Rakh";
+  src: url("/fonts/Rakh-Regular.woff2") format("woff2");
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: "Plak";
+  src: url("/fonts/Plak-Regular.woff2") format("woff2");
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+
 @theme inline {
   --font-sans: var(--font-vazir), sans-serif;
+  --font-yekan: "Yekan", var(--font-vazir), sans-serif;
+  --font-iransans: "IranSans", var(--font-vazir), sans-serif;
+  --font-rakh: "Rakh", var(--font-vazir), sans-serif;
+  --font-plak: "Plak", var(--font-yekan), sans-serif;
 }
 
 :root {
@@ -26,6 +69,24 @@ body {
   background: var(--bg);
   color: var(--fg);
   transition: background-color 0.3s, color 0.3s;
+}
+
+/* ─── اعمال فونت‌ها بر اساس مکان ─── */
+/* سرتیترها و عناوین → یه‌کان (نمایشی، شیک) */
+h1, h2, h3, h4, h5, h6,
+.font-heading {
+  font-family: var(--font-yekan);
+  letter-spacing: 0;
+}
+/* دکمه‌ها و منو → یه‌کان */
+button, .btn, [role="button"], input[type="submit"],
+.font-action {
+  font-family: var(--font-yekan);
+}
+/* ورودی‌ها و جداول → ایران سنس (خوانا برای داده) */
+input, textarea, select, table, th, td, kbd,
+.font-form {
+  font-family: var(--font-iransans);
 }
 
 /* ─── اسکرول‌بار ظریف ─── */

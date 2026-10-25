@@ -1,3 +1,5 @@
+﻿
+
 import { requireRole } from "@/lib/auth/guards";
 import { prisma } from "@/lib/prisma";
 import { json, apiError } from "@/lib/utils";
@@ -50,9 +52,14 @@ export async function GET() {
     }
     for (const s of subscriptions) if (s.status === "CANCELLED" || s.status === "EXPIRED") churn[key(s.createdAt)] = (churn[key(s.createdAt)] ?? 0) + 1;
 
+    // برچسب ماه‌ها به فارسی (مثلاً «آبان ۱۴۰۵»)
+    const monthLabels = months.map((m) =>
+      new Intl.DateTimeFormat("fa-IR", { month: "long", year: "numeric" }).format(new Date(`${m}-01T12:00:00`))
+    );
+
     return json({
       success: true,
-      months,
+      months: monthLabels,
       revenue: months.map((m) => revenue[m]),
       userGrowth: months.map((m) => userGrowth[m]),
       appointments: months.map((m) => apptCount[m]),
@@ -63,3 +70,4 @@ export async function GET() {
     return apiError(err);
   }
 }
+

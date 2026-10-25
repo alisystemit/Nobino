@@ -489,6 +489,11 @@ model Invoice {
   subscription   Subscription? @relation(fields: [subscriptionId], references: [id], onDelete: SetNull)
   orderId        String?       @unique
   order          Order?        @relation(fields: [orderId], references: [id], onDelete: SetNull)
+  kind           String        @default("SUBSCRIPTION") // SUBSCRIPTION | SERVICE (فاکتور خدماتی برای مشتری)
+  customerName   String?
+  customerPhone  String?
+  description    String?
+  payToken       String?       @unique
   amount         Int
   originalAmount Int?
   period         String        @default("MONTHLY")
@@ -498,6 +503,8 @@ model Invoice {
   paidAt         DateTime?
   createdAt      DateTime      @default(now())
   updatedAt      DateTime      @updatedAt
+
+  payments Payment[]
 
   @@index([salonId])
   @@index([subscriptionId])
@@ -545,8 +552,10 @@ model Order {
 
 model Payment {
   id          String        @id @default(cuid())
-  orderId     String
-  order       Order         @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  orderId     String?
+  order       Order?        @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  invoiceId   String?
+  invoice     Invoice?      @relation(fields: [invoiceId], references: [id], onDelete: SetNull)
   gateway     String // zarinpal | mellat | ...
   amount      Int
   status      PaymentStatus @default(PENDING)
@@ -559,6 +568,7 @@ model Payment {
   updatedAt   DateTime      @updatedAt
 
   @@index([orderId])
+  @@index([invoiceId])
   @@index([gateway])
 }
 

@@ -1,6 +1,5 @@
 import { prisma } from "@/lib/prisma";
 import { enqueueSms } from "@/lib/notifications/queue";
-import { logAudit } from "@/lib/audit";
 
 /** ساخت اشتراک پس از پرداخت موفق */
 export async function activateSubscription(params: { salonId: string; packageId: string; period: string; autoRenew?: boolean }) {

@@ -1,11 +1,7 @@
-import { createHmac } from "crypto";
+import { createHmac } from "node:crypto";
 import { BaseGateway } from "@/lib/payments/gateways/base";
 import { PaymentOrder, PaymentRequestResult, PaymentVerifyResult } from "@/lib/payments/types";
 import { env, isSandbox } from "@/lib/env";
-
-function sha256(input: string): string {
-  return createHmac("sha256", "").update(input).digest("hex");
-}
 
 /**
  * درگاه پاسارگاد — شبکه پرداخت پی

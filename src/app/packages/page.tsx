@@ -52,7 +52,7 @@ export default function PackagesPage() {
         setLoading(false);
       }
     })();
-  }, []);
+  }, [router]);
 
   async function buy(pkgId: string) {
     setBuying(pkgId);
@@ -70,7 +70,7 @@ export default function PackagesPage() {
       }
       // انتقال به درگاه یا صفحه تست
       if (data.redirectUrl) {
-        window.location.href = data.redirectUrl;
+        window.location.assign(data.redirectUrl);
       } else {
         router.push(`/payment/result?status=success`);
       }
