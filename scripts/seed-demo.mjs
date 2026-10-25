@@ -30,8 +30,8 @@ const SVG_FONTS =
       (_IranSans ? `@font-face{font-family:"IranSans";src:url(data:font/woff2;base64,${_IranSans}) format("woff2");font-weight:400;}` : "") +
       `]]></style>`
     : "";
-const F_YEKAN = '"Yekan","Vazirmatn",Tahoma,sans-serif';
-const F_IRANSANS = '"IranSans","Vazirmatn",Tahoma,sans-serif';
+const F_YEKAN = "'Yekan','Vazirmatn',Tahoma,sans-serif";
+const F_IRANSANS = "'IranSans','Vazirmatn',Tahoma,sans-serif";
 
 function svgLogo(letter, c1, c2) {
   return `<svg xmlns="http://www.w3.org/2000/svg" width="256" height="256" viewBox="0 0 256 256">${SVG_FONTS}<defs><linearGradient id="g" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="${c1}"/><stop offset="1" stop-color="${c2}"/></linearGradient></defs><rect width="256" height="256" rx="64" fill="url(#g)"/><circle cx="64" cy="52" r="30" fill="#fff" opacity="0.18"/><circle cx="204" cy="196" r="44" fill="#fff" opacity="0.10"/><text x="128" y="140" text-anchor="middle" dominant-baseline="central" font-size="112" font-weight="bold" fill="#fff" font-family="${F_YEKAN}">${esc(letter)}</text></svg>`;
