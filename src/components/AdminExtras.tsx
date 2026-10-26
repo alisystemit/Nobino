@@ -39,7 +39,20 @@ type Review = {
 type AuditLog = { id: string; action: string; entityType: string; actorPhone?: string | null; createdAt: string };
 type Subscription = { id: string; salon?: { name: string } | null; package?: { name: string } | null; endsAt: string; period: string; status: string };
 type UserRow = { id: string; name?: string | null; phone: string; email?: string | null; loyaltyPoints: number; role: string; isActive: boolean };
-type Pkg = { id: string; name: string; plan: string; price: number; yearlyPrice: number | null; durationDays: number; features: StoredFeature[]; featureLabels?: string[]; isActive: boolean };
+type Pkg = {
+  id: string;
+  name: string;
+  plan: string;
+  price: number;
+  yearlyPrice: number | null;
+  durationDays: number;
+  features: StoredFeature[];
+  featureLabels?: string[];
+  isActive: boolean;
+  subscriptionCount?: number;
+  orderCount?: number;
+  paidOrderCount?: number;
+};
 type PkgDraft = { id: string | null; name: string; plan: string; price: number; yearlyPrice: number | null; durationDays: number; features: StoredFeature[]; isActive: boolean };
 type Ticket = {
   id: string;
@@ -646,10 +659,15 @@ function UserManager({ ctx }: { ctx: Ctx }) {
 
 /* ─── مدیریت پکیج‌ها ─────────────────────────────────────────────────── */
 
+/** برچسب فارسی پلن (PLAN_LABELS در limits.ts سمت سرور است و قابل import در کلاینت نیست) */
+const PLAN_TITLES: Record<string, string> = { FREE: "رایگان", BASIC: "پایه", PRO: "حرفه‌ای", ENTERPRISE: "سازمانی" };
+
 function PackageManager({ ctx }: { ctx: Ctx }) {
   const [pkgs, setPkgs] = useState<Pkg[]>([]);
   const [editing, setEditing] = useState<PkgDraft | null>(null);
   const [customText, setCustomText] = useState("");
+  const [confirmId, setConfirmId] = useState<string | null>(null);
+  const [busyId, setBusyId] = useState<string | null>(null);
 
   const reload = useCallback(async () => {
     const r = await fetch("/api/admin/packages");
@@ -673,11 +691,45 @@ function PackageManager({ ctx }: { ctx: Ctx }) {
   async function save() {
     if (!editing) return;
     if (!editing.name.trim()) return ctx.setMsg({ ok: false, text: "نام پکیج را وارد کنید" });
-    const r = await ctx.api("/api/admin/packages", editing.id ? "PATCH" : "POST", editing, "پکیج ذخیره شد ✅");
+    const payload = { ...editing, name: editing.name.trim() };
+    const r = await ctx.api("/api/admin/packages", editing.id ? "PATCH" : "POST", payload, editing.id ? "پکیج به‌روز شد ✅" : "پکیج جدید ساخته شد ✅");
     if (r) {
       setEditing(null);
       reload();
     }
+  }
+
+  /**
+   * حذف پکیج. اگر اشتراک یا سفارشی به آن وصل باشد، حالت پیش‌فرض فقط غیرفعالش
+   * می‌کند تا تاریخچهٔ مالی و فاکتورها سالم بمانند؛ «حذف قطعی» (force) فقط وقتی
+   * ممکن است که هیچ سفارش پرداخت‌شده‌ای به آن وصل نباشد.
+   */
+  async function remove(p: Pkg, force = false) {
+    setConfirmId(null);
+    setBusyId(p.id);
+    const d = await ctx.api<
+      ApiRes<{ deleted?: boolean; deactivated?: boolean; subscriptions?: number; orders?: number; purgedSubscriptions?: number; purgedOrders?: number }>
+    >(`/api/admin/packages?id=${encodeURIComponent(p.id)}${force ? "&force=1" : ""}`, "DELETE");
+    setBusyId(null);
+    if (!d) return;
+    if (d.deleted && (d.purgedOrders ?? 0) + (d.purgedSubscriptions ?? 0) > 0) {
+      ctx.setMsg({
+        ok: true,
+        text:
+          `پکیج «${p.name}» و ${(d.purgedSubscriptions ?? 0).toLocaleString("fa-IR")} اشتراک و ` +
+          `${(d.purgedOrders ?? 0).toLocaleString("fa-IR")} سفارش تسویه‌نشدهٔ آن حذف شد ✅`,
+      });
+    } else if (d.deleted) {
+      ctx.setMsg({ ok: true, text: `پکیج «${p.name}» حذف شد ✅` });
+    } else {
+      ctx.setMsg({
+        ok: true,
+        text:
+          `پکیج «${p.name}» غیرفعال شد؛ از فهرست فروش حذف نمی‌شود چون ` +
+          `${(d.subscriptions ?? 0).toLocaleString("fa-IR")} اشتراک و ${(d.orders ?? 0).toLocaleString("fa-IR")} سفارش به آن وصل است.`,
+      });
+    }
+    reload();
   }
 
   function addCustom() {
@@ -719,11 +771,24 @@ function PackageManager({ ctx }: { ctx: Ctx }) {
           <div className="grid gap-3 sm:grid-cols-2">
             <input className={input} placeholder="نام پکیج" aria-label="نام پکیج" value={editing.name} onChange={(e) => setEditing({ ...editing, name: e.target.value })} />
             <select className={input} value={editing.plan} onChange={(e) => setEditing({ ...editing, plan: e.target.value })} aria-label="پلن">
-              {["FREE", "BASIC", "PRO", "ENTERPRISE"].map((p) => <option key={p} value={p}>{p}</option>)}
+              {["FREE", "BASIC", "PRO", "ENTERPRISE"].map((p) => (
+                <option key={p} value={p}>
+                  {PLAN_TITLES[p]} ({p})
+                </option>
+              ))}
             </select>
             <input className={input} type="number" placeholder="قیمت ماهانه (تومان)" aria-label="قیمت ماهانه" value={editing.price} onChange={(e) => setEditing({ ...editing, price: Number(e.target.value) })} />
             <input className={input} type="number" placeholder="قیمت سالانه (اختیاری)" aria-label="قیمت سالانه" value={editing.yearlyPrice ?? ""} onChange={(e) => setEditing({ ...editing, yearlyPrice: e.target.value === "" ? null : Number(e.target.value) })} />
             <input className={input} type="number" placeholder="مدت (روز)" aria-label="مدت" value={editing.durationDays} onChange={(e) => setEditing({ ...editing, durationDays: Number(e.target.value) })} />
+            <label className="flex items-center gap-2 text-xs font-medium text-neutral-600 dark:text-neutral-300">
+              <input
+                type="checkbox"
+                checked={editing.isActive}
+                onChange={(e) => setEditing({ ...editing, isActive: e.target.checked })}
+                className="h-4 w-4 accent-pink-600"
+              />
+              در صفحه پکیج‌ها فروخته شود{editing.isActive ? "" : " (مخفی)"}
+            </label>
           </div>
           <div className="mt-3">
             <div className="mb-1 text-xs font-bold text-neutral-600 dark:text-neutral-300">
@@ -759,7 +824,7 @@ function PackageManager({ ctx }: { ctx: Ctx }) {
                         min={0}
                         value={typeof selected === "object" ? selected.value ?? "" : ""}
                         onChange={(e) => setModuleValue(m.key, e.target.value)}
-                        placeholder="پلن"
+                        placeholder="خالی = سقف پلن"
                         aria-label={`سقف ${m.label}`}
                         className="w-16 shrink-0 rounded-lg border border-neutral-200 bg-white px-1.5 py-1 text-center text-xs outline-none focus:border-pink-400 dark:border-neutral-700 dark:bg-neutral-800"
                       />
@@ -807,7 +872,11 @@ function PackageManager({ ctx }: { ctx: Ctx }) {
               {editing.features.length === 0
                 ? "هیچ ماژولی انتخاب نشده — صفحهٔ پکیج‌ها فهرست پیش‌فرض پلن را نشان می‌دهد."
                 : normalizeFeatures(editing.features)
-                    .map((f) => `${moduleIcon(f)} ${moduleLabel(f)}`)
+                    .map((f) => {
+                      const text = `${moduleIcon(f)} ${moduleLabel(f)}`;
+                      const isAutoCap = typeof f !== "string" && findModule(f.key)?.kind === "count" && f.value == null;
+                      return isAutoCap ? `${text} (سقف پلن)` : text;
+                    })
                     .join(" | ")}
             </div>
           </div>
@@ -820,14 +889,27 @@ function PackageManager({ ctx }: { ctx: Ctx }) {
 
       <div className="space-y-2">
         {pkgs.length === 0 && <p className="py-6 text-center text-sm text-neutral-400 dark:text-neutral-500">پکیجی ساخته نشده است.</p>}
-        {pkgs.map((p) => (
-          <div key={p.id} className={`${listRow} flex flex-wrap items-center justify-between gap-2`}>
+        {pkgs.map((p) => {
+          const linked = (p.subscriptionCount ?? 0) + (p.orderCount ?? 0);
+          const paidOrders = p.paidOrderCount ?? 0;
+          return (
+          <div key={p.id} className={`${listRow} flex flex-wrap items-center justify-between gap-2 ${p.isActive ? "" : "opacity-70"}`}>
             <div>
               <div className="font-bold text-neutral-800 dark:text-neutral-100">
-                {p.name} <span className="text-xs font-normal text-neutral-400 dark:text-neutral-500">({p.plan})</span>
+                {p.name}{" "}
+                <span className="text-xs font-normal text-neutral-400 dark:text-neutral-500">
+                  {PLAN_TITLES[p.plan] ?? p.plan}
+                  {!p.isActive && " · غیرفعال"}
+                </span>
               </div>
               <div className="text-xs text-neutral-500 dark:text-neutral-400">
-                ماهانه: {p.price.toLocaleString("fa-IR")} — سالانه: {(p.yearlyPrice ?? p.price * 10).toLocaleString("fa-IR")} — {p.features?.length ?? 0} ماژول
+                ماهانه: {p.price.toLocaleString("fa-IR")} — سالانه: {(p.yearlyPrice ?? p.price * 10).toLocaleString("fa-IR")} —{" "}
+                {(p.featureLabels?.length ?? p.features?.length ?? 0).toLocaleString("fa-IR")} ماژول
+                {linked > 0 && (
+                  <span className="ml-1 rounded-lg bg-amber-50 px-1.5 py-0.5 text-[11px] font-bold text-amber-700 dark:bg-amber-950/40 dark:text-amber-300">
+                    {p.subscriptionCount?.toLocaleString("fa-IR") ?? "۰"} اشتراک · {p.orderCount?.toLocaleString("fa-IR") ?? "۰"} سفارش
+                  </span>
+                )}
               </div>
               {p.featureLabels && p.featureLabels.length > 0 && (
                 <div className="mt-1 flex max-w-xl flex-wrap gap-1">
@@ -839,7 +921,7 @@ function PackageManager({ ctx }: { ctx: Ctx }) {
                 </div>
               )}
             </div>
-            <div className="flex items-center gap-2">
+            <div className="flex flex-wrap items-center gap-2">
               <button
                 onClick={() => setEditing({ id: p.id, name: p.name, plan: p.plan, price: p.price, yearlyPrice: p.yearlyPrice, durationDays: p.durationDays, features: normalizeFeatures(p.features), isActive: p.isActive })}
                 className={ghostBtn}
@@ -858,9 +940,46 @@ function PackageManager({ ctx }: { ctx: Ctx }) {
                 />
                 فعال
               </label>
+              {confirmId === p.id ? (
+                <span className="flex flex-wrap items-center gap-1.5 rounded-xl bg-red-50 px-2 py-1 text-[11px] font-bold text-red-700 dark:bg-red-950/40 dark:text-red-300">
+                  {linked > 0 ? `${linked.toLocaleString("fa-IR")} مورد به این پکیج وصل است:` : "حذف شود؟"}
+                  {linked > 0 ? (
+                    <button onClick={() => remove(p)} disabled={busyId === p.id} className={ghostBtn}>
+                      فقط غیرفعال شود
+                    </button>
+                  ) : (
+                    <button onClick={() => remove(p)} disabled={busyId === p.id} className={dangerBtn}>
+                      {busyId === p.id ? "در حال انجام…" : "بله، حذف شود"}
+                    </button>
+                  )}
+                  {linked > 0 && (
+                    <button
+                      onClick={() => remove(p, true)}
+                      disabled={busyId === p.id || paidOrders > 0}
+                      title={paidOrders > 0 ? `${paidOrders.toLocaleString("fa-IR")} سفارش پرداخت‌شده دارد؛ برای حفظ اسناد مالی حذف قطعی مجاز نیست` : "اشتراک‌ها و سفارش‌های تسویه‌نشده هم حذف می‌شوند"}
+                      className={paidOrders > 0 ? `${dangerBtn} cursor-not-allowed opacity-50` : dangerBtn}
+                    >
+                      حذف قطعی
+                    </button>
+                  )}
+                  <button onClick={() => setConfirmId(null)} className={ghostBtn}>
+                    انصراف
+                  </button>
+                </span>
+              ) : (
+                <button
+                  onClick={() => setConfirmId(p.id)}
+                  disabled={busyId === p.id}
+                  title={linked > 0 ? "به این پکیج اشتراک یا سفارش وصل است؛ فقط غیرفعال می‌شود" : "حذف پکیج"}
+                  className={dangerBtn}
+                >
+                  {linked > 0 ? "حذف/غیرفعال‌سازی" : "حذف"}
+                </button>
+              )}
             </div>
           </div>
-        ))}
+          );
+        })}
       </div>
     </div>
   );
