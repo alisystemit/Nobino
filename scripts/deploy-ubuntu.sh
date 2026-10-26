@@ -1175,8 +1175,10 @@ echo "  PM2 status    : sudo -u ${APP_USER} -H env PM2_HOME=${APP_HOME}/.pm2 pm2
 echo "  Logs          : sudo -u ${APP_USER} -H env PM2_HOME=${APP_HOME}/.pm2 pm2 logs ${APP_NAME}"
 echo "  Database      : ${DB_NAME} (user: ${DB_USER})"
 echo ""
-echo "  Update later   : sudo bash ${APP_DIR}/scripts/deploy-ubuntu.sh"
-echo "  (or pull a tag) : GIT_REF=v1.2.0 sudo bash ${APP_DIR}/scripts/deploy-ubuntu.sh"
+echo "  Update later   : sudo bash ${APP_DIR}/scripts/update-ubuntu.sh"
+echo "  (or a tag)     : sudo bash ${APP_DIR}/scripts/update-ubuntu.sh --ref v1.2.0"
+echo "  (dry run)      : sudo bash ${APP_DIR}/scripts/update-ubuntu.sh --dry-run"
+echo "  (change domain / port / site file): sudo bash ${APP_DIR}/scripts/deploy-ubuntu.sh"
 echo ""
 if [ "$WEB_INSTALLED" -eq 0 ]; then
   info "Your existing ${WEB_KIND} was reused: other sites, domains and certificates were not modified."

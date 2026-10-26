@@ -171,7 +171,35 @@ curl -fsSL https://raw.githubusercontent.com/alisystemit/Nobino/main/scripts/ins
 اگر دامنهٔ جدید ندارید، `DOMAIN` را خالی بگذارید؛ اسکریپت یک پورت آزاد 8080–8099
 انتخاب می‌کند و آدرس نهایی را در پایان چاپ می‌کند.
 
-**به‌روزرسانی بعدی** (کد را می‌کشد و سرویس را با همان کاربر ری‌استارت می‌کند):
+**به‌روزرسانی بعدی** — اسکریپت `update-ubuntu.sh` کد را از GitHub می‌گیرد، قبل از
+هر کاری از `.env` و دیتابیس پشتیبان می‌سازد، وابستگی‌ها را نصب می‌کند، schema را
+اعمال می‌کند، اپ را build و با PM2 ری‌استارت می‌کند و در پایان سلامت سرویس را
+با یک درخواست محلی چک می‌کند:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/alisystemit/Nobino/main/scripts/update-ubuntu.sh \
+  | sudo bash -s -- --dry-run      # پیش‌نمایش، بدون هیچ تغییری
+curl -fsSL https://raw.githubusercontent.com/alisystemit/Nobino/main/scripts/update-ubuntu.sh \
+  | sudo bash -s -- --yes
+```
+
+اگر فایل‌ها روی سرور هستند، از همان‌جا هم اجرا می‌شود:
+
+```bash
+sudo bash /var/www/nobino/scripts/update-ubuntu.sh
+sudo bash /var/www/nobino/scripts/update-ubuntu.sh --ref v1.0.0 --stash
+```
+
+گزینه‌ها: `--dir` (مسیر نصب؛ پیش‌فرض خودکار `/var/www/nobino` و بعد `/opt/nobino`)،
+`--ref` (برنچ/تگ/کامیت)، `--stash` (تغییرات دست‌ی را موقتاً کنار بگذار تا کد جلو
+برود)، `--replace` (پوشه‌ای که `.git` ندارد را به چک‌اوت گیت تبدیل کن؛ پوشهٔ قبلی
+حذف نمی‌شود، با پسوند `.old-تاریخ` کنار نگه داشته می‌شود)، `--skip-deps`،
+`--no-build`، `--full` (بعد از آپدیت، `deploy-ubuntu.sh` را هم اجرا کند تا فایل
+سایت/vhost بازسازی شود)، `--dry-run`، `--yes`.
+
+این اسکریپت چیزی را در سیستم عوض نمی‌کند: وب‌سرور، SSL، فایروال، Node، PostgreSQL
+و هیچ سایت دیگری نصب، حذف یا بازپیکربندی نمی‌شود و رمز یوزرهای PostgreSQL تغییر
+نمی‌کند. برای نصب اولیه یا تغییر دامنه/پورت، `deploy-ubuntu.sh` را اجرا کنید:
 
 ```bash
 sudo bash /var/www/nobino/scripts/deploy-ubuntu.sh

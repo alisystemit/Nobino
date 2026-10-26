@@ -366,7 +366,14 @@ curl -fsSL https://raw.githubusercontent.com/alisystemit/Nobino/main/scripts/ins
   NONINTERACTIVE=1`). گزینه‌های دیگر: `REPO_URL`، `GIT_REF`، `APP_USER`،
   `APP_DIR`، `PORT`، `WEB_SERVER`، `WEB_PORT`، `MANAGE_UFW`، `ENABLE_SSL`،
   `SSL_EMAIL`، `APP_URL`، `ROOT_DOMAIN`.
-- به‌روزرسانی بعدی: `sudo bash /var/www/nobino/scripts/deploy-ubuntu.sh`
+- به‌روزرسانی: `sudo bash /var/www/nobino/scripts/update-ubuntu.sh`
+  (پیش‌نمایش با `--dry-run`؛ تگ مشخص با `--ref v1.0.0`؛ اگر پوشهٔ نصب تغییر دست‌ی
+  دارد و می‌خواهید کد جلو برود `--stash`). این اسکریپت اول از `.env` و دیتابیس
+  پشتیبان می‌گیرد، بعد `npm ci` → `prisma migrate`/`db push` → `npm run build` →
+  `pm2 restart` و در آخر با یک درخواست محلی سلامت سرویس را چک می‌کند. چیزی را در
+  سیستم عوض نمی‌کند: وب‌سرور، SSL، فایروال، Node، PostgreSQL، PHP، MySQL و سایت‌های
+  دیگر دست‌نخورده می‌مانند و رمز هیچ یوزر PostgreSQL تغییر نمی‌کند.
+- تغییر دامنه/پورت یا بازسازی فایل سایت: `sudo bash /var/www/nobino/scripts/deploy-ubuntu.sh`
   (با `GIT_REF=v1.0.0` می‌توان تگ مشخصی را استقرار داد).
 - حذف کامل و مرحله‌ای: `sudo bash /var/www/nobino/scripts/uninstall-ubuntu.sh`
   (پیش‌نمایش: `--dry-run`)؛ فقط vhost/فایل اختصاصی Nobino حذف می‌شود و
