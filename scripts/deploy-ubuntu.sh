@@ -628,6 +628,10 @@ else
   [ -n "$REPO" ] || fail "Repository URL is required (or place the code in $APP_DIR yourself)."
   if [ -d "$APP_DIR" ] && [ -n "$(ls -A "$APP_DIR" 2>/dev/null)" ]; then
     warn "Directory $APP_DIR already has files; using it as-is (no clone)."
+    warn "There is no .git here, so this run cannot update the code from GitHub; the"
+    warn "dependency step will keep failing on whatever package.json is on this disk."
+    warn "Make it a checkout (your .env stays): cp $APP_DIR/.env /root/nobino.env.bak"
+    warn "  then: rm -rf $APP_DIR && git clone --branch $GIT_REF $REPO $APP_DIR && cp /root/nobino.env.bak $APP_DIR/.env"
   else
     mkdir -p "$APP_DIR"
     info "Cloning $REPO ($GIT_REF) into $APP_DIR..."
