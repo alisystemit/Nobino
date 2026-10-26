@@ -18,7 +18,7 @@
 10. [سرویس‌های پیامک و ایمیل](#sms)
 11. [API مرجع](#api)
 12. [ساختار پروژه](#structure)
-13. [بهینه‌سازی و استقرار (Vercel)](#deploy)
+13. [بهینه‌سازی و استقرار (Vercel و VPS اوبونتو)](#deploy)
 14. [عیب‌یابی رایج](#troubleshooting)
 
 ---
@@ -82,6 +82,8 @@ npm run dev
 | `npm run seed` | داده نمونه |
 | `npm run db:push` | اعمال schema |
 | `npm run lint` | بررسی کد |
+| `npm run deploy:ubuntu` | استقرار/به‌روزرسانی روی VPS اوبونتو (از همین پوشه) |
+| `npm run uninstall:ubuntu` | حذف کامل نصب روی VPS (مرحله‌ای، با تأیید) |
 
 ---
 
@@ -321,12 +323,32 @@ Nobino/
 
 # ۱۳) بهینه‌سازی و استقرار (Vercel)  {#deploy}
 
+## الف) Vercel
+
 1. دیتابیس PostgreSQL روی [Neon](https://neon.tech) یا Supabase بسازید.
 2. `DATABASE_URL` را در Vercel تنظیم کنید.
 3. همه متغیرهای `.env.example` را در Vercel Environment Variables بگذارید.
 4. دامنه `nobino.ir` را به Vercel وصل کنید (برای ساب‌دامین سالن‌ها).
 5. Cronها در `vercel.json` تعریف شده‌اند (یادآوری، صف پیامک، اشتراک، صف انتظار، قفل موقت).
 6. روش `npm run build`؛ خروجی خودکار است.
+
+## ب) VPS اوبونتو با یک فرمان از GitHub
+
+روی سرور تازه، کد از ریپوی عمومی گرفته و همه‌چیز خودکار پیکربندی می‌شود
+(PostgreSQL، Node.js، build، PM2، Nginx، SSL، UFW):
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/alisystemit/Nobino/main/scripts/install-from-github.sh | sudo bash
+```
+
+- نصب بی‌سؤال: `sudo DOMAIN=nobino.ir NONINTERACTIVE=1 bash -c '…'` (یا متغیرها را
+  قبل از `bash` بگذارید). گزینه‌های دیگر: `REPO_URL`، `GIT_REF`، `APP_DIR`، `PORT`،
+  `NGINX_PORT`، `SSL_EMAIL`، `APP_URL`، `ROOT_DOMAIN`.
+- به‌روزرسانی بعدی: `sudo bash /var/www/nobino/scripts/deploy-ubuntu.sh`
+  (با `GIT_REF=v1.0.0` می‌توان تگ مشخصی را استقرار داد).
+- حذف کامل و مرحله‌ای: `sudo bash /var/www/nobino/scripts/uninstall-ubuntu.sh`
+  (پیش‌نمایش: `--dry-run`).
+- توضیح کامل در [README](./README.md#-نصب-خودکار-روی-vps-اوبونتو--فقط-با-لینک-github).
 
 ---
 

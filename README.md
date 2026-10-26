@@ -19,7 +19,7 @@
 | احراز هویت | شماره موبایل + OTP (JWT) |
 | پیامک | ۱۰ سرویس‌دهنده ایرانی (انتخابی پویا از پنل ادمین) |
 | پرداخت | ۱۵+ درگاه (Adapter + Sandbox) |
-| استقرار | Vercel + Neon (Postgres) |
+| استقرار | Vercel + Neon (Postgres) یا VPS اوبونتو با یک فرمان از GitHub |
 
 ---
 
@@ -93,6 +93,72 @@ npm run dev
 زرین‌پال، ملت، سامان، پارسیان، پاسارگاد، آسان‌پرداخت، ایران‌کیش، سداد، مبناکارت، سی‌تاب، پرداخت‌نت، PSP، نکست‌پی، ونکی، به‌پرداخت ملت، Pay.ir، زیبال، آیدی‌پی، آمانت.
 
 برای اتصال واقعی هر درگاه: کلیدها را در `.env` بگذارید و `PAYMENT_DEFAULT_GATEWAY="zarinpal"` تنظیم کنید.
+
+---
+
+## 🖥 نصب خودکار روی VPS اوبونتو — فقط با لینک GitHub
+
+روی یک سرور اوبونتوی تازه، **یک فرمان** کافی است؛ کد از همین ریپوی عمومی
+دریافت می‌شود و نیازی به آپلود دستی فایل‌ها نیست:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/alisystemit/Nobino/main/scripts/install-from-github.sh | sudo bash
+```
+
+اسکریپت به ترتیب: پیش‌نیازها را با `apt` نصب می‌کند، ریپو را در `/var/www/nobino`
+`clone` می‌کند، سپس `scripts/deploy-ubuntu.sh` را از همان فایل اجرا می‌کند
+(PostgreSQL، Node.js عبر nvm، `npm install`، ساخت `.env` با رمزهای تصادفی،
+مهاجرت و seed دیتابیس، `npm run build`، PM2، کانفیگ Nginx، گواهینامه SSL با
+certbot و بستن پورت‌ها با UFW). هر بخش اگر از قبل باشد، **دوبارده نصب نمی‌شود**.
+
+> اجرا از طریق pipe است، ولی سؤال‌ها از ترمینال (`/dev/tty`) خوانده می‌شوند؛ پس
+> تعامل کامل کار می‌کند. اگر کد را از قبل روی سرور دارید، همان
+> `sudo bash scripts/deploy-ubuntu.sh` را اجرا کنید.
+
+**انتخاب‌های دلخواه با متغیر محیطی** (همه اختیاری):
+
+| متغیر | پیش‌فرض | شرح |
+|---|---|---|
+| `REPO_URL` | `https://github.com/alisystemit/Nobino.git` | ریپوی منبع (برای ریپوی خصوصی با توکن هم کار می‌کند) |
+| `GIT_REF` | `main` | برنچ، تگ یا کامیت برای استقرار |
+| `APP_DIR` | `/var/www/nobino` | پوشه نصب |
+| `PORT` | `3000` | پورت داخلی Next (پشت Nginx می‌ماند و عمومی نیست) |
+| `NGINX_PORT` | `80` | پورت عمومی Nginx |
+| `DOMAIN` | _(خالی)_ | دامنه برای SSL؛ خالی = نصب فقط با IP |
+| `SSL_EMAIL` | `admin@DOMAIN` | ایمیل تماس certbot |
+| `APP_URL` / `ROOT_DOMAIN` | از `DOMAIN` | آدرس عمومی و دامنه ریشه ساب‌دامین‌ها |
+| `NONINTERACTIVE` | `0` | با `1` هیچ سؤالی پرسیده نمی‌شود |
+
+نصب بی‌سؤال (مثلاً برای دامنه `nobino.ir`):
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/alisystemit/Nobino/main/scripts/install-from-github.sh \
+  | sudo DOMAIN=nobino.ir SSL_EMAIL=admin@nobino.ir NONINTERACTIVE=1 bash
+```
+
+**به‌روزرسانی بعدی** (همان مسیر، فقط کد را می‌کشد و سرویس را ری‌استارت می‌کند):
+
+```bash
+sudo bash /var/www/nobino/scripts/deploy-ubuntu.sh
+# یا یک تگ مشخص:
+sudo GIT_REF=v1.0.0 bash /var/www/nobino/scripts/deploy-ubuntu.sh
+```
+
+اگر پوشهٔ نصب تغییرات دست‌ی (commit‌نشده) داشته باشد، اسکریپت آن را **پاک نمی‌کند**
+و فقط هشدار می‌دهد.
+
+**حذف کامل:** هر بخش (PM2، Nginx، SSL، دیتابیس، فایروال، Node، پوشه) جداگانه
+پرسیده می‌شود و فقط چیزی که تأیید کنید حذف می‌شود؛ قبل از حذف دیتابیس هم پشتیبان
+`pg_dump` گرفته می‌شود:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/alisystemit/Nobino/main/scripts/uninstall-ubuntu.sh \
+  | sudo bash -s -- --dry-run      # پیش‌نمایش، بدون هیچ تغییری
+sudo bash /var/www/nobino/scripts/uninstall-ubuntu.sh
+```
+
+پس از نصب، ادمین پیش‌فرض سید با شماره `09120000000` وارد شوید و رمز را عوض کنید
+(`node scripts/reset-admin-password.mjs رمز-جدید`).
 
 ---
 
