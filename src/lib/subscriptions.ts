@@ -35,6 +35,7 @@ export async function activateSubscription(params: { salonId: string; packageId:
       recipient: salon.phone,
       message: `اشتراک «${pkg.name}» برای «${salon.name}» فعال شد تا ${endsAt.toLocaleDateString("fa-IR")}.`,
       uniqueKey: `subactive:${params.salonId}`,
+      salonId: params.salonId,
     });
   }
 
@@ -59,6 +60,7 @@ export async function renewSubscription(subId: string) {
     recipient: sub.salon.phone,
     message: `اشتراک «${sub.package.name}» برای «${sub.salon.name}» تمدید خودکار شد تا ${endsAt.toLocaleDateString("fa-IR")}.`,
     uniqueKey: `subrenew:${subId}`,
+    salonId: sub.salonId,
   });
 
   return { endsAt };

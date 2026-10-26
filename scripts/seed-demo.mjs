@@ -583,7 +583,8 @@ async function seedSubscription(salon) {
       data: {
         id: "pkg-1", name: "پلن حرفه‌ای", plan: "PRO", durationDays: 30, price: 1890000, yearlyPrice: 18900000,
         features: [
-          { key: "booking" }, { key: "staff" }, { key: "branches" }, { key: "voiceBooking" },
+          { key: "booking" }, { key: "staff" }, { key: "branches" }, { key: "services" },
+          { key: "customers" }, { key: "smsQuota" }, { key: "salons" }, { key: "voiceBooking" },
           { key: "smsReminders" }, { key: "webapp" }, { key: "csvExport" }, { key: "customDomain" },
           { key: "api" }, { key: "gallery" }, { key: "reviews" }, { key: "campaigns" },
           { key: "waitlist" }, { key: "wallet" }, { key: "invoices" }, { key: "loyalty" },

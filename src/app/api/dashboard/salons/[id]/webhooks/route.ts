@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { requireSalonManage } from "@/lib/auth/guards";
 import { prisma } from "@/lib/prisma";
+import { assertLimit } from "@/lib/plans/limits";
 import { json, apiError } from "@/lib/utils";
 
 const createSchema = z.object({
@@ -28,6 +29,9 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
     if (!salon) return json({ success: false, error: "salon not found" }, { status: 404 });
 
     const body = createSchema.parse(await req.json());
+    // سقف تعداد وب‌هوک پلن (در پلن رایگان صفر است؛ کلید api هم باید فعال باشد)
+    await assertLimit({ salonId: id }, "api");
+    await assertLimit({ salonId: id }, "webhooks");
     const webhook = await prisma.webhookConfig.create({ data: { salonId: id, ...body } });
     return json({ success: true, webhook }, { status: 201 });
   } catch (err) {

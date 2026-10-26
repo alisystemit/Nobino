@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { requireSalonManage } from "@/lib/auth/guards";
 import { prisma } from "@/lib/prisma";
+import { assertLimit } from "@/lib/plans/limits";
 import { json, apiError } from "@/lib/utils";
 
 const schema = z.object({
@@ -121,6 +122,8 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
     const phone = normalizePhone(body.phone);
 
     const existing = await prisma.salonCustomer.findUnique({ where: { salonId_phone: { salonId: id, phone } } });
+    // سقف «تعداد مشتری» پلن فقط موقع ساخت پروندهٔ جدید بررسی می‌شود (ویرایش آزاد است)
+    if (!existing) await assertLimit({ salonId: id }, "customers");
     if (existing && body.note) {
       await prisma.salonCustomerNote.create({ data: { customerId: existing.id, note: body.note } });
     }

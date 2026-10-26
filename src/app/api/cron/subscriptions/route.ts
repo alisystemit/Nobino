@@ -43,6 +43,7 @@ export async function GET(req: Request) {
             recipient: sub.salon.phone,
             message: `پرداخت تمدید اشتراک «${sub.package.name}» ناموفق بود. برای ادامه، لطفاً پرداخت را تکرار کنید.`,
             uniqueKey: `subfailed:${sub.id}:${charge.orderId ?? ""}`,
+            salonId: sub.salonId,
           });
         }
       } else {
@@ -53,6 +54,7 @@ export async function GET(req: Request) {
           recipient: sub.salon.phone,
           message: `اشتراک «${sub.package.name}» برای «${sub.salon.name}» منقضی شد. برای ادامه، تمدید کنید.`,
           uniqueKey: `subexpired:${sub.id}`,
+          salonId: sub.salonId,
         });
         expired++;
       }
@@ -62,6 +64,7 @@ export async function GET(req: Request) {
         recipient: sub.salon.phone,
         message: `اشتراک «${sub.package.name}» برای «${sub.salon.name}» تا ${sub.endsAt.toLocaleDateString("fa-IR")} اعتبار دارد.`,
         uniqueKey: `subremind:${sub.id}`,
+        salonId: sub.salonId,
       });
       reminded++;
     }

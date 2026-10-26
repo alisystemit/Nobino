@@ -1387,8 +1387,13 @@ function DataView({ ctx }: { ctx: Ctx }) {
     try {
       const parsed = JSON.parse(raw);
       const rows = Array.isArray(parsed) ? parsed : parsed.rows;
-      const res = await ctx.api(`${ctx.base}/import/${importType === "customers" ? "customers" : "appointments"}`, "POST", { rows }, t("data.imported"));
-      if (res) ctx.setMsg({ ok: true, text: t("data.imported") });
+      const res = await ctx.api<{ created: number; updated: number; blocked?: number; warning?: string | null }>(
+        `${ctx.base}/import/${importType === "customers" ? "customers" : "appointments"}`,
+        "POST",
+        { rows },
+        t("data.imported")
+      );
+      if (res) ctx.setMsg({ ok: !res.warning, text: res.warning ?? t("data.imported") });
     } catch {
       ctx.setMsg({ ok: false, text: t("data.invalidJson") });
     }

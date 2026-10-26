@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { requireSalonManage } from "@/lib/auth/guards";
 import { prisma } from "@/lib/prisma";
+import { assertLimit } from "@/lib/plans/limits";
 import { json, apiError } from "@/lib/utils";
 
 const createSchema = z.object({
@@ -31,6 +32,8 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
     await requireSalonManage(id);
 
     const body = createSchema.parse(await req.json());
+    // سقف تعداد خدمات پلن (از ماتریس محدودیت‌های پنل سوپرادمین)
+    await assertLimit({ salonId: id }, "services");
     const service = await prisma.service.create({ data: { salonId: id, ...body } });
     return json({ success: true, service }, { status: 201 });
   } catch (err) {

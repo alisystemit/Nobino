@@ -30,6 +30,7 @@ export async function POST(_req: Request, { params }: { params: Promise<{ id: st
       recipient: invoice.customerPhone,
       message,
       uniqueKey: `invoice-sms:${invoice.id}:${Math.floor(Date.now() / 864e5)}`,
+      salonId: invoice.salonId ?? id,
     });
 
     return json({ success: true });

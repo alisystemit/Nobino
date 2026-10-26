@@ -3,6 +3,7 @@
 import { z } from "zod";
 import { requireRole } from "@/lib/auth/guards";
 import { prisma } from "@/lib/prisma";
+import { assertLimit } from "@/lib/plans/limits";
 import { json, apiError } from "@/lib/utils";
 
 const createSchema = z.object({
@@ -37,6 +38,8 @@ export async function POST(req: Request) {
     if (existing) return json({ success: false, error: "این اسلاگ قبلاً استفاده شده است" }, { status: 409 });
 
     const existingCount = await prisma.salon.count({ where: { ownerId: user.id } });
+    // سقف «تعداد سالن هر کاربر» از ماتریس محدودیت‌های پلن خوانده می‌شود (سوپرادمین مستثنا)
+    if (user.role !== "ADMIN") await assertLimit({ userId: user.id }, "salons");
     const salon = await prisma.salon.create({
       data: {
         name: body.name,

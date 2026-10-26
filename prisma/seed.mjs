@@ -110,19 +110,22 @@ async function main() {
   }
 
   // ماژول‌ها با کلید از کاتالوگ سامانه (src/lib/plans/modules.ts) انتخاب می‌شوند؛
-  // برچسب سقف‌ها (کارمند/شعبه) هنگام نمایش از محدودیت زندهٔ همان پلن ساخته می‌شود.
+  // برچسب سقف‌ها (کارمند/شعبه/خدمت/مشتری/پیامک/سالن) هنگام نمایش از محدودیت زندهٔ
+  // همان پلن ساخته می‌شود (src/lib/plans/limit-defs.ts + limits-data.ts).
   const packages = [
     {
       id: "pkg-0", name: "پلن پایه", plan: "BASIC", durationDays: 30, price: 990000, yearlyPrice: 9900000,
       features: [
-        { key: "booking" }, { key: "staff" }, { key: "branches" }, { key: "voiceBooking" },
+        { key: "booking" }, { key: "staff" }, { key: "branches" }, { key: "services" },
+        { key: "customers" }, { key: "smsQuota" }, { key: "salons" }, { key: "voiceBooking" },
         { key: "smsReminders" }, { key: "webapp" }, { key: "gallery" }, { key: "reviews" },
       ],
     },
     {
       id: "pkg-1", name: "پلن حرفه‌ای", plan: "PRO", durationDays: 30, price: 1890000, yearlyPrice: 18900000,
       features: [
-        { key: "booking" }, { key: "staff" }, { key: "branches" }, { key: "voiceBooking" },
+        { key: "booking" }, { key: "staff" }, { key: "branches" }, { key: "services" },
+        { key: "customers" }, { key: "smsQuota" }, { key: "salons" }, { key: "voiceBooking" },
         { key: "smsReminders" }, { key: "webapp" }, { key: "csvExport" }, { key: "customDomain" },
         { key: "api" }, { key: "gallery" }, { key: "reviews" }, { key: "campaigns" },
         { key: "waitlist" }, { key: "wallet" }, { key: "invoices" }, { key: "loyalty" },
@@ -131,7 +134,8 @@ async function main() {
     {
       id: "pkg-2", name: "پلن سازمانی", plan: "ENTERPRISE", durationDays: 30, price: 3290000, yearlyPrice: 32900000,
       features: [
-        { key: "booking" }, { key: "staff" }, { key: "branches" }, { key: "voiceBooking" },
+        { key: "booking" }, { key: "staff" }, { key: "branches" }, { key: "services" },
+        { key: "customers" }, { key: "smsQuota" }, { key: "salons" }, { key: "voiceBooking" },
         { key: "smsReminders" }, { key: "webapp" }, { key: "csvExport" }, { key: "customDomain" },
         { key: "api" }, { key: "gallery" }, { key: "reviews" }, { key: "campaigns" },
         { key: "waitlist" }, { key: "wallet" }, { key: "invoices" }, { key: "loyalty" }, { key: "support" },
@@ -180,12 +184,9 @@ async function main() {
     { key: "stt.deepgram.key", value: "", group: "ai", type: "secret", description: "کلید Deepgram (STT با اعتبار رایگان)" },
     { key: "stt.order", value: "groq,huggingface,cloudflare,deepgram,openai", group: "ai", type: "string", description: "ترتیب تلاش ربات‌های STT (با کاما)" },
     { key: "ai.enabled", value: "true", group: "ai", type: "select", options: JSON.stringify(["true", "false"]), description: "فعال‌سازی قابلیت‌های AI" },
-    { key: "plan.limit.FREE.staff", value: "5", group: "plans", type: "number", description: "حداکثر کارکنان پلن رایگان" },
-    { key: "plan.limit.BASIC.staff", value: "15", group: "plans", type: "number", description: "حداکثر کارکنان پلن پایه" },
-    { key: "plan.limit.PRO.staff", value: "60", group: "plans", type: "number", description: "حداکثر کارکنان پلن حرفه‌ای" },
-    { key: "plan.limit.FREE.branches", value: "2", group: "plans", type: "number", description: "حداکثر شعبه پلن رایگان" },
-    { key: "plan.limit.BASIC.branches", value: "5", group: "plans", type: "number", description: "حداکثر شعبه پلن پایه" },
-    { key: "plan.limit.PRO.branches", value: "20", group: "plans", type: "number", description: "حداکثر شعبه پلن حرفه‌ای" },
+    // سقف‌های پلن (کارکنان/شعبه/…) در src/lib/plans/limits-data.ts تعریف می‌شوند و
+    // از طریق پنل محدودیت‌های /admin قابل تغییر‌اند. seed عمداً هیچ کلید
+    // plan.limit.<PLAN>.<key> نمی‌سازد تا ماتریس پنل «پیش‌فرض» بماند.
   ];
   for (const s of defaultSettings) {
     await prisma.setting.upsert({
@@ -193,6 +194,30 @@ async function main() {
       update: {},
       create: s,
     });
+  }
+
+  // مهاجرت کلید قدیمی «plan.limit.<key>» (بدون نام پلن، یک عدد برای همهٔ پلن‌ها) به
+  // کلید اختصاصی هر پلن، تا رفتار نصب‌های قدیمی حفظ شود و بعد از بین برود.
+  const PLANS = ["FREE", "BASIC", "PRO", "ENTERPRISE"];
+  const limitRows = await prisma.setting.findMany({ where: { key: { startsWith: "plan.limit." } } });
+  for (const row of limitRows) {
+    const name = row.key.slice("plan.limit.".length);
+    if (!name || name.includes(".") || !row.value) continue;
+    for (const plan of PLANS) {
+      const scopedKey = `plan.limit.${plan}.${name}`;
+      if (await prisma.setting.findUnique({ where: { key: scopedKey }, select: { id: true } })) continue;
+      await prisma.setting.create({
+        data: {
+          key: scopedKey,
+          value: row.value,
+          group: "plans",
+          type: row.value === "true" || row.value === "false" ? "boolean" : "number",
+          description: `${name} — پلن ${plan} (منتقل‌شده از تنظیم قدیمی)`,
+        },
+      });
+    }
+    await prisma.setting.delete({ where: { key: row.key } });
+    console.log(`   ↪️ کلید قدیمی ${row.key} به سقف اختصاصی ۴ پلن منتقل شد`);
   }
 
   console.log("✅ Seed کامل شد");

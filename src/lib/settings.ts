@@ -55,6 +55,12 @@ export async function updateSetting(key: string, value: string, extra?: Partial<
   return row;
 }
 
+/** حذف یک تنظیم (برای «بازگشت به پیش‌فرض» در پنل محدودیت‌ها) */
+export async function deleteSetting(key: string) {
+  cache.delete(key);
+  await prisma.setting.deleteMany({ where: { key } });
+}
+
 export function invalidateSettings() {
   cache.clear();
 }

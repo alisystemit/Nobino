@@ -8,7 +8,11 @@ export const instant = false;
 
 export default async function VoiceBookingPage() {
   const user = await requireRole(["SALON_OWNER", "ADMIN"]);
-  const salon = await prisma.salon.findUnique({ where: { ownerId: user.id }, select: { id: true, slug: true } });
+  const salon = await prisma.salon.findFirst({
+    where: { ownerId: user.id },
+    orderBy: { createdAt: "asc" },
+    select: { id: true, slug: true },
+  });
   if (!salon) redirect("/dashboard/salon");
 
   return (

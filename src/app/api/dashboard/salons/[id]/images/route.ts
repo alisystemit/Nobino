@@ -1,7 +1,7 @@
 import { requireSalonManage } from "@/lib/auth/guards";
 import { prisma } from "@/lib/prisma";
 import { storeFile } from "@/lib/storage";
-import { withinLimit } from "@/lib/plans/limits";
+import { checkLimit } from "@/lib/plans/limits";
 import { json, apiError } from "@/lib/utils";
 
 const MAX_BYTES = 5 * 1024 * 1024; // ۵ مگابایت
@@ -38,19 +38,13 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
     }
 
     if (kind === "gallery") {
-      const galleryCount = await prisma.galleryItem.count({ where: { salonId: id } });
-      // پلن رایگان حداکثر ۱۲ تصویر گالری؛ پلن‌های بالاتر ۱۰۰
-      const limits = await import("@/lib/plans/limits").then((m) => m.getPlanLimits(id));
-      const maxGallery = limits.api ? 200 : 12;
-      if (galleryCount >= maxGallery) {
-        return json(
-          { success: false, error: `سقف تصاویر گالری پلن شما (${maxGallery} تصویر) پر شده است.` },
-          { status: 403 }
-        );
-      }
-      if (!(await withinLimit(id, "webapp"))) {
-        return json({ success: false, error: "بارگذاری گالری در پلن فعلی فعال نیست" }, { status: 403 });
-      }
+      // سقف گالری از ماتریس محدودیت‌های پلن خوانده می‌شود (نه عدد ثابت در کد)
+      const [gallery, webapp] = await Promise.all([
+        checkLimit({ salonId: id }, "galleryItems"),
+        checkLimit({ salonId: id }, "webapp"),
+      ]);
+      if (!webapp.allowed) return json({ success: false, error: webapp.message }, { status: 403 });
+      if (!gallery.allowed) return json({ success: false, error: gallery.message }, { status: 402 });
     }
 
     const stored = await storeFile(file, { dir: "uploads" });

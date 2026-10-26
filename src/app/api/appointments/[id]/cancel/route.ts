@@ -54,6 +54,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
       recipient: appointment.customerPhone,
       message: cancelMsg,
       uniqueKey: `cancel:${id}`,
+      salonId: appointment.salonId,
     });
     if (appointment.customerId) {
       await enqueueInApp({

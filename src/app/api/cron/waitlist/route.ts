@@ -44,6 +44,7 @@ export async function GET(req: Request) {
         recipient: w.customerPhone,
         message: `سلام ${w.customerName}، برای خدمت درخواستی شما در «${w.salon.name}» امروز زمانی آزاد شده است. برای رزرو اقدام کنید.`,
         uniqueKey: `waitlist:${w.id}`,
+        salonId: w.salonId,
       });
       notified++;
     }

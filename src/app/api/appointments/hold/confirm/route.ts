@@ -53,6 +53,7 @@ export async function POST(req: Request) {
       recipient: phone,
       message: `نوبت شما در «${appointment.salon.name}» برای ساعت ${time} ثبت شد. (تأیید: ${confirmed.id.slice(0, 8)})`,
       uniqueKey: `confirm:${confirmed.id}`,
+      salonId: appointment.salonId,
     });
     await dispatchWebhook(appointment.salonId, "appointment.confirmed", { appointmentId: confirmed.id, customerName: body.customerName, startAt: confirmed.startAt });
 

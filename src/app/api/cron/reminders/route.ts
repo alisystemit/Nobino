@@ -48,6 +48,7 @@ export async function GET(req: Request) {
         recipient: a.customerPhone,
         message: msg,
         uniqueKey: `reminder:${w.key}:${a.id}`,
+        salonId: a.salonId,
       });
       queued++;
     }

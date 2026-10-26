@@ -2,6 +2,9 @@ import Link from "next/link";
 import { prisma } from "@/lib/prisma";
 import { requireRole } from "@/lib/auth/guards";
 import { toPersianDigits } from "@/lib/utils";
+import { listOwnerSalons, resolveDashboardSalonId } from "@/lib/salons";
+import { UNLIMITED_FROM } from "@/lib/plans/limit-defs";
+import { limitSnapshot } from "@/lib/plans/limits";
 import SalonSettings from "@/components/SalonSettings";
 import CreateSalon from "@/components/CreateSalon";
 import SalonManager from "@/components/SalonManager";
@@ -9,7 +12,7 @@ import DailyStats from "@/components/DailyStats";
 import DailyBoard from "@/components/DailyBoard";
 import DashboardShell from "@/components/DashboardShell";
 import { StatCard, PanelCard, Badge } from "@/components/ui/Stats";
-import { CalendarDays, Scissors, Images, Star, Settings, Rocket, ClipboardList, Mic, Store } from "lucide-react";
+import { CalendarDays, Scissors, Images, Star, Settings, Rocket, ClipboardList, Mic, Store, Gauge, Plus } from "lucide-react";
 
 export const instant = false;
 
@@ -25,12 +28,38 @@ function faDate(d: Date | null | undefined): string | null {
   return new Intl.DateTimeFormat("fa-IR", { dateStyle: "medium" }).format(d);
 }
 
-export default async function SalonDashboardPage() {
+export default async function SalonDashboardPage({ searchParams }: { searchParams: Promise<{ salon?: string; new?: string }> }) {
   const user = await requireRole(["SALON_OWNER", "ADMIN"]);
-  const salon = await prisma.salon.findUnique({
-    where: { ownerId: user.id },
-    include: { services: true, _count: { select: { appointments: true, galleryItems: true, reviews: true } } },
-  });
+  const sp = await searchParams;
+  const mySalons = await listOwnerSalons(user.id);
+
+  // «ساخت سالن جدید» از سوییچر — تا سقف تعداد سالن پلن (خطای سقف از API می‌آید)
+  if (sp.new === "1" && mySalons.length > 0) {
+    return (
+      <DashboardShell role={user.role} title="ساخت سالن">
+        <div className="mx-auto max-w-lg">
+          <h1 className="text-2xl font-black text-neutral-900 dark:text-neutral-100">ساخت سالن جدید</h1>
+          <p className="mt-2 text-neutral-500 dark:text-neutral-400">
+            در حال حاضر {toPersianDigits(mySalons.length)} سالن دارید. سقف پلن شما از بخش اشتراک قابل ارتقاست.
+          </p>
+          <div className="mt-6 rounded-3xl border border-neutral-200 bg-white p-8 shadow-sm dark:border-neutral-800 dark:bg-neutral-900">
+            <CreateSalon />
+          </div>
+          <Link href="/dashboard/salon" className="mt-4 inline-block text-sm font-bold text-pink-600 hover:underline">
+            بازگشت به سالن‌ها
+          </Link>
+        </div>
+      </DashboardShell>
+    );
+  }
+
+  const salonId = await resolveDashboardSalonId(user.id, sp.salon ?? null, user.role === "ADMIN");
+  const salon = salonId
+    ? await prisma.salon.findUnique({
+        where: { id: salonId },
+        include: { services: true, _count: { select: { appointments: true, galleryItems: true, reviews: true } } },
+      })
+    : null;
 
   if (!salon) {
     return (
@@ -51,6 +80,8 @@ export default async function SalonDashboardPage() {
   const trialEnd = faDate(salon.trialEndsAt);
   const today = new Date();
   const subActive = salon.subscriptionEndsAt ? salon.subscriptionEndsAt > today : false;
+  // وضعیت مصرف سقف‌ها — همه از کاتالوگ محدودیت‌ها و تنظیمات سوپرادمین می‌آید
+  const snap = await limitSnapshot(salon.id);
 
   return (
     <DashboardShell role={user.role} title="سالن من">
@@ -88,6 +119,36 @@ export default async function SalonDashboardPage() {
           </Link>
         </div>
       </div>
+
+      {/* سوییچر سالن‌ها — فقط وقتی کاربر بیش از یک سالن دارد */}
+      {mySalons.length > 1 && (
+        <div className="mb-5 flex flex-wrap items-center gap-2 rounded-2xl border border-neutral-200 bg-white p-3 dark:border-neutral-800 dark:bg-neutral-900">
+          <span className="px-1 text-xs font-bold text-neutral-500">سالن‌های من:</span>
+          {mySalons.map((s) => {
+            const active = s.id === salon.id;
+            return (
+              <Link
+                key={s.id}
+                href={`/dashboard/salon?salon=${s.id}`}
+                className={`rounded-xl px-3.5 py-1.5 text-sm font-bold transition ${
+                  active
+                    ? "bg-[#1c2434] text-white"
+                    : "bg-neutral-100 text-neutral-600 hover:bg-neutral-200 dark:bg-neutral-800 dark:text-neutral-300"
+                }`}
+              >
+                {s.name}
+              </Link>
+            );
+          })}
+          <Link
+            href="/dashboard/salon?new=1"
+            className="inline-flex items-center gap-1.5 rounded-xl border border-dashed border-pink-300 px-3.5 py-1.5 text-sm font-bold text-pink-600 transition hover:bg-pink-50 dark:hover:bg-pink-950/40"
+          >
+            <Plus className="h-4 w-4" />
+            سالن جدید
+          </Link>
+        </div>
+      )}
 
       <DailyStats role={user.role} />
 
@@ -171,6 +232,52 @@ export default async function SalonDashboardPage() {
         </div>
 
         <div className="flex flex-col gap-5">
+          <PanelCard
+            title="مصرف پلن"
+            subtitle={`سقف‌های ${snap.planLabel} — هر سقف در پنل سوپرادمین قابل تغییر است`}
+            icon={<Gauge className="h-5 w-5" />}
+          >
+            <div className="space-y-3">
+              {snap.counts.map((c) => {
+                const unlimited = c.limit >= UNLIMITED_FROM;
+                const pct = unlimited ? 8 : Math.min(100, Math.round((c.used / Math.max(1, c.limit)) * 100));
+                const tone = pct >= 100 ? "bg-red-500" : pct >= 80 ? "bg-amber-500" : "bg-emerald-500";
+                return (
+                  <div key={c.key}>
+                    <div className="flex items-center justify-between text-xs font-bold text-neutral-600 dark:text-neutral-300">
+                      <span>
+                        {c.icon} {c.label}
+                      </span>
+                      <span className="text-neutral-400">
+                        {unlimited ? "نامحدود" : `${toPersianDigits(c.used)} / ${toPersianDigits(c.limit)}`}
+                      </span>
+                    </div>
+                    <div className="mt-1 h-1.5 overflow-hidden rounded-full bg-neutral-100 dark:bg-neutral-800">
+                      <div className={`h-full rounded-full ${tone}`} style={{ width: `${pct}%` }} />
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+            <div className="mt-4 flex flex-wrap gap-1.5">
+              {snap.bools.map((b) => (
+                <span
+                  key={b.key}
+                  className={`rounded-full px-2.5 py-1 text-[11px] font-bold ${
+                    b.on
+                      ? "bg-emerald-50 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300"
+                      : "bg-neutral-100 text-neutral-400 line-through dark:bg-neutral-800"
+                  }`}
+                >
+                  {b.icon} {b.label}
+                </span>
+              ))}
+            </div>
+            <Link href="/packages" className="mt-4 inline-block text-xs font-bold text-pink-600 hover:underline">
+              ارتقا برای افزایش سقف‌ها ←
+            </Link>
+          </PanelCard>
+
           <PanelCard title="نظرات مشتریان" subtitle="امتیاز و بازخورد صفحه عمومی" icon={<Star className="h-5 w-5" />}>
             <div className="text-3xl font-black text-neutral-900 dark:text-neutral-100">{toPersianDigits(salon._count.reviews)}</div>
             <div className="mt-1 text-sm text-neutral-500">نظر ثبت‌شده</div>

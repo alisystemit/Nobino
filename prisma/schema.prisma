@@ -86,7 +86,7 @@ model User {
   updatedAt     DateTime  @updatedAt
 
   // relations
-  ownedSalon      Salon?           @relation("SalonOwner")
+  ownedSalons     Salon[]          @relation("SalonOwner")
   votes           Appointment[]    @relation("AppointmentCustomer")
   wallets         Wallet[]
   orders          Order[]
@@ -160,7 +160,7 @@ model Salon {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  ownerId String @unique
+  ownerId String
   owner   User   @relation("SalonOwner", fields: [ownerId], references: [id], onDelete: Cascade)
 
   services        Service[]
@@ -183,6 +183,9 @@ model Salon {
   customers       SalonCustomer[]
   invoices        Invoice[]
   campaigns       Campaign[]
+
+  // یک کاربر می‌تواند چند سالن داشته باشد (سقف «تعداد سالن هر کاربر» در پلن‌ها اعمال می‌شود)
+  @@index([ownerId])
 }
 
 // ─── CRM مشتریان هر سالن ─────────────────────────────────────────────────
@@ -794,6 +797,7 @@ model Notification {
   channel       String    @default("SMS")
   recipient     String
   userId        String?
+  salonId       String? // سالنی که پیامک را مصرف می‌کند (برای شمارش سقف پیامک ماهانه)
   readAt        DateTime? // شماره یا ایمیل
   payload       Json?
   uniqueKey     String?   @unique // برای جلوگیری از ارسال تکراری
@@ -806,4 +810,5 @@ model Notification {
   updatedAt     DateTime  @updatedAt
 
   @@index([status, nextAttemptAt])
+  @@index([salonId, channel, createdAt])
 }

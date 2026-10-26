@@ -31,7 +31,7 @@ export async function GET() {
     }
 
     if (user.role === "SALON_OWNER") {
-      const salon = await prisma.salon.findUnique({ where: { ownerId: user.id } });
+      const salon = await prisma.salon.findFirst({ where: { ownerId: user.id }, orderBy: { createdAt: "asc" } });
       if (!salon) return json({ success: true, stats: { hasSalon: false } });
 
       const [total, today, pending] = await Promise.all([

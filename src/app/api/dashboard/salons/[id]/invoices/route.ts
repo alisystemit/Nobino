@@ -74,6 +74,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
       recipient: phone,
       message,
       uniqueKey: `invoice-sms:${invoice.id}`,
+      salonId: id,
     });
 
     return json({ success: true, invoice: { ...invoice, payToken: undefined, payLink: `/pay/${invoice.payToken}` }, payLink }, { status: 201 });

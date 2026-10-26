@@ -9,7 +9,8 @@
  * این فایل عمداً بدون وابستگی سمت سرور نوشته شده تا هم در API و هم در کامپوننت
  * کلاینت (پنل ادمین) قابل import باشد.
  */
-import type { PlanLimits } from "./limits";
+import { UNLIMITED_FROM } from "./limit-defs.ts";
+import type { PlanLimits } from "./limits-data.ts";
 
 /** تبدیل رقم به فارسی — اینجا محلی است تا کاتالوگ بدون وابستگی، در تست و کلاینت هم کار کند */
 function fa(input: string | number): string {
@@ -32,13 +33,17 @@ export type ModuleDef = {
   hint?: string;
 };
 
-/** سقف «نامحدود» در ماتریس پلن‌ها */
-export const UNLIMITED_FROM = 999;
+/** سقف «نامحدود» — یک آستانهٔ مشترک با کاتالوگ محدودیت‌ها */
+export { UNLIMITED_FROM };
 
 export const MODULES: ModuleDef[] = [
   { key: "booking", label: "نوبت‌دهی آنلاین", kind: "bool", icon: "📅", hint: "تقویم، نوبت‌های امروز و لغو نوبت" },
   { key: "staff", label: "کارکنان", kind: "count", limitKey: "staff", icon: "👥" },
   { key: "branches", label: "شعبه", kind: "count", limitKey: "branches", icon: "🏬" },
+  { key: "services", label: "خدمات", kind: "count", limitKey: "services", icon: "✂️" },
+  { key: "customers", label: "مشتریان CRM", kind: "count", limitKey: "customers", icon: "📇" },
+  { key: "smsQuota", label: "پیامک ماهانه", kind: "count", limitKey: "smsPerMonth", icon: "📩" },
+  { key: "salons", label: "سالن برای هر کاربر", kind: "count", limitKey: "salons", icon: "🏪" },
   { key: "voiceBooking", label: "نوبت صوتی با هوش مصنوعی", kind: "bool", limitKey: "voiceBooking", icon: "🎙️" },
   { key: "smsReminders", label: "پیامک یادآوری خودکار", kind: "bool", limitKey: "smsReminders", icon: "💬" },
   { key: "webapp", label: "وب‌اپ نصب‌شدنی (PWA)", kind: "bool", limitKey: "webapp", icon: "📲" },
@@ -47,7 +52,7 @@ export const MODULES: ModuleDef[] = [
   { key: "api", label: "وب‌هوک و API", kind: "bool", limitKey: "api", icon: "🔌" },
   { key: "gallery", label: "گالری نمونه‌کار", kind: "bool", icon: "🖼️" },
   { key: "reviews", label: "نظرات و امتیاز مشتریان", kind: "bool", icon: "⭐" },
-  { key: "campaigns", label: "کمپین پیامکی", kind: "bool", icon: "📣" },
+  { key: "campaigns", label: "کمپین پیامکی در ماه", kind: "count", limitKey: "campaigns", icon: "📣" },
   { key: "waitlist", label: "لیست انتظار نوبت", kind: "bool", icon: "⏳" },
   { key: "wallet", label: "کیف پول و کمیسیون", kind: "bool", icon: "💰" },
   { key: "invoices", label: "فاکتور آنلاین مشتری", kind: "bool", icon: "🧾" },

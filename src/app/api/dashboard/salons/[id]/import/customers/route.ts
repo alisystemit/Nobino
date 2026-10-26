@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { requireSalonManage } from "@/lib/auth/guards";
 import { prisma } from "@/lib/prisma";
+import { LimitExceededError, PLAN_LABELS, checkLimit } from "@/lib/plans/limits";
 import { json, apiError } from "@/lib/utils";
 
 const schema = z.object({
@@ -25,8 +26,14 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
     await requireSalonManage(id);
     const { rows } = schema.parse(await req.json());
 
+    // سقف «مشتریان» پلن: ردیف‌های جدید تا باقی‌ماندهٔ سقف وارد می‌شوند، بقیه رد می‌شوند
+    const cap = await checkLimit({ salonId: id }, "customers");
+    let room = typeof cap.limit === "number" ? Math.max(0, cap.limit - cap.used) : rows.length;
+    if (cap.allowed === false && room === 0) throw new LimitExceededError(cap.message);
+
     let created = 0;
     let updated = 0;
+    let blocked = 0;
 
     for (const row of rows) {
       const phone = row.phone.startsWith("0") ? row.phone : `0${row.phone}`;
@@ -43,6 +50,8 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
           },
         });
         updated++;
+      } else if (room <= 0) {
+        blocked++;
       } else {
         await prisma.salonCustomer.create({
           data: {
@@ -56,10 +65,15 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
           },
         });
         created++;
+        room--;
       }
     }
 
-    return json({ success: true, created, updated, total: rows.length });
+    const warning = blocked
+      ? `${blocked} ردیف به سقف «${cap.def.label}» پلن ${PLAN_LABELS[cap.plan]} رسید و وارد نشد. با ارتقای پلن می‌توانید ادامه دهید.`
+      : null;
+
+    return json({ success: true, created, updated, blocked, total: rows.length, warning });
   } catch (err) {
     return apiError(err);
   }

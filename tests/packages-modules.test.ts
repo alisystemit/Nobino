@@ -22,7 +22,8 @@ test("برچسب سقف‌ها از محدودیت زندهٔ پلن ساخته 
   assert.equal(moduleLabel({ key: "staff" }, { staff: 15 }), "تا ۱۵ کارکنان");
   assert.equal(moduleLabel({ key: "staff", value: 3 }, { staff: 60 }), "تا ۶۰ کارکنان");
   assert.equal(moduleLabel({ key: "staff", value: 3 }, undefined), "تا ۳ کارکنان");
-  assert.equal(moduleLabel({ key: "staff", value: 1000 }), "کارکنان نامحدود");
+  assert.equal(moduleLabel({ key: "staff", value: 1000 }), "تا ۱,۰۰۰ کارکنان");
+  assert.equal(moduleLabel({ key: "staff", value: 100000 }), "کارکنان نامحدود");
   assert.equal(moduleLabel({ key: "branches", value: 5 }), "تا ۵ شعبه");
   assert.equal(moduleLabel({ key: "customDomain" }), "دامنه اختصاصی سالن");
 });

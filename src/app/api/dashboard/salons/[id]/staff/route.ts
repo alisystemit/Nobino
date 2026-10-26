@@ -1,7 +1,7 @@
 import { z } from "zod";
 import { requireRole } from "@/lib/auth/guards";
 import { prisma } from "@/lib/prisma";
-import { withinLimit } from "@/lib/plans/limits";
+import { assertLimit } from "@/lib/plans/limits";
 import { json, apiError } from "@/lib/utils";
 
 const createSchema = z.object({
@@ -52,10 +52,8 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
 
     const body = createSchema.parse(await req.json());
 
-    // رعایت محدودیت پلن (تعداد آرایشگران)
-    if (!(await withinLimit(id, "staff"))) {
-      return json({ success: false, error: "به سقف تعداد کارکنان پلن فعلی رسیده‌اید" }, { status: 402 });
-    }
+    // رعایت محدودیت پلن (تعداد آرایشگران) — پیام دقیق از ماتریس محدودیت‌ها می‌آید
+    await assertLimit({ salonId: id }, "staff");
 
     const staff = await prisma.staff.create({
       data: {

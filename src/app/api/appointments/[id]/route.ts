@@ -104,6 +104,7 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
         recipient: prev.customerPhone,
         message: `نوبت شما در «${prev.salon.name}» لغو شد.`,
         uniqueKey: `cancel:${id}`,
+        salonId: prev.salonId,
       });
     }
 

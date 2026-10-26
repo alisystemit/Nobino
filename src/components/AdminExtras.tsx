@@ -985,6 +985,282 @@ function PackageManager({ ctx }: { ctx: Ctx }) {
   );
 }
 
+/* ─── ماتریس محدودیت‌ها ───────────────────────────────────────────────── */
+
+type LimitDefRow = {
+  key: string;
+  label: string;
+  unit: string;
+  kind: "count" | "bool";
+  scope: "salon" | "owner";
+  monthly?: boolean;
+  icon: string;
+  hint: string;
+  max: number;
+};
+type LimitCellRow = {
+  plan: string;
+  key: string;
+  fallback: number | boolean;
+  override: string | null;
+  effective: number | boolean;
+  overridden: boolean;
+  atDefault?: boolean;
+};
+type LimitMatrixData = {
+  plans: { id: string; label: string }[];
+  defs: LimitDefRow[];
+  cells: Record<string, LimitCellRow>;
+  issues?: string[];
+  unlimitedFrom: number;
+};
+
+const faNum = (n: number | string) => new Intl.NumberFormat("fa-IR").format(Number(n) || 0);
+
+/**
+ * ماتریس «ردیف = محدودیت، ستون = پلن».
+ *
+ * هر خانه مستقیماً کلید `plan.limit.<PLAN>.<key>` را می‌نویسد؛ پس هر تغییر بدون
+ * دیپلوی و در همان لحظه در سراسر سامانه (و صفحهٔ پکیج‌ها) اعمال می‌شود.
+ * خانهٔ خالی/«پیش‌فرض» یعنی همان عددی که در `PLAN_DEFAULTS` تعریف شده است.
+ */
+function LimitMatrixPanel({ ctx }: { ctx: Ctx }) {
+  const [data, setData] = useState<LimitMatrixData | null>(null);
+  const [draft, setDraft] = useState<Record<string, string>>({});
+  const [failed, setFailed] = useState(false);
+  const [saving, setSaving] = useState(false);
+
+  const reload = useCallback(async () => {
+    try {
+      const res = await fetch("/api/admin/limits");
+      const d = (await res.json()) as ApiRes<LimitMatrixData>;
+      if (d.success) {
+        setData(d);
+        setFailed(false);
+      } else {
+        setFailed(true);
+        ctx.setMsg({ ok: false, text: d.error ?? "خطا در خواندن محدودیت‌ها" });
+      }
+    } catch {
+      setFailed(true);
+      ctx.setMsg({ ok: false, text: "خطا در ارتباط با سرور" });
+    }
+  }, [ctx]);
+
+  useEffect(() => {
+    let cancelled = false;
+    fetch("/api/admin/limits")
+      .then((r) => r.json())
+      .then((d: ApiRes<LimitMatrixData>) => {
+        if (cancelled) return;
+        if (d.success) setData(d);
+        else setFailed(true);
+      })
+      .catch(() => {
+        if (!cancelled) setFailed(true);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  if (!data)
+    return failed ? (
+      <div className="rounded-xl bg-red-50 px-4 py-3 text-red-600">ماتریس محدودیت‌ها در دسترس نیست.</div>
+    ) : (
+      <div className="py-10 text-center text-neutral-400">در حال بارگیری محدودیت‌ها...</div>
+    );
+
+  const ck = (plan: string, key: string) => `${plan}:${key}`;
+  const valueOf = (cell: LimitCellRow | undefined) => {
+    if (!cell) return "";
+    return draft[ck(cell.plan, cell.key)] ?? String(cell.effective);
+  };
+  const dirtyKeys = Object.keys(draft);
+  // بعد از guard بالا `data` قطعاً مقدار دارد (متغیر محلی برای تشخیص تایپ در توابع داخلی)
+  const matrix = data;
+
+  async function persist(updates: { plan: string; key: string; value: string | number | boolean | null }[], okMsg: string) {
+    if (!updates.length) return;
+    setSaving(true);
+    const d = await ctx.api<ApiRes<{ saved: number; matrix: LimitMatrixData }>>("/api/admin/limits", "PATCH", { updates }, okMsg);
+    setSaving(false);
+    if (d?.matrix) {
+      setData(d.matrix);
+      setDraft({});
+    }
+  }
+
+  function saveDirty() {
+    const updates = dirtyKeys.flatMap((key) => {
+      const [plan, limitKey] = key.split(":");
+      const def = matrix.defs.find((x) => x.key === limitKey);
+      if (!def) return [];
+      const raw = draft[key];
+      const value =
+        def.kind === "bool"
+          ? raw === "true"
+          : raw.trim() === "" || raw === "null"
+            ? null
+            : Number(raw.replace(/[^\d]/g, ""));
+      return [{ plan, key: limitKey, value }];
+    });
+    void persist(updates, `${faNum(updates.length)} محدودیت به‌روزرسانی شد ✅`);
+  }
+
+  function resetAll() {
+    const updates: { plan: string; key: string; value: null }[] = [];
+    for (const plan of matrix.plans) {
+      for (const def of matrix.defs) {
+        const cell = matrix.cells[ck(plan.id, def.key)];
+        if (cell?.overridden) updates.push({ plan: plan.id, key: def.key, value: null });
+      }
+    }
+    if (!updates.length) {
+      ctx.setMsg({ ok: true, text: "همهٔ سقف‌ها همین حالا روی پیش‌فرض پلن‌ها هستند." });
+      return;
+    }
+    void persist(updates, `${faNum(updates.length)} سقف به پیش‌فرض پلن برگشت ✅`);
+  }
+
+  return (
+    <div className="space-y-4">
+      <div className={card}>
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div>
+            <h3 className="text-base font-black text-neutral-900 dark:text-neutral-100">ماتریس محدودیت پلن‌ها</h3>
+            <p className="mt-1 text-sm text-neutral-500">
+              هر خانه یک تنظیم واقعی به شکل <span dir="ltr" className="font-mono text-xs">plan.limit.&lt;PLAN&gt;.&lt;key&gt;</span> است.
+              با تغییر همین اعداد، سقف‌ها در داشبورد سالن‌ها، صفحهٔ پکیج‌ها و صف پیامک فوراً عوض می‌شود — بدون تغییر کد.
+            </p>
+          </div>
+          <div className="flex gap-2">
+            <button className={ghostBtn} onClick={() => void reload()} disabled={saving}>
+              بازخوانی
+            </button>
+            <button className={dangerBtn} onClick={resetAll} disabled={saving}>
+              بازگشت همه به پیش‌فرض
+            </button>
+            <button className={primaryBtn} onClick={saveDirty} disabled={saving || dirtyKeys.length === 0}>
+              {saving ? "در حال ذخیره..." : dirtyKeys.length ? `ذخیره ${faNum(dirtyKeys.length)} تغییر` : "تغییری نیست"}
+            </button>
+          </div>
+        </div>
+
+        {!!data.issues?.length && (
+          <p className="mt-3 rounded-xl bg-amber-50 px-4 py-2.5 text-sm text-amber-700 dark:bg-amber-950/40 dark:text-amber-300">
+            ⚠️ ناهماهنگی کاتالوگ: {data.issues.join(" — ")}
+          </p>
+        )}
+
+        <div className="mt-4 overflow-x-auto">
+          <table className="w-full min-w-[820px] border-collapse text-sm">
+            <thead>
+              <tr className="text-right">
+                <th className="sticky right-0 z-10 bg-white px-3 py-2.5 text-xs font-black text-neutral-500 dark:bg-neutral-900">محدودیت</th>
+                {data.plans.map((p) => (
+                  <th key={p.id} className="px-3 py-2.5 text-center text-xs font-black text-neutral-700 dark:text-neutral-200">
+                    {p.label}
+                    <div dir="ltr" className="text-[10px] font-medium text-neutral-400">
+                      {p.id}
+                    </div>
+                  </th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {data.defs.map((def) => (
+                <tr key={def.key} className="border-t border-neutral-100 dark:border-neutral-800">
+                  <td className="sticky right-0 z-10 bg-white px-3 py-3 align-top dark:bg-neutral-900">
+                    <div className="font-bold text-neutral-800 dark:text-neutral-100">
+                      {def.icon} {def.label}
+                    </div>
+                    <div className="mt-0.5 text-[11px] leading-5 text-neutral-400">{def.hint}</div>
+                    <div className="mt-1 flex flex-wrap gap-1">
+                      {def.monthly && (
+                        <span className="rounded-full bg-sky-50 px-2 py-0.5 text-[10px] font-bold text-sky-700 dark:bg-sky-950/40 dark:text-sky-300">
+                          شمارش ماهانه
+                        </span>
+                      )}
+                      {def.scope === "owner" && (
+                        <span className="rounded-full bg-purple-50 px-2 py-0.5 text-[10px] font-bold text-purple-700 dark:bg-purple-950/40 dark:text-purple-300">
+                          سطح کاربر
+                        </span>
+                      )}
+                      {def.kind === "bool" && (
+                        <span className="rounded-full bg-neutral-100 px-2 py-0.5 text-[10px] font-bold text-neutral-500 dark:bg-neutral-800">
+                          امکان روشن/خاموش
+                        </span>
+                      )}
+                    </div>
+                  </td>
+                  {data.plans.map((p) => {
+                    const cell = data.cells[ck(p.id, def.key)];
+                    const key = ck(p.id, def.key);
+                    const val = valueOf(cell);
+                    const edited = key in draft;
+                    const custom = cell?.overridden ? cell : null;
+                    return (
+                      <td key={p.id} className="px-2 py-3 text-center align-top">
+                        {def.kind === "bool" ? (
+                          <select
+                            value={val}
+                            onChange={(e) => setDraft((d) => ({ ...d, [key]: e.target.value }))}
+                            className="w-full rounded-lg border border-neutral-300 bg-white px-2 py-1.5 text-xs font-bold text-neutral-800 outline-none focus:border-pink-500 dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-100"
+                          >
+                            <option value="true">فعال</option>
+                            <option value="false">غیرفعال</option>
+                          </select>
+                        ) : (
+                          <input
+                            dir="ltr"
+                            type="number"
+                            min={0}
+                            max={def.max}
+                            step={1}
+                            value={val}
+                            onChange={(e) => setDraft((d) => ({ ...d, [key]: e.target.value }))}
+                            className="w-full rounded-lg border border-neutral-300 bg-white px-2 py-1.5 text-center text-xs font-bold text-neutral-800 outline-none focus:border-pink-500 dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-100"
+                          />
+                        )}
+                        <div className="mt-1 text-[10px] font-bold">
+                          {edited ? (
+                            <span className="text-pink-600">ذخیره نشده</span>
+                          ) : custom ? (
+                            <button
+                              className={cell!.atDefault ? "text-neutral-400 underline decoration-dotted hover:text-neutral-600" : "text-amber-600 underline decoration-dotted hover:text-amber-700"}
+                              title={
+                                cell!.atDefault
+                                  ? "یک رکورد تنظیمات برای این خانه وجود دارد ولی همان عدد پیش‌فرض است؛ کلیک کنید تا حذف شود"
+                                  : "این خانه دست‌ی است؛ برای بازگشت به پیش‌فرض پلن کلیک کنید"
+                              }
+                              onClick={() => void persist([{ plan: p.id, key: def.key, value: null }], `«${def.label}» پلن ${p.label} به پیش‌فرض برگشت ✅`)}
+                            >
+                              {cell!.atDefault ? "مساوی پیش‌فرض · پاک‌سازی" : "دستی · بازگشت"}
+                            </button>
+                          ) : (
+                            <span className="text-neutral-400">پیش‌فرض {p.label}</span>
+                          )}
+                        </div>
+                      </td>
+                    );
+                  })}
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+
+        <p className="mt-4 text-[11px] leading-6 text-neutral-400">
+          💡 از عدد {faNum(data.unlimitedFrom)} به بالا، سقف در صفحهٔ پکیج‌ها و داشبورد «نامحدود» خوانده می‌شود؛ پس برای
+          بی‌سقف کردن یک پلن همان عدد را وارد کنید. سقف «پیامک ارسالی در ماه» روی صف پیامک اعمال می‌شود؛ پیامک‌های تأیید
+          شماره و اطلاع‌رسانی‌های پلتفرمی محدود نمی‌شوند.
+        </p>
+      </div>
+    </div>
+  );
+}
+
 /* ─── پشتیبانی ───────────────────────────────────────────────────────── */
 
 function SupportManager({ ctx }: { ctx: Ctx }) {
@@ -1406,6 +1682,7 @@ export default function AdminExtras({ initialTab = "metrics" }: { initialTab?: s
         {tab === "subscriptions" && <SubscriptionManager ctx={ctx} />}
         {tab === "users" && <UserManager ctx={ctx} />}
         {tab === "packages" && <PackageManager ctx={ctx} />}
+        {tab === "limits" && <LimitMatrixPanel ctx={ctx} />}
         {tab === "discounts" && <DiscountManager ctx={ctx} discounts={discounts} refresh={refreshDiscounts} />}
         {tab === "sms" && (
           <>

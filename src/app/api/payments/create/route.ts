@@ -32,7 +32,11 @@ export async function POST(req: Request) {
         return json({ success: false, error: "دسترسی غیرمجاز" }, { status: 403 });
       }
     } else if (user.role !== "ADMIN") {
-      const owned = await prisma.salon.findUnique({ where: { ownerId: user.id }, select: { id: true } });
+      const owned = await prisma.salon.findFirst({
+        where: { ownerId: user.id },
+        orderBy: { createdAt: "asc" },
+        select: { id: true },
+      });
       if (owned) salonId = owned.id;
     }
 

@@ -18,6 +18,7 @@ const NAV = [
   { href: "/admin?tab=notifications", label: "گزارش پیامک", icon: "M4 4h16a1 1 0 0 1 1 1v12a1 1 0 0 1-1 1H8l-4 4V5a1 1 0 0 1 1-1Z" },
   { href: "/admin?tab=users", label: "کاربران", icon: "M12 12a4 4 0 1 0 0-8 4 4 0 0 0 0 8Zm0-6a2 2 0 1 1 0 4 2 2 0 0 1 0-4Zm4 14v-2a4 4 0 0 0-8 0v2H6v-2a6 6 0 0 1 12 0v2h-2Z" },
   { href: "/admin?tab=packages", label: "پکیج‌ها", icon: "M4 6h16v2H4V6Zm0 5h16v2H4v-2Zm0 5h10v2H4v-2Zm14-2 3 3-3 3-1.4-1.4L17.2 17H14v-2h3.2l-.6-.6L18 14Z" },
+  { href: "/admin?tab=limits", label: "محدودیت‌ها", icon: "M3 5h18v2H3V5Zm0 4h12v2H3V9Zm0 4h18v2H3v-2Zm0 4h12v2H3v-2Z" },
   { href: "/admin?tab=discounts", label: "کد تخفیف", icon: "M4 4h7l9 9-7 7-9-9V4Zm2 2v5l7 7 5-5-7-7H6Zm3 0a1.5 1.5 0 1 1 0 3 1.5 1.5 0 0 1 0-3Z" },
   { href: "/admin?tab=reviews", label: "نظرات", icon: "M12 3c4.97 0 9 3.58 9 8 0 4.42-4.03 8-9 8a9.9 9.9 0 0 1-3.7-.72L4 20l1.2-3.1A7.6 7.6 0 0 1 3 11c0-4.42 4.03-8 9-8Zm0 2c-3.86 0-7 2.69-7 6 0 3.31 3.14 6 7 6 .61 0 1.2-.07 1.76-.2l.8-.18.7.4 1.2.6-.4-1.2-.2-.7.42-.75A6.6 6.6 0 0 0 19 11c0-3.31-3.14-6-7-6ZM9 10h2v2H9v-2Zm4 0h2v2h-2v-2Z" },
   { href: "/admin?tab=sms", label: "پیامک", icon: "M4 4h16a1 1 0 0 1 1 1v12a1 1 0 0 1-1 1H8l-4 4V5a1 1 0 0 1 1-1Zm1 2v13.2L7.2 17H20V6H5Zm3 3h8v2H8V9Zm0 4h6v2H8v-2Z" },

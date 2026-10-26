@@ -19,7 +19,11 @@ export async function GET(req: Request) {
     let where: Prisma.AppointmentWhereInput = { id: "" };
     let timezone = "Asia/Tehran";
     if (user.role === "SALON_OWNER") {
-      const salon = await prisma.salon.findUnique({ where: { ownerId: user.id }, select: { id: true, timezone: true } });
+      const salon = await prisma.salon.findFirst({
+        where: { ownerId: user.id },
+        orderBy: { createdAt: "asc" },
+        select: { id: true, timezone: true },
+      });
       where = salon ? { salonId: salon.id } : { id: "" };
       if (salon?.timezone) timezone = salon.timezone;
     } else if (user.role === "AGENT") {
@@ -221,6 +225,7 @@ export async function POST(req: Request) {
       recipient: body.customerPhone,
       message: confirmMsg,
       uniqueKey: `confirm:${appointment.id}`,
+      salonId: appointment.salonId,
     });
     if (user?.id) {
       await enqueueInApp({

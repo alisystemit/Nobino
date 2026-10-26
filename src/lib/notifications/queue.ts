@@ -1,23 +1,42 @@
 import { prisma } from "@/lib/prisma";
 import { sendSmsWithFallback } from "@/lib/sms/provider";
 import { getEmailSender } from "@/lib/email/provider";
+import { checkLimit } from "@/lib/plans/limits";
 
 const MAX_ATTEMPTS = 5;
 
-/** قرار دادن پیامک در صف (با حذف تکراری از طریق uniqueKey) */
+export type EnqueueResult = { queued: boolean; reason?: "DUPLICATE" | "SMS_LIMIT"; message?: string };
+
+/**
+ * قرار دادن پیامک در صف (با حذف تکراری از طریق uniqueKey).
+ *
+ * اگر `salonId` داده شود، سقف «پیامک ارسالی در ماه» همان پلن بررسی می‌شود و در
+ * صورت پر شدن سقف، پیامک ثبت نمی‌شود (بهجای خطا؛ جریان اصلی مثل ثبت نوبت نباید
+ * با شکست پیامک متوقف شود). پیامک‌های سطح پلتفرم مثل OTP که سالن ندارند،
+ * هرگز محدود نمی‌شوند.
+ */
 export async function enqueueSms(params: {
   type: string;
   recipient: string;
   message: string;
   uniqueKey?: string;
   delayMs?: number;
-}) {
+  salonId?: string | null;
+}): Promise<EnqueueResult> {
   if (params.uniqueKey) {
     const existing = await prisma.notification.findUnique({
       where: { uniqueKey: params.uniqueKey },
       select: { status: true },
     });
-    if (existing && existing.status !== "FAILED") return;
+    if (existing && existing.status !== "FAILED") return { queued: false, reason: "DUPLICATE" };
+  }
+
+  if (params.salonId) {
+    const check = await checkLimit({ salonId: params.salonId }, "smsPerMonth");
+    if (!check.allowed) {
+      await notifySmsLimit(params.salonId, check.message, params.recipient);
+      return { queued: false, reason: "SMS_LIMIT", message: check.message };
+    }
   }
 
   await prisma.notification.create({
@@ -25,12 +44,35 @@ export async function enqueueSms(params: {
       type: params.type,
       channel: "SMS",
       recipient: params.recipient,
+      salonId: params.salonId ?? undefined,
       payload: { message: params.message },
       uniqueKey: params.uniqueKey,
       status: "PENDING",
       nextAttemptAt: new Date(Date.now() + (params.delayMs ?? 0)),
     },
   });
+  return { queued: true };
+}
+
+/**
+ * یک اعلان داخل‌برنامه‌ای که سالندار بفهمد سقف پیامک ماهش پر شده (حداکثر روزی یک
+ * بار برای هر سالن). مسیر پیامک ندارد، بنابراین چرخهٔ صف را نمی‌شکند.
+ */
+async function notifySmsLimit(salonId: string, message: string, recipient: string) {
+  try {
+    const salon = await prisma.salon.findUnique({ where: { id: salonId }, select: { ownerId: true } });
+    if (!salon?.ownerId) return;
+    const day = new Date().toISOString().slice(0, 10);
+    await enqueueInApp({
+      type: "SMS_LIMIT_REACHED",
+      userId: salon.ownerId,
+      salonId,
+      message: `${message} (درخواست ارسال به ${recipient} ثبت نشد)`,
+      uniqueKey: `sms-limit:${salonId}:${day}`,
+    });
+  } catch {
+    /* اعلان جانبی؛ نباید صف را با شکست دهد */
+  }
 }
 
 /** قرار دادن ایمیل در صف (با حذف تکراری) */
@@ -69,6 +111,8 @@ export async function enqueueInApp(params: {
   userId: string;
   message: string;
   uniqueKey?: string;
+  /** سالن مربوط (برای اعلان‌های سطح سالن مثل پر شدن سقف پیامک) */
+  salonId?: string | null;
 }) {
   if (params.uniqueKey) {
     const existing = await prisma.notification.findUnique({
@@ -84,6 +128,7 @@ export async function enqueueInApp(params: {
       channel: "IN_APP",
       recipient: params.userId,
       userId: params.userId,
+      salonId: params.salonId ?? undefined,
       payload: { message: params.message },
       uniqueKey: params.uniqueKey,
       status: "SENT",

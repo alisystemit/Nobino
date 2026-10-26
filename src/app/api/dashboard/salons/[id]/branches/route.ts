@@ -1,7 +1,7 @@
 import { z } from "zod";
 import { requireRole } from "@/lib/auth/guards";
 import { prisma } from "@/lib/prisma";
-import { withinLimit } from "@/lib/plans/limits";
+import { assertLimit } from "@/lib/plans/limits";
 import { json, apiError } from "@/lib/utils";
 
 const createSchema = z.object({
@@ -36,9 +36,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
     if (user.role !== "ADMIN" && salon.ownerId !== user.id) {
       return json({ success: false, error: "دسترسی غیرمجاز" }, { status: 403 });
     }
-    if (!(await withinLimit(id, "branches"))) {
-      return json({ success: false, error: "به سقف تعداد شعبه‌های پلن فعلی رسیده‌اید" }, { status: 402 });
-    }
+    await assertLimit({ salonId: id }, "branches");
 
     const body = createSchema.parse(await req.json());
     const branch = await prisma.branch.create({ data: { salonId: id, ...body } });

@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { requireSalonManage } from "@/lib/auth/guards";
 import { prisma } from "@/lib/prisma";
+import { assertLimit } from "@/lib/plans/limits";
 import { json, apiError } from "@/lib/utils";
 
 const schema = z.object({
@@ -27,6 +28,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
     const { id } = await params;
     await requireSalonManage(id);
     const body = schema.parse(await req.json());
+    await assertLimit({ salonId: id }, "campaigns");
     const campaign = await prisma.campaign.create({
       data: {
         salonId: id,

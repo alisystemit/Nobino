@@ -1,6 +1,7 @@
 import { requireSalonManage } from "@/lib/auth/guards";
 import { prisma } from "@/lib/prisma";
 import { enqueueSms } from "@/lib/notifications/queue";
+import { PLAN_LABELS, checkLimit } from "@/lib/plans/limits";
 import { json, apiError } from "@/lib/utils";
 
 /** اجرای کمپین برای مشتریانی که مراجعهٔ واقعی داشته‌اند */
@@ -10,6 +11,10 @@ export async function POST(_req: Request, { params }: { params: Promise<{ id: st
     await requireSalonManage(id);
     const campaign = await prisma.campaign.findUnique({ where: { id: campaignId } });
     if (!campaign || campaign.salonId !== id) return json({ success: false, error: "campaign not found" }, { status: 404 });
+
+    // سقف پیامک ماهانهٔ پلن: قبل از گرفتن مخاطبان بررسی شود تا پیام روشن بدهیم
+    const smsCap = await checkLimit({ salonId: id }, "smsPerMonth");
+    if (!smsCap.allowed) return json({ success: false, error: smsCap.message }, { status: 402 });
 
     // جایگزینی {salon} با نام سالن در قالب‌های آماده
     const salon = await prisma.salon.findUnique({ where: { id }, select: { name: true } });
@@ -34,21 +39,38 @@ export async function POST(_req: Request, { params }: { params: Promise<{ id: st
       return json({ success: false, error: "email campaign is not enabled in this build" }, { status: 400 });
     }
 
-    for (const phone of recipients) {
-      await enqueueSms({
+    // تا جایی که سهمیهٔ پیامک ماهانه اجازه می‌دهد ارسال می‌کنیم
+    const remaining = typeof smsCap.limit === "number" ? Math.max(0, smsCap.limit - smsCap.used) : recipients.length;
+    const targets = recipients.slice(0, remaining);
+
+    let queued = 0;
+    for (const phone of targets) {
+      const r = await enqueueSms({
         type: "MARKETING",
         recipient: phone,
         message,
         uniqueKey: `campaign:${campaign.id}:${phone}`,
+        salonId: id,
       });
+      if (r.queued) queued++;
     }
 
     const updated = await prisma.campaign.update({
       where: { id: campaign.id },
-      data: { status: "SENT", sentAt: new Date(), sentCount: recipients.length },
+      data: { status: "SENT", sentAt: new Date(), sentCount: queued },
     });
 
-    return json({ success: true, campaign: updated, recipients: recipients.length });
+    const blocked = recipients.length - queued;
+    return json({
+      success: true,
+      campaign: updated,
+      recipients: queued,
+      blocked,
+      warning:
+        blocked > 0
+          ? `${blocked} مخاطب به دلیل سقف «${smsCap.def.label}» پلن ${PLAN_LABELS[smsCap.plan]} ارسال نشد.`
+          : undefined,
+    });
   } catch (err) {
     return apiError(err);
   }

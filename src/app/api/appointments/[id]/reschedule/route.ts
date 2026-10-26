@@ -39,6 +39,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
       recipient: appointment.customerPhone,
       message: `نوبت شما در «${appointment.salon.name}» به ساعت ${newTime} تغییر کرد.`,
       uniqueKey: `changed:${id}:${updated.startAt.getTime()}`,
+      salonId: appointment.salonId,
     });
     if (appointment.customerId) {
       await enqueueInApp({
