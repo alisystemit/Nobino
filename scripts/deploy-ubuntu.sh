@@ -571,18 +571,32 @@ fi
 # ══════════════════════════════════════════════════════════════════
 # Git refuses to operate on a directory owned by another user; on a VPS the
 # app folder is often owned by www-data while this script runs as root.
-git config --global --add safe.directory "$APP_DIR" >/dev/null 2>&1 || true
+if [ -n "$APP_DIR" ]; then
+  git config --global --add safe.directory "$APP_DIR" >/dev/null 2>&1 || true
+fi
 
 # Bring the working tree to $GIT_REF (branch, tag or commit).
 checkout_ref() {
   # Never discard hand-edited files on the server: a dirty tree is left alone.
   # package-lock.json is excluded because `npm install` legitimately rewrites it
   # on the server (different npm version) and that must not block updates.
-  local dirty
+  local dirty head_ref new_ref
   dirty="$(git -C "$APP_DIR" status --porcelain --untracked-files=no 2>/dev/null | grep -v ' package-lock.json$' || true)"
   if [ -n "$dirty" ]; then
     warn "$APP_DIR has uncommitted changes; not touching the working tree."
-    warn "Commit or revert them to let this script update the code."
+    printf '%s\n' "$dirty" | sed -n '1,15p;s/^/          /'
+    if [ "$(printf '%s\n' "$dirty" | wc -l)" -gt 15 ]; then
+      warn "...and more."
+    fi
+    # Say out loud when that means the server keeps running stale code, since a
+    # stale package.json is what usually makes the dependency step fail later.
+    head_ref="$(git -C "$APP_DIR" rev-parse --short HEAD 2>/dev/null || echo '?')"
+    new_ref="$(git -C "$APP_DIR" rev-parse --short "origin/$GIT_REF" 2>/dev/null || true)"
+    if [ -n "$new_ref" ] && [ "$head_ref" != "$new_ref" ]; then
+      warn "Code stays at ${head_ref} while origin/${GIT_REF} is ${new_ref}; this run installs the OLD code."
+      warn "To update: git -C ${APP_DIR} diff          (see the edits)"
+      warn "             git -C ${APP_DIR} stash && sudo bash ${APP_DIR}/scripts/deploy-ubuntu.sh"
+    fi
     return 0
   fi
   if git -C "$APP_DIR" rev-parse --verify --quiet "origin/$GIT_REF" >/dev/null; then

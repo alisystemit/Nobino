@@ -131,8 +131,47 @@ if ! command -v git >/dev/null 2>&1 || ! command -v curl >/dev/null 2>&1; then
 fi
 
 # ─── Fetch the code (or keep what is already there) ───────────────
+# An existing checkout is advanced here, before the deployment script is
+# exec'ed: the newest scripts/deploy-ubuntu.sh then runs (a fix shipped to
+# GitHub takes effect on the next install), and the file bash is executing is
+# never rewritten by git halfway through the run.
+update_existing_checkout() {
+  # Only a real path: an empty one would write a useless safe.directory entry.
+  if [ -n "$APP_DIR" ]; then
+    git config --global --add safe.directory "$APP_DIR" >/dev/null 2>&1 || true
+  fi
+  if ! git -C "$APP_DIR" remote get-url origin >/dev/null 2>&1; then
+    git -C "$APP_DIR" remote add origin "$REPO_URL" >/dev/null 2>&1 || true
+  fi
+  git -C "$APP_DIR" fetch --tags --prune origin >/dev/null 2>&1 \
+    || warn "Could not reach the repository; continuing with the local copy."
+
+  local dirty head new
+  dirty="$(git -C "$APP_DIR" status --porcelain --untracked-files=no 2>/dev/null | grep -v ' package-lock.json$' || true)"
+  if [ -n "$dirty" ]; then
+    warn "$APP_DIR has uncommitted changes; leaving the code as it is (deploy-ubuntu.sh will list them)."
+    return 0
+  fi
+  new="$(git -C "$APP_DIR" rev-parse --short "origin/$GIT_REF" 2>/dev/null || true)"
+  if [ -z "$new" ]; then
+    warn "Ref '$GIT_REF' is not on the remote; leaving the code as it is."
+    return 0
+  fi
+  head="$(git -C "$APP_DIR" rev-parse --short HEAD 2>/dev/null || echo '')"
+  if [ "$head" = "$new" ]; then
+    info "Code is already at ${head} ($GIT_REF)."
+  else
+    if git -C "$APP_DIR" checkout -B "$GIT_REF" "origin/$GIT_REF" >/dev/null 2>&1; then
+      info "Code updated from ${head:-unknown} to ${new} ($GIT_REF)."
+    else
+      warn "Could not check out origin/${GIT_REF}; continuing with ${head:-unknown}."
+    fi
+  fi
+}
+
 if [ -d "$APP_DIR/.git" ]; then
-  info "$APP_DIR already contains a git checkout; deploy-ubuntu.sh will update it."
+  info "$APP_DIR already contains a git checkout; bringing it up to date."
+  update_existing_checkout
 elif [ -d "$APP_DIR" ] && [ -n "$(ls -A "$APP_DIR" 2>/dev/null)" ]; then
   if [ -f "$APP_DIR/package.json" ] && [ -f "$APP_DIR/scripts/deploy-ubuntu.sh" ]; then
     warn "$APP_DIR holds files that were placed there manually; using them as-is."
