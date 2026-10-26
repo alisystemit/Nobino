@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import JalaliDatePicker from "@/components/ui/JalaliDatePicker";
 import { toPersianDigits } from "@/lib/utils";
 
 type Row = {
@@ -185,12 +186,12 @@ export default function DailyBoard({ salonId }: { salonId: string }) {
     <div>
       <div className="mb-4 flex flex-wrap items-end gap-3">
         <div>
-          <label className="text-[11px] font-bold text-neutral-500 dark:text-neutral-400">تاریخ</label>
-          <input
-            type="date"
+          <label className="text-[11px] font-bold text-neutral-500 dark:text-neutral-400">تاریخ (شمسی)</label>
+          <JalaliDatePicker
+            className="mt-1 w-56"
             value={date}
-            onChange={(e) => setDate(e.target.value)}
-            className="mt-1 block rounded-xl border border-neutral-300 px-3 py-2 text-sm outline-none focus:border-pink-500 dark:border-neutral-700 dark:bg-neutral-800"
+            onChange={setDate}
+            timeZone={timezone}
           />
         </div>
         <div className="min-w-[150px] flex-1">

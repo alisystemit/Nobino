@@ -4,6 +4,9 @@ import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { CalendarPlus, Info, Mic, PhoneCall, Users } from "lucide-react";
 import { PanelCard } from "@/components/ui/Stats";
+import JalaliDatePicker from "@/components/ui/JalaliDatePicker";
+import TimeField from "@/components/ui/TimeField";
+import { todayInZone, zonedTimeToIso } from "@/lib/time/zoned";
 
 type Service = { id: string; name: string; durationMin: number; price: number };
 type Staff = { id: string; name: string; title?: string | null };
@@ -20,7 +23,7 @@ const CHANNELS = [
  * ثبت نهایی از `POST /api/appointments` و در سرویس‌لایر `createAppointmentSafe`
  * انجام می‌شود (قفل FOR UPDATE روی سالن)، پس تداخل زمانی در سمت فرانت بررسی نمی‌شود.
  */
-export default function ManualBooking({ salonId }: { salonId: string }) {
+export default function ManualBooking({ salonId, timezone }: { salonId: string; timezone?: string }) {
   const [services, setServices] = useState<Service[]>([]);
   const [staff, setStaff] = useState<Staff[]>([]);
   const [branches, setBranches] = useState<Branch[]>([]);
@@ -49,7 +52,8 @@ export default function ManualBooking({ salonId }: { salonId: string }) {
     })();
   }, [salonId]);
 
-  const today = useMemo(() => new Date().toISOString().slice(0, 10), []);
+  // «امروز» به وقت سالن، نه UTC/مرورگر — تا `min` تاریخ برای همه درست باشد
+  const today = useMemo(() => todayInZone(timezone), [timezone]);
   const picked = services.find((s) => s.id === serviceId);
 
   const input =
@@ -74,7 +78,8 @@ export default function ManualBooking({ salonId }: { salonId: string }) {
           branchId: branchId || undefined,
           customerName: name.trim(),
           customerPhone: phone.trim(),
-          startAt: new Date(`${date}T${time}:00`).toISOString(),
+          // ساعت سالن (نه ساعت مرورگر) — وگرنه نوبت چند ساعت جابه‌جا و رد می‌شود
+          startAt: zonedTimeToIso(date, time, timezone),
           channel,
         }),
       });
@@ -122,14 +127,8 @@ export default function ManualBooking({ salonId }: { salonId: string }) {
             </div>
           </div>
           <div className="grid gap-3 sm:grid-cols-2">
-            <div>
-              <span className={label}>تاریخ</span>
-              <input type="date" min={today} className={input} value={date} onChange={(e) => setDate(e.target.value)} />
-            </div>
-            <div>
-              <span className={label}>ساعت شروع</span>
-              <input type="time" className={input} value={time} onChange={(e) => setTime(e.target.value)} />
-            </div>
+            <JalaliDatePicker label="تاریخ (شمسی)" value={date} onChange={setDate} min={today} timeZone={timezone} />
+            <TimeField label="ساعت شروع" value={time} onChange={setTime} />
           </div>
           <div className="grid gap-3 sm:grid-cols-2">
             {staff.length > 0 && (

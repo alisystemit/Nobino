@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import JalaliDatePicker from "@/components/ui/JalaliDatePicker";
 
 type Service = {
   id: string;
@@ -579,14 +580,13 @@ export default function SalonBooking({
 
           <div>
             <span className="mb-2 block text-xs font-bold text-neutral-600">۴. تاریخ و ساعت آزاد</span>
-            <input
-              type="date"
+            <JalaliDatePicker
+              value={date}
+              onChange={setDate}
               min={today}
               max={maxDate}
-              value={date}
-              onChange={(e) => setDate(e.target.value)}
-              className={input}
-              aria-label="تاریخ نوبت"
+              timeZone={timezone}
+              placeholder="انتخاب تاریخ (شمسی)"
             />
 
             {loadingSlots && (

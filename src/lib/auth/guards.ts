@@ -1,4 +1,5 @@
 import { cookies } from "next/headers";
+import { redirect } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import { verifyToken, JwtPayload } from "@/lib/auth/jwt";
 import { httpError } from "@/lib/utils";
@@ -39,10 +40,29 @@ export async function requireAuth() {
   return user;
 }
 
-/** یاریاب دسترسی بر اساس نقش */
+/** یاریاب دسترسی بر اساس نقش (برای Route Handlerها — خطا پرتاب می‌کند) */
 export async function requireRole(roles: JwtPayload["role"][]) {
   const user = await requireAuth();
   if (!roles.includes(user.role)) throw httpError("Forbidden", 403);
+  return user;
+}
+
+/**
+ * نگهبان مسیرهای صفحه (Server Component).
+ * برخلاف requireAuth/requireRole خطا پرتاب نمی‌کند؛ چون خطای 401 در رندر صفحه
+ * به 500 (و در dev به Error Overlay روی prefetch) تبدیل می‌شود. کاربر بدون
+ * نشست به صفحه ورود و نقش نادرست به داشبورد هدایت می‌شود.
+ */
+export async function requirePageAuth() {
+  const user = await getCurrentUser();
+  if (!user) redirect("/login");
+  return user;
+}
+
+/** نگهبان صفحه بر اساس نقش؛ در صورت نبود دسترسی به داشبورد برگردانده می‌شود */
+export async function requirePageRole(roles: JwtPayload["role"][]) {
+  const user = await requirePageAuth();
+  if (!roles.includes(user.role)) redirect("/dashboard");
   return user;
 }
 

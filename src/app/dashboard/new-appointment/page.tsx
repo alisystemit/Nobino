@@ -2,7 +2,7 @@ import { redirect } from "next/navigation";
 import Link from "next/link";
 import { Mic } from "lucide-react";
 import { prisma } from "@/lib/prisma";
-import { requireRole } from "@/lib/auth/guards";
+import { requirePageRole } from "@/lib/auth/guards";
 import DashboardShell from "@/components/DashboardShell";
 import ManualBooking from "@/components/ManualBooking";
 import PwaInstallButton from "@/components/PwaInstallButton";
@@ -10,11 +10,11 @@ import PwaInstallButton from "@/components/PwaInstallButton";
 export const instant = false;
 
 export default async function ManualBookingPage() {
-  const user = await requireRole(["SALON_OWNER", "ADMIN"]);
+  const user = await requirePageRole(["SALON_OWNER", "ADMIN"]);
   const salon = await prisma.salon.findFirst({
     where: { ownerId: user.id },
     orderBy: { createdAt: "asc" },
-    select: { id: true },
+    select: { id: true, timezone: true },
   });
   if (!salon) redirect("/dashboard/salon");
 
@@ -27,7 +27,7 @@ export default async function ManualBookingPage() {
           </p>
           <PwaInstallButton />
         </div>
-        <ManualBooking salonId={salon.id} />
+        <ManualBooking salonId={salon.id} timezone={salon.timezone} />
         <p className="mt-4 flex items-center gap-1.5 text-[11px] text-neutral-400">
           <Mic className="h-3.5 w-3.5" />
           این صفحه مستقل از رزرو صوتی است؛ هیچ بخشی از آن به میکروفون نیاز ندارد و روی http هم کامل کار می‌کند.

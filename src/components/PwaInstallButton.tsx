@@ -18,10 +18,14 @@ export default function PwaInstallButton({ className = "" }: { className?: strin
   const [openGuide, setOpenGuide] = useState(false);
   const installable = support === "installable";
 
+  /** همان ابعاد و رنگ دکمهٔ «تأیید و ثبت نوبت» — تا نصب اپ چیزی نباشد که چشم کاربر دنبالش بگردد */
+  const BTN =
+    "inline-flex items-center justify-center gap-2 rounded-xl px-5 py-3 text-sm font-black text-white shadow-lg shadow-pink-500/25 transition hover:scale-[1.01] active:scale-[0.99]";
+
   if (installed && !openGuide) {
     return (
-      <span className={`inline-flex items-center gap-1.5 rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs font-bold text-emerald-700 dark:border-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-300 ${className}`}>
-        <Check className="h-4 w-4" />
+      <span className={`${BTN} gap-1.5 border border-emerald-200 bg-gradient-to-l from-emerald-600 to-teal-600 shadow-emerald-500/25 ${className}`}>
+        <Check className="h-5 w-5" />
         اپ نوبینو نصب است
       </span>
     );
@@ -32,16 +36,14 @@ export default function PwaInstallButton({ className = "" }: { className?: strin
       <button
         type="button"
         onClick={() => (installable ? void install() : setOpenGuide((v) => !v))}
-        className={`inline-flex items-center gap-1.5 rounded-xl px-3 py-2 text-xs font-black shadow-sm transition ${
-          installable
-            ? "bg-gradient-to-l from-pink-600 to-purple-600 text-white hover:opacity-95"
-            : "border border-neutral-200 bg-white text-neutral-700 hover:bg-neutral-50 dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-200 dark:hover:bg-neutral-700"
+        className={`${BTN} bg-gradient-to-l ${
+          installable ? "from-pink-600 to-purple-600" : "from-purple-600 to-indigo-600"
         }`}
         aria-expanded={!installable ? openGuide : undefined}
       >
-        {installable ? <Download className="h-4 w-4" /> : <Smartphone className="h-4 w-4" />}
-        {installable ? "نصب اپ نوبینو" : "نصب اپ"}
-        {!installable && <ChevronDown className={`h-3.5 w-3.5 transition ${openGuide ? "rotate-180" : ""}`} />}
+        {installable ? <Download className="h-5 w-5" /> : <Smartphone className="h-5 w-5" />}
+        نصب اپ نوبینو
+        {!installable && <ChevronDown className={`h-4 w-4 transition ${openGuide ? "rotate-180" : ""}`} />}
       </button>
 
       {openGuide && (

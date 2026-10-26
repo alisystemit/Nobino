@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { prisma } from "@/lib/prisma";
-import { requireRole } from "@/lib/auth/guards";
+import { requirePageRole } from "@/lib/auth/guards";
 import { toPersianDigits } from "@/lib/utils";
 import { listOwnerSalons, resolveDashboardSalonId } from "@/lib/salons";
 import { UNLIMITED_FROM } from "@/lib/plans/limit-defs";
@@ -29,7 +29,7 @@ function faDate(d: Date | null | undefined): string | null {
 }
 
 export default async function SalonDashboardPage({ searchParams }: { searchParams: Promise<{ salon?: string; new?: string }> }) {
-  const user = await requireRole(["SALON_OWNER", "ADMIN"]);
+  const user = await requirePageRole(["SALON_OWNER", "ADMIN"]);
   const sp = await searchParams;
   const mySalons = await listOwnerSalons(user.id);
 
@@ -327,7 +327,7 @@ export default async function SalonDashboardPage({ searchParams }: { searchParam
           subtitle="خدمات، کارکنان، مشتریان، تقویم، صندوق، گزارش و کمپین‌ها"
           icon={<Store className="h-5 w-5" />}
         >
-          <SalonManager salonId={salon.id} salonSlug={salon.slug} />
+          <SalonManager salonId={salon.id} salonSlug={salon.slug} timezone={salon.timezone} />
         </PanelCard>
       </div>
     </DashboardShell>

@@ -4,6 +4,9 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import type { Dispatch, SetStateAction } from "react";
 import RevenueChart from "@/components/RevenueChart";
 import DailyBoard from "@/components/DailyBoard";
+import JalaliDatePicker from "@/components/ui/JalaliDatePicker";
+import TimeField from "@/components/ui/TimeField";
+import { zonedTimeToIso } from "@/lib/time/zoned";
 import { useI18n } from "@/lib/i18n";
 
 /* ─── انواع ─────────────────────────────────────────────────────────── */
@@ -56,6 +59,8 @@ type Tab = "services" | "staff" | "blocks" | "booking" | "branches" | "cash" | "
 type Ctx = {
   salonId: string;
   salonSlug?: string;
+  /** منطقهٔ زمانی سالن برای تبدیل تاریخ شمسی → لحظهٔ UTC */
+  timezone: string;
   base: string;
   api: <T = ApiRes>(path: string, method: string, body?: unknown, okMsg?: string) => Promise<T | null>;
   refreshServices: () => Promise<void>;
@@ -333,12 +338,12 @@ function ReportView({ ctx }: { ctx: Ctx }) {
         <h4 className="text-sm font-extrabold text-neutral-800 dark:text-neutral-100">گزارش مالی بازه‌ای</h4>
         <div className="mt-2 flex flex-wrap items-end gap-2">
           <div>
-            <label className="text-[11px] font-medium text-neutral-500 dark:text-neutral-400">از</label>
-            <input type="date" className={inputCls} value={finFrom} onChange={(e) => setFinFrom(e.target.value)} />
+            <label className="text-[11px] font-medium text-neutral-500 dark:text-neutral-400">از تاریخ (شمسی)</label>
+            <JalaliDatePicker className="mt-1 w-44" value={finFrom} onChange={setFinFrom} timeZone={ctx.timezone} />
           </div>
           <div>
-            <label className="text-[11px] font-medium text-neutral-500 dark:text-neutral-400">تا</label>
-            <input type="date" className={inputCls} value={finTo} onChange={(e) => setFinTo(e.target.value)} />
+            <label className="text-[11px] font-medium text-neutral-500 dark:text-neutral-400">تا تاریخ (شمسی)</label>
+            <JalaliDatePicker className="mt-1 w-44" value={finTo} onChange={setFinTo} timeZone={ctx.timezone} />
           </div>
           <button onClick={loadFinancial} className={darkBtn}>نمایش</button>
         </div>
@@ -718,22 +723,43 @@ function CashForm({ ctx }: { ctx: Ctx }) {
 /* ─── مسدودسازی ──────────────────────────────────────────────────────── */
 
 function BlockForm({ ctx }: { ctx: Ctx }) {
-  const [startAt, setStartAt] = useState("");
-  const [endAt, setEndAt] = useState("");
+  const [startDate, setStartDate] = useState("");
+  const [startTime, setStartTime] = useState("");
+  const [endDate, setEndDate] = useState("");
+  const [endTime, setEndTime] = useState("");
   const [reason, setReason] = useState("");
   async function submit() {
-    const r = await ctx.api(`${ctx.base}/blocks`, "POST", { startAt: new Date(startAt).toISOString(), endAt: new Date(endAt).toISOString(), reason: reason || undefined }, "مسدودسازی ثبت شد ✅");
+    if (!startDate || !startTime || !endDate || !endTime) {
+      return ctx.setMsg({ ok: false, text: "تاریخ و ساعت شروع و پایان را انتخاب کنید" });
+    }
+    let startIso: string;
+    let endIso: string;
+    try {
+      startIso = zonedTimeToIso(startDate, startTime, ctx.timezone);
+      endIso = zonedTimeToIso(endDate, endTime, ctx.timezone);
+    } catch (e) {
+      return ctx.setMsg({ ok: false, text: e instanceof Error ? e.message : "تاریخ نامعتبر است" });
+    }
+    const r = await ctx.api(`${ctx.base}/blocks`, "POST", { startAt: startIso, endAt: endIso, reason: reason || undefined }, "مسدودسازی ثبت شد ✅");
     if (r) {
-      setStartAt("");
-      setEndAt("");
+      setStartDate("");
+      setStartTime("");
+      setEndDate("");
+      setEndTime("");
       setReason("");
       ctx.refreshBlocks();
     }
   }
   return (
-    <div className={`${cardCls} grid gap-3 sm:grid-cols-[1fr_1fr_1fr_auto]`}>
-      <input type="datetime-local" className={inputCls} value={startAt} onChange={(e) => setStartAt(e.target.value)} />
-      <input type="datetime-local" className={inputCls} value={endAt} onChange={(e) => setEndAt(e.target.value)} />
+    <div className={`${cardCls} grid gap-3 sm:grid-cols-2`}>
+      <div className="grid grid-cols-2 gap-2">
+        <JalaliDatePicker label="از تاریخ (شمسی)" value={startDate} onChange={setStartDate} timeZone={ctx.timezone} placeholder="تاریخ شروع" />
+        <TimeField label="از ساعت" value={startTime} onChange={setStartTime} />
+      </div>
+      <div className="grid grid-cols-2 gap-2">
+        <JalaliDatePicker label="تا تاریخ (شمسی)" value={endDate} onChange={setEndDate} timeZone={ctx.timezone} placeholder="تاریخ پایان" />
+        <TimeField label="تا ساعت" value={endTime} onChange={setEndTime} />
+      </div>
       <input className={inputCls} placeholder="دلیل (ناهار، تعمیرات...)" value={reason} onChange={(e) => setReason(e.target.value)} />
       <button onClick={submit} className={darkBtn}>مسدودسازی</button>
     </div>
@@ -747,10 +773,17 @@ function BookingForm({ ctx }: { ctx: Ctx }) {
   const [customerPhone, setCustomerPhone] = useState("");
   const [serviceId, setServiceId] = useState("");
   const [employeeId, setEmployeeId] = useState("");
-  const [startAt, setStartAt] = useState("");
+  const [date, setDate] = useState("");
+  const [time, setTime] = useState("");
   const [channel, setChannel] = useState("MANUAL");
   async function submit() {
-    if (!startAt) return ctx.setMsg({ ok: false, text: "زمان را انتخاب کنید" });
+    if (!date || !time) return ctx.setMsg({ ok: false, text: "تاریخ و ساعت را انتخاب کنید" });
+    let startAt: string;
+    try {
+      startAt = zonedTimeToIso(date, time, ctx.timezone);
+    } catch (e) {
+      return ctx.setMsg({ ok: false, text: e instanceof Error ? e.message : "تاریخ نامعتبر است" });
+    }
     const r = await ctx.api(
       "/api/appointments",
       "POST",
@@ -760,7 +793,7 @@ function BookingForm({ ctx }: { ctx: Ctx }) {
         employeeId: employeeId || undefined,
         customerName,
         customerPhone,
-        startAt: new Date(startAt).toISOString(),
+        startAt,
         channel,
       },
       "نوبت ثبت شد ✅"
@@ -768,7 +801,8 @@ function BookingForm({ ctx }: { ctx: Ctx }) {
     if (r) {
       setCustomerName("");
       setCustomerPhone("");
-      setStartAt("");
+      setDate("");
+      setTime("");
     }
   }
   return (
@@ -783,7 +817,10 @@ function BookingForm({ ctx }: { ctx: Ctx }) {
         <option value="">آرایشگر (اختیاری)</option>
         {ctx.staff.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
       </select>
-      <input type="datetime-local" className={inputCls} value={startAt} onChange={(e) => setStartAt(e.target.value)} />
+      <div className="grid grid-cols-2 gap-2">
+        <JalaliDatePicker value={date} onChange={setDate} timeZone={ctx.timezone} placeholder="تاریخ (شمسی)" />
+        <TimeField value={time} onChange={setTime} />
+      </div>
       <select className={inputCls} value={channel} onChange={(e) => setChannel(e.target.value)}>
         <option value="MANUAL">تلفنی/حضوری</option>
         <option value="WEBAPP">شبکه اجتماعی</option>
@@ -859,7 +896,7 @@ function HolidaysView({ ctx }: { ctx: Ctx }) {
         برای تعطیلی کامل سالن در یک تاریخ، یا تغییر ساعت کاری آن روز (مثلاً تعطیلات نیمه‌وقت) از این بخش استفاده کنید.
       </p>
       <div className={`${cardCls} grid gap-3 sm:grid-cols-[1fr_1fr_1fr_auto]`}>
-        <input type="date" className={inputCls} value={date} onChange={(e) => setDate(e.target.value)} />
+        <JalaliDatePicker value={date} onChange={setDate} timeZone={ctx.timezone} placeholder="تاریخ (شمسی)" />
         <input className={inputCls} placeholder="دلیل (اختیاری)" value={reason} onChange={(e) => setReason(e.target.value)} />
         <select className={inputCls} value={branchId} onChange={(e) => setBranchId(e.target.value)}>
           <option value="">کل سالن</option>
@@ -871,8 +908,8 @@ function HolidaysView({ ctx }: { ctx: Ctx }) {
         </label>
         {!isClosed && (
           <>
-            <input type="time" className={inputCls} value={openTime} onChange={(e) => setOpenTime(e.target.value)} />
-            <input type="time" className={inputCls} value={closeTime} onChange={(e) => setCloseTime(e.target.value)} />
+            <TimeField label="از ساعت" value={openTime} onChange={setOpenTime} />
+            <TimeField label="تا ساعت" value={closeTime} onChange={setCloseTime} />
           </>
         )}
         <button onClick={add} className={darkBtn}>
@@ -1602,8 +1639,8 @@ function StaffRow({ ctx, item }: { ctx: Ctx; item: StaffItem }) {
               {days.map((d, i) => (
                 <div key={d.day} className="grid grid-cols-[70px_1fr_1fr_58px] items-center gap-1.5">
                   <span className="text-[11px] text-neutral-500 dark:text-neutral-400">{DAY_NAMES[i]}</span>
-                  <input type="time" className={inputCls} value={d.open} disabled={d.isClosed} onChange={(e) => setDays((prev) => prev.map((x) => (x.day === d.day ? { ...x, open: e.target.value } : x)))} />
-                  <input type="time" className={inputCls} value={d.close} disabled={d.isClosed} onChange={(e) => setDays((prev) => prev.map((x) => (x.day === d.day ? { ...x, close: e.target.value } : x)))} />
+                  <TimeField value={d.open} disabled={d.isClosed} onChange={(v) => setDays((prev) => prev.map((x) => (x.day === d.day ? { ...x, open: v } : x)))} />
+                  <TimeField value={d.close} disabled={d.isClosed} onChange={(v) => setDays((prev) => prev.map((x) => (x.day === d.day ? { ...x, close: v } : x)))} />
                   <label className="flex items-center gap-1 text-[10px] text-neutral-500 dark:text-neutral-400">
                     <input type="checkbox" checked={d.isClosed} onChange={(e) => setDays((prev) => prev.map((x) => (x.day === d.day ? { ...x, isClosed: e.target.checked } : x)))} />
                     تعطیل
@@ -1642,7 +1679,15 @@ function StaffRow({ ctx, item }: { ctx: Ctx; item: StaffItem }) {
 
 /* ─── کامپوننت اصلی ──────────────────────────────────────────────────── */
 
-export default function SalonManager({ salonId, salonSlug }: { salonId: string; salonSlug?: string }) {
+export default function SalonManager({
+  salonId,
+  salonSlug,
+  timezone = "Asia/Tehran",
+}: {
+  salonId: string;
+  salonSlug?: string;
+  timezone?: string;
+}) {
   const { t } = useI18n();
   const [tab, setTab] = useState<Tab>("services");
   const [services, setServices] = useState<Service[]>([]);
@@ -1720,6 +1765,7 @@ export default function SalonManager({ salonId, salonSlug }: { salonId: string; 
   const ctx: Ctx = {
     salonId,
     salonSlug,
+    timezone,
     base,
     api,
     refreshServices,

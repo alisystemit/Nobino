@@ -21,8 +21,11 @@ import {
   X,
 } from "lucide-react";
 import { PanelCard } from "@/components/ui/Stats";
+import JalaliDatePicker from "@/components/ui/JalaliDatePicker";
+import TimeField from "@/components/ui/TimeField";
 import { HTTPS_HINT, clipboardAvailable, micBlockReason } from "@/lib/browser/capabilities";
 import { useMicCapability } from "@/lib/browser/use-mic-capability";
+import { zonedTimeToIso } from "@/lib/time/zoned";
 
 type Service = { id: string; name: string; durationMin: number; price: number };
 type Staff = { id: string; name: string; title?: string | null };
@@ -55,7 +58,7 @@ const REQUIRED_FIELDS: FieldKey[] = ["name", "phone", "date", "time"];
  * «می‌مرد». حالا قابلیت میکروفون سنجیده می‌شود، دلیلش فارسی نمایش داده می‌شود و
  * آپلود فایل صوتی / تایپ جمله از همان `/api/voice/transcribe` عبور می‌کنند.
  */
-export default function AdminVoiceBooking({ salonId }: { salonId: string; salonSlug?: string }) {
+export default function AdminVoiceBooking({ salonId, timezone }: { salonId: string; salonSlug?: string; timezone?: string }) {
   const [services, setServices] = useState<Service[]>([]);
   const [staff, setStaff] = useState<Staff[]>([]);
   const [branches, setBranches] = useState<Branch[]>([]);
@@ -194,7 +197,8 @@ export default function AdminVoiceBooking({ salonId }: { salonId: string; salonS
           branchId: branchId || undefined,
           customerName: payload.name,
           customerPhone: payload.phone,
-          startAt: new Date(`${payload.date}T${payload.time}:00`).toISOString(),
+          // ساعت سالن (نه ساعت مرورگر) — وگرنه کاربر با TZ متفاوت، نوبت چند ساعت جابه‌جا می‌شود
+          startAt: zonedTimeToIso(payload.date, payload.time, timezone),
           channel: "VOICE",
         }),
       });
@@ -668,8 +672,8 @@ export default function AdminVoiceBooking({ salonId }: { salonId: string; salonS
             <input className={`${input} text-center`} dir="ltr" placeholder="۰۹۱۲۳۴۵۶۷۸" value={phone} onChange={(e) => fillField("phone", e.target.value)} />
           </div>
           <div className="grid grid-cols-2 gap-3">
-            <input type="date" className={input} value={date} onChange={(e) => fillField("date", e.target.value)} />
-            <input type="time" className={input} value={time} onChange={(e) => fillField("time", e.target.value)} />
+            <JalaliDatePicker value={date} onChange={(v) => fillField("date", v)} timeZone={timezone} placeholder="تاریخ (شمسی)" />
+            <TimeField value={time} onChange={(v) => fillField("time", v)} />
           </div>
           <button
             onClick={submit}

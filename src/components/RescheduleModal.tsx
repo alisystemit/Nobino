@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import JalaliDatePicker from "@/components/ui/JalaliDatePicker";
 
 type Slot = { startAt: string; endAt: string };
 
@@ -130,8 +131,6 @@ export default function RescheduleModal({
     }
   }
 
-  const input = "w-full rounded-xl border border-neutral-300 px-3 py-2.5 text-sm outline-none focus:border-pink-500";
-
   return (
     <div className="fixed inset-0 z-[60] flex items-center justify-center p-4" role="dialog" aria-modal="true" aria-label="تغییر زمان نوبت">
       <div className="absolute inset-0 bg-black/50" onClick={onClose} />
@@ -152,13 +151,13 @@ export default function RescheduleModal({
           </p>
         ) : (
           <>
-            <label className="mt-5 block text-xs font-bold text-neutral-600 dark:text-neutral-300">تاریخ جدید</label>
-            <input
-              type="date"
-              className={`${input} mt-1`}
-              min={todayISO(tz)}
+            <label className="mt-5 block text-xs font-bold text-neutral-600 dark:text-neutral-300">تاریخ جدید (شمسی)</label>
+            <JalaliDatePicker
+              className="mt-1"
               value={date}
-              onChange={(e) => setDate(e.target.value)}
+              onChange={setDate}
+              min={todayISO(tz)}
+              timeZone={tz}
             />
             <p className="mt-1 text-[11px] text-neutral-400">{formatDateLabel(date, tz)}</p>
 

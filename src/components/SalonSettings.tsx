@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import SalonIcon from "@/components/icons/SalonIcon";
+import TimeField from "@/components/ui/TimeField";
 
 type Salon = {
   id: string;
@@ -355,8 +356,8 @@ export default function SalonSettings({ salon }: { salon: Salon }) {
           {hours.map((h) => (
             <div key={h.dayOfWeek} className="grid grid-cols-[80px_1fr_1fr_64px] items-center gap-2">
               <span className="text-xs font-medium text-neutral-600">{DAY_NAMES[h.dayOfWeek]}</span>
-              <input type="time" className={input} value={h.openTime} disabled={h.isClosed} onChange={(e) => setHour(h.dayOfWeek, { openTime: e.target.value })} />
-              <input type="time" className={input} value={h.closeTime} disabled={h.isClosed} onChange={(e) => setHour(h.dayOfWeek, { closeTime: e.target.value })} />
+              <TimeField value={h.openTime} disabled={h.isClosed} onChange={(v) => setHour(h.dayOfWeek, { openTime: v })} />
+              <TimeField value={h.closeTime} disabled={h.isClosed} onChange={(v) => setHour(h.dayOfWeek, { closeTime: v })} />
               <label className="flex items-center gap-1 text-xs text-neutral-500">
                 <input type="checkbox" checked={h.isClosed} onChange={(e) => setHour(h.dayOfWeek, { isClosed: e.target.checked })} />
                 تعطیل
