@@ -296,6 +296,9 @@ fi
 # The seed is idempotent (findUnique/upsert), so it is safe on every update.
 info "Seeding (only adds what is missing)..."
 app_sh "node prisma/seed.mjs" || warn "seed reported errors (data may already exist)."
+# The demo template (6 salons + artwork) is opt-in and never runs here.
+info "Salon artwork now ships in public/seed (tracked in git). If you loaded the demo template,"
+info "refresh its image paths once with: sudo -u ${APP_USER} -H bash -lc 'cd ${APP_DIR} && npm run db:demo'"
 
 # ─── Phase 5: build ───────────────────────────────────────────────
 echo
