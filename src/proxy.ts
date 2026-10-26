@@ -6,11 +6,24 @@ import { prisma } from "@/lib/prisma";
  */
 const ROOT_DOMAIN = process.env.NEXT_PUBLIC_ROOT_DOMAIN ?? "localhost";
 
+// میزبان خودِ سایت (مثلاً bots.example.com). بدون این بررسی، اگر سایت اصلی روی
+// یک ساب‌دامین نشسته باشد، خودش با ساب‌دامین سالن اشتباه گرفته و به /s/<slug>
+// بازنویسی می‌شود و صفحهٔ «یافت نشد» برمی‌گرداند.
+const APP_HOST = (process.env.NEXT_PUBLIC_APP_URL ?? "")
+  .replace(/^[a-zA-Z][a-zA-Z0-9+.-]*:\/\//, "")
+  .replace(/[/?#].*$/, "")
+  .replace(/:[0-9]+$/, "")
+  .toLowerCase();
+
 export async function proxy(request: NextRequest) {
   const { hostname, pathname } = request.nextUrl;
 
   // ۱) ساب‌دامین روی دامنه اصلی
-  if (ROOT_DOMAIN !== "localhost" && hostname.endsWith(`.${ROOT_DOMAIN}`)) {
+  if (
+    ROOT_DOMAIN !== "localhost" &&
+    hostname !== APP_HOST &&
+    hostname.endsWith(`.${ROOT_DOMAIN}`)
+  ) {
     const subdomain = hostname.replace(`.${ROOT_DOMAIN}`, "");
     if (subdomain && subdomain !== "www" && !pathname.startsWith("/s/")) {
       return NextResponse.rewrite(new URL(`/s/${subdomain}${pathname}`, request.url));
@@ -21,6 +34,7 @@ export async function proxy(request: NextRequest) {
   if (
     ROOT_DOMAIN !== "localhost" &&
     hostname !== ROOT_DOMAIN &&
+    hostname !== APP_HOST &&
     !hostname.endsWith(`.${ROOT_DOMAIN}`) &&
     hostname !== "localhost" &&
     !hostname.startsWith("127.") &&
