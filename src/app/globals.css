@@ -25,7 +25,10 @@
   font-display: swap;
 }
 /* Rakh (رخ) و Plak (پلاک) — وقتی فایل وبر در public/fonts قرار گرفت فعال می‌شوند
-   در غیر این صورت به زیباترین جایگزین (Yekan/Vazirmatn) برمی‌گردند. */
+   در غیر این صورت به زیباترین جایگزین (Yekan/Vazirmatn) برمی‌گردند.
+   بلوک Rakh عمداً کامنت است چون public/fonts/Rakh-Regular.woff2 در ریپو نیست؛
+   بدون آن مرورگر هر بار خطای Not Found 404 می‌گرفت. بعد از افزودن فایل، همین بلوک را باز کنید. */
+/*
 @font-face {
   font-family: "Rakh";
   src: url("/fonts/Rakh-Regular.woff2") format("woff2");
@@ -33,6 +36,7 @@
   font-style: normal;
   font-display: swap;
 }
+*/
 @font-face {
   font-family: "Plak";
   src: url("/fonts/Plak-Regular.woff2") format("woff2");
