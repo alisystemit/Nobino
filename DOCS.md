@@ -387,4 +387,5 @@ curl -fsSL https://raw.githubusercontent.com/alisystemit/Nobino/main/scripts/ins
 | AI کار نمی‌کند | کلید `openai.api_key` را وارد کنید |
 | پورت 3000 اشغال | سرور قبلی را ببندید یا پورت عوض کنید |
 | خطای Prisma | `npm run db:generate` و `db:push` |
+| `bash: line 1: npx: command not found` | Node از nvm در دسترس کاربر سرویس نبود؛ نسخهٔ فعلی اسکریپت خودش `node`/`npm`/`npx` و پوشهٔ global npm را به PATH کاربر `nobino` می‌دهد. رفع فوری روی سرور: `sudo ln -sf /usr/local/nvm/versions/node/*/bin/npx /usr/local/bin/npx` |
 | `npm error code ERESOLVE` در نصب | کد روی سرور قدیمی است (پوشهٔ نصب تغییر دست‌ی دارد و اسکریپت آن را به‌روز نکرده). مسیر پیش‌فرض `/var/www/nobino` است؛ نصب‌های قدیمی‌تر در `/opt/nobino` هستند. ببینید چه چیزی عوض شده: `sudo git -C /var/www/nobino status --porcelain --untracked-files=no` سپس `sudo git -C /var/www/nobino stash` و `sudo git -C /var/www/nobino checkout -B main origin/main` و دوباره `sudo bash /var/www/nobino/scripts/deploy-ubuntu.sh` |

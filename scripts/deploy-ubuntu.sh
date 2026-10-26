@@ -236,6 +236,36 @@ else
 fi
 APP_GROUP="$(id -gn "$APP_USER")"
 
+# ─── Making the Node.js toolchain visible to the service user ──────
+# nvm installs node under /usr/local/nvm/versions/node/<ver>/bin, which a
+# plain login shell of another user does not have on its PATH. Everything the
+# app user runs (npm, npx, prisma, pm2) lives in that directory or in the npm
+# global bin directory, so both are exported explicitly.
+APP_PATH_EXTRA=""
+node_path_for_app() {
+  local node_dir prefix out=""
+  node_dir="$(dirname "$(command -v node 2>/dev/null || echo /usr/local/bin/node)")"
+  out="$node_dir"
+  prefix="$(npm config get prefix 2>/dev/null || true)"
+  if [ -n "$prefix" ] && [ -d "$prefix/bin" ]; then
+    out="$out:$prefix/bin"
+  fi
+  printf '%s' "$out"
+}
+link_for_app() { # link_for_app <name> — expose an executable root sees to the app user
+  local name="$1" src
+  as_app bash -lc "command -v $name >/dev/null 2>&1" && return 0
+  src="$(command -v "$name" 2>/dev/null || true)"
+  if [ -z "$src" ]; then
+    return 1
+  fi
+  if ln -sf "$src" "/usr/local/bin/$name" 2>/dev/null; then
+    info "Linked $name into /usr/local/bin so '${APP_USER}' can use it."
+    return 0
+  fi
+  return 1
+}
+
 as_app() { # as_app <command...> — run as the service user with its own home/PM2
   if [ "$(id -un)" = "$APP_USER" ]; then
     "$@"
@@ -246,7 +276,13 @@ as_app() { # as_app <command...> — run as the service user with its own home/P
   fi
 }
 app_sh() { # app_sh '<shell snippet>' — executed inside APP_DIR as the service user
-  as_app bash -lc "cd '$APP_DIR' && $1"
+  # The service user's login shell does not see the nvm version directory, so
+  # npx (and every later global install) would be "command not found" there.
+  # Prepend node's own directory and the npm global bin directory to its PATH.
+  if [ -z "$APP_PATH_EXTRA" ]; then
+    APP_PATH_EXTRA="$(node_path_for_app)"
+  fi
+  as_app bash -lc "cd '$APP_DIR' && export PATH=\"$APP_PATH_EXTRA:\$PATH\" && $1"
 }
 
 # ─── Own domain: every install gets its own vhost/site file ───────
@@ -554,17 +590,16 @@ else
   ln -sf "$NVM_DIR/versions/node/$(nvm version)/bin/npm" /usr/local/bin/npm || true
 fi
 # The service user must be able to run node/npm from its own login shell.
+for tool in node npm npx corepack; do
+  link_for_app "$tool" || true
+done
 if ! as_app bash -lc 'command -v node >/dev/null 2>&1 && command -v npm >/dev/null 2>&1'; then
-  NODE_BIN="$(command -v node || true)"
-  NPM_BIN="$(command -v npm || true)"
-  if [ -n "$NODE_BIN" ] && [ -n "$NPM_BIN" ]; then
-    ln -sf "$NODE_BIN" /usr/local/bin/node
-    ln -sf "$NPM_BIN" /usr/local/bin/npm
-    warn "Linked node/npm into /usr/local/bin so '${APP_USER}' can use them."
-  else
-    fail "node/npm are not usable by '${APP_USER}'. Install Node.js 18+ system-wide and rerun."
-  fi
+  fail "node/npm are not usable by '${APP_USER}'. Install Node.js ${NODE_REQUIRED}+ system-wide and rerun."
 fi
+# Node may have been installed above: refresh the PATH handed to app_sh so the
+# service user also reaches npx and anything installed globally later (pm2).
+APP_PATH_EXTRA="$(node_path_for_app)"
+info "Toolchain for '${APP_USER}': PATH+=${APP_PATH_EXTRA}"
 
 # ══════════════════════════════════════════════════════════════════
 #  Phase 3 — fetch the code (clone from GitHub, or update in place)
@@ -739,8 +774,10 @@ chown "$APP_USER":"$APP_GROUP" .env 2>/dev/null || true
 #  Phase 6 — Prisma: generate + migrate + seed
 # ══════════════════════════════════════════════════════════════════
 info "Generating Prisma Client and applying the schema..."
-app_sh "npx prisma generate"
-app_sh "npx prisma migrate deploy" || { info "migrate deploy failed; trying db push..."; app_sh "npx prisma db push"; }
+app_sh "npx prisma generate" || fail "prisma generate failed; the npm output above has the reason."
+app_sh "npx prisma migrate deploy" \
+  || { info "migrate deploy failed; trying db push..."; app_sh "npx prisma db push" \
+       || fail "Prisma could not create the schema. Check DATABASE_URL in ${APP_DIR}/.env (a fresh PostgreSQL role needs the password the script generated for it)."; }
 info "Seeding initial data..."
 app_sh "node prisma/seed.mjs" || warn "seed reported errors (data may already exist)."
 
@@ -757,13 +794,13 @@ if command -v pm2 >/dev/null 2>&1; then
   info "PM2 is present ($(pm2 --version))."
 else
   info "Installing PM2 (global)..."
-  npm install -g pm2
+  npm install -g pm2 || fail "Could not install PM2 globally."
 fi
-if ! as_app bash -lc 'command -v pm2 >/dev/null 2>&1'; then
-  PM2_BIN="$(command -v pm2 || true)"
-  [ -n "$PM2_BIN" ] && ln -sf "$PM2_BIN" /usr/local/bin/pm2
-  warn "Linked pm2 into /usr/local/bin so '${APP_USER}' can use it."
-fi
+hash -r 2>/dev/null || true
+# pm2 was just placed in the npm global bin directory: let app_sh see it and
+# give the service user its own link.
+APP_PATH_EXTRA="$(node_path_for_app)"
+link_for_app pm2 || warn "pm2 is not visible to '${APP_USER}'; the PM2 step will fail."
 
 # PM2 ecosystem file (owned by the service user)
 cat > ecosystem.config.cjs <<EOF
