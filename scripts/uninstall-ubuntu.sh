@@ -8,9 +8,14 @@
 #  from the terminal, not from the pipe):
 #        curl -fsSL https://raw.githubusercontent.com/alisystemit/Nobino/main/scripts/uninstall-ubuntu.sh \
 #          | sudo bash -s -- --dry-run
-#  Behavior: each section (PM2, Nginx, SSL, database, firewall, Node, app folder)
-#            is prompted separately; only confirmed items are removed.
-#  Overridable env vars: APP_NAME, APP_DIR, PORT, DOMAIN, BACKUP_DIR
+#  Behavior: each section (PM2, Nginx, SSL, database, firewall, Node, app folder,
+#            service user) is prompted separately; only confirmed items are removed.
+#
+#  Coexistence-safe: Apache, its sites/certificates, PHP and MySQL/MariaDB are
+#  never touched. Nobino is removed as the unprivileged service user it runs as.
+#
+#  Overridable env vars: APP_NAME, APP_USER, APP_HOME, APP_DIR, PORT, DOMAIN,
+#                        NGINX_PORT, NGINX_CONF, BACKUP_DIR
 # ══════════════════════════════════════════════════════════════════
 set -uo pipefail
 
@@ -33,7 +38,8 @@ Usage:
   curl -fsSL https://raw.githubusercontent.com/alisystemit/Nobino/main/scripts/uninstall-ubuntu.sh | sudo bash -s -- --dry-run
 
 Optional environment variables:
-  APP_NAME=nobino  APP_DIR=/var/www/nobino  PORT=3000  DOMAIN=example.com
+  APP_NAME=nobino  APP_USER=nobino  APP_HOME=/var/lib/nobino
+  APP_DIR=/opt/nobino  PORT=3000  DOMAIN=example.com
   BACKUP_DIR=/root/nobino-backups
 EOF
 }
@@ -62,6 +68,17 @@ as_postgres() { # run a command as the postgres system user (sudo may be absent 
   if command -v sudo >/dev/null 2>&1; then sudo -u postgres "$@";
   elif command -v runuser >/dev/null 2>&1; then runuser -u postgres -- "$@";
   else su postgres -c "$*"; fi
+}
+
+as_app() { # run a command as the Nobino service user, with its own HOME/PM2 home
+  [ "$(id -un)" = "$APP_USER" ] && { "$@"; return; }
+  if command -v sudo >/dev/null 2>&1; then
+    sudo -u "$APP_USER" -H env HOME="$APP_HOME" PM2_HOME="$APP_HOME/.pm2" "$@"
+  elif command -v runuser >/dev/null 2>&1; then
+    runuser -u "$APP_USER" -- env HOME="$APP_HOME" PM2_HOME="$APP_HOME/.pm2" "$@"
+  else
+    su -s /bin/sh "$APP_USER" -c "HOME='$APP_HOME' PM2_HOME='$APP_HOME/.pm2' $*"
+  fi
 }
 
 read_answer() { # read_answer "<prompt-text>" — reads the terminal, not stdin
@@ -120,12 +137,20 @@ fi
 SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" >/dev/null 2>&1 && pwd)"
 PROJECT_ROOT="$(dirname -- "$SCRIPT_DIR")"
 APP_NAME="${APP_NAME:-nobino}"
+APP_USER="${APP_USER:-nobino}"
+APP_HOME="${APP_HOME:-/var/lib/${APP_USER}}"
 if [ -z "${APP_DIR:-}" ]; then
-  if [ -d "/var/www/$APP_NAME" ]; then APP_DIR="/var/www/$APP_NAME"; else APP_DIR="$PROJECT_ROOT"; fi
+  if [ -d "/opt/$APP_NAME" ]; then
+    APP_DIR="/opt/$APP_NAME"                       # default since the coexistence layout
+  elif [ -d "/var/www/$APP_NAME" ]; then
+    APP_DIR="/var/www/$APP_NAME"                   # older layout
+  else
+    APP_DIR="$PROJECT_ROOT"
+  fi
 fi
 APP_DIR="${APP_DIR%/}"
-NGINX_CONF="${NGINX_CONF:-/etc/nginx/sites-available/${APP_NAME}}"
-NGINX_LINK="${NGINX_LINK:-/etc/nginx/sites-enabled/${APP_NAME}}"
+NGINX_CONF="${NGINX_CONF:-/etc/nginx/sites-available/${APP_NAME}.conf}"
+NGINX_LINK="${NGINX_LINK:-/etc/nginx/sites-enabled/${APP_NAME}.conf}"
 BACKUP_DIR="${BACKUP_DIR:-/root/nobino-backups}"
 
 env_get() {
@@ -147,6 +172,18 @@ detect_port() {
   printf '%s' "${p:-3000}"
 }
 PORT="$(detect_port)"
+
+# Public ports Nginx listens on for this site (a coexistence install uses a
+# single port such as 8080; a standalone one may listen on 80 and 443).
+detect_nginx_ports() {
+  local p="${NGINX_PORT:-}"
+  if [ -n "$p" ]; then printf '%s' "$p"; return; fi
+  if [ -f "$NGINX_CONF" ]; then
+    sed -nE 's/^[[:space:]]*listen[[:space:]]+([0-9]+).*/\1/p' "$NGINX_CONF" | sort -un | tr '\n' ' '
+  fi
+}
+NGINX_PORTS="$(detect_nginx_ports)"
+NGINX_PORTS="${NGINX_PORTS% }"
 
 # Domain: env -> Nginx server_name -> NEXT_PUBLIC_APP_URL
 detect_domain() {
@@ -192,7 +229,9 @@ echo "  +----------------------------------------------------+"
 echo "${C_RESET}"
 echo "  App           : $APP_NAME"
 echo "  App directory : $APP_DIR"
+echo "  Service user  : ${APP_USER} (home: ${APP_HOME})"
 echo "  Internal port : $PORT"
+echo "  Public port(s): ${NGINX_PORTS:-—}"
 echo "  Domain        : ${DOMAIN:-—}"
 echo "  Database      : ${DB_NAME} / role ${DB_USER} @ ${DB_HOST}:${DB_PORT}$( [ "$DB_LOCAL" -eq 0 ] && echo ' (external)')"
 echo "  Backups       : $BACKUP_DIR"
@@ -207,8 +246,40 @@ if [ "$ASSUME_YES" -eq 0 ]; then
 fi
 
 # ══════════════════════════════════════════════════════════════════
-#  1) PM2 — app, startup service, package
+#  1) PM2 — the app of the service user (plus a legacy root instance)
 # ══════════════════════════════════════════════════════════════════
+pm2_count() { # pm2_count as|root — number of apps PM2 knows about
+  if [ "$1" = "as" ]; then as_app pm2 jlist 2>/dev/null; else pm2 jlist 2>/dev/null; fi \
+    | grep -o '"pm_id"' | wc -l | tr -d ' '
+}
+
+delete_pm2_app() { # delete_pm2_app as|root <label>
+  local who="$1" label="$2" removed=0
+  if ! ask_yes "Stop and remove the PM2 app '$APP_NAME' ${label}?" no; then
+    mark_kept "PM2: app $APP_NAME ${label}"
+    return
+  fi
+  if [ "$DRY_RUN" -eq 1 ]; then
+    if [ "$who" = "as" ]; then run as_app pm2 delete "$APP_NAME"; else run pm2 delete "$APP_NAME"; fi
+    mark_removed "PM2: app $APP_NAME ${label}"
+    return
+  fi
+  if [ "$who" = "as" ]; then
+    as_app pm2 delete "$APP_NAME" >/dev/null 2>&1 && ! as_app pm2 describe "$APP_NAME" >/dev/null 2>&1 && removed=1
+    [ "$removed" -eq 1 ] && as_app pm2 save >/dev/null 2>&1
+  else
+    pm2 delete "$APP_NAME" >/dev/null 2>&1 && ! pm2 describe "$APP_NAME" >/dev/null 2>&1 && removed=1
+    [ "$removed" -eq 1 ] && pm2 save >/dev/null 2>&1
+  fi
+  if [ "$removed" -eq 1 ]; then
+    ok "App '$APP_NAME' removed from PM2 ${label}."
+    mark_removed "PM2: app $APP_NAME ${label}"
+  else
+    warn "Failed to remove the app from PM2."
+    PROBLEMS+=("PM2: remove app $APP_NAME ${label}")
+  fi
+}
+
 section_pm2() {
   header "1) PM2"
   if ! command -v pm2 >/dev/null 2>&1; then
@@ -216,21 +287,23 @@ section_pm2() {
     return
   fi
 
-  if pm2 describe "$APP_NAME" >/dev/null 2>&1; then
-    if ask_yes "Stop and remove the PM2 app '$APP_NAME'?" no; then
-      if run pm2 delete "$APP_NAME" >/dev/null 2>&1; then
-        ok "App '$APP_NAME' removed from PM2."
-        mark_removed "PM2: app $APP_NAME"
-      else
-        warn "Failed to remove the app from PM2."
-        PROBLEMS+=("PM2: remove app $APP_NAME")
-      fi
-      run pm2 save >/dev/null 2>&1 || true
+  local user_exists=0
+  id -u "$APP_USER" >/dev/null 2>&1 && user_exists=1
+
+  # The current layout: PM2 runs per user, as the unprivileged app user.
+  if [ "$user_exists" -eq 1 ]; then
+    if as_app pm2 describe "$APP_NAME" >/dev/null 2>&1; then
+      delete_pm2_app as "(user ${APP_USER})"
     else
-      mark_kept "PM2: app $APP_NAME"
+      info "App '$APP_NAME' was not found in PM2 of '${APP_USER}'."
     fi
   else
-    info "App '$APP_NAME' was not found in PM2."
+    info "Service user '${APP_USER}' does not exist; skipping its PM2."
+  fi
+
+  # Older installs ran the app from root's PM2; remove that too if present.
+  if pm2 describe "$APP_NAME" >/dev/null 2>&1; then
+    delete_pm2_app root "(root's PM2, older install)"
   fi
 
   if [ "$DRY_RUN" -eq 1 ]; then
@@ -238,23 +311,46 @@ section_pm2() {
     return
   fi
 
-  local remaining
-  remaining="$(pm2 jlist 2>/dev/null | node -e 'let s="";process.stdin.on("data",d=>s+=d).on("end",()=>{try{console.log(JSON.parse(s).length)}catch(e){console.log(0)}})' 2>/dev/null || echo 0)"
+  local remaining=0
+  [ "$user_exists" -eq 1 ] && remaining="$(pm2_count as)"
+  remaining=$(( remaining + $(pm2_count root) ))
   case "$remaining" in ''|*[!0-9]*) remaining=0 ;; esac
+
+  # Startup units: one per PM2 user that this install created.
+  if [ "$user_exists" -eq 1 ] && [ -f "/etc/systemd/system/pm2-${APP_USER}.service" ]; then
+    if ask_yes "Remove the PM2 startup service of '${APP_USER}' (systemd)?" no; then
+      as_app pm2 unstartup systemd >/dev/null 2>&1 || true
+      rm -f "/etc/systemd/system/pm2-${APP_USER}.service"
+      systemctl daemon-reload >/dev/null 2>&1 || true
+      ok "PM2 startup service of '${APP_USER}' removed."
+      mark_removed "PM2: startup service (${APP_USER})"
+    fi
+  fi
+  if [ -f /etc/systemd/system/pm2-root.service ] && [ "$remaining" -eq 0 ]; then
+    if ask_yes "Remove the PM2 startup service of root (older install)?" no; then
+      pm2 unstartup systemd >/dev/null 2>&1 || true
+      rm -f /etc/systemd/system/pm2-root.service
+      systemctl daemon-reload >/dev/null 2>&1 || true
+      ok "PM2 startup service of root removed."
+      mark_removed "PM2: startup service (root)"
+    fi
+  fi
+
   if [ "$remaining" -gt 0 ]; then
-    warn "Other PM2 apps are still running ($remaining); keeping the startup service and PM2 package."
+    warn "Other PM2 apps are still running ($remaining); keeping the PM2 package."
     return
   fi
 
-  if ask_yes "Remove the PM2 startup service (systemd)?" no; then
-    pm2 unstartup systemd >/dev/null 2>&1 || true
-    rm -f /etc/systemd/system/pm2-root.service
-    systemctl daemon-reload >/dev/null 2>&1 || true
-    ok "PM2 startup service removed."
-    mark_removed "PM2: systemd service"
+  if [ "$user_exists" -eq 1 ] && [ -d "$APP_HOME/.pm2" ]; then
+    if ask_yes "Remove '${APP_HOME}/.pm2' (logs and process dump of '${APP_USER}')?" no; then
+      run rm -rf "$APP_HOME/.pm2"
+      ok "PM2 data of '${APP_USER}' removed."
+      mark_removed "PM2: ${APP_HOME}/.pm2"
+    fi
   fi
 
-  if ask_yes "Remove the PM2 npm package and ~/.pm2 (logs/dump)?" no; then
+  if ask_yes "Remove the PM2 npm package (no PM2 app is left)?" no; then
+    [ "$user_exists" -eq 1 ] && as_app pm2 kill >/dev/null 2>&1
     pm2 kill >/dev/null 2>&1 || true
     if command -v npm >/dev/null 2>&1 && npm uninstall -g pm2 >/dev/null 2>&1; then
       ok "PM2 package removed."
@@ -264,7 +360,6 @@ section_pm2() {
       PROBLEMS+=("PM2: remove package")
     fi
     rm -rf /root/.pm2
-    ok "~/.pm2 (logs and dump) removed."
   fi
 }
 
@@ -314,7 +409,7 @@ section_nginx() {
 
   if command -v nginx >/dev/null 2>&1; then
     local others
-    others="$(find /etc/nginx/sites-enabled -mindepth 1 -maxdepth 1 ! -name default ! -name "$APP_NAME" 2>/dev/null | wc -l | tr -d ' ')"
+    others="$(find /etc/nginx/sites-enabled -mindepth 1 -maxdepth 1 ! -name default ! -name "${APP_NAME}.conf" 2>/dev/null | wc -l | tr -d ' ')"
     if [ "${others:-0}" -eq 0 ] && ask_yes "Purge the Nginx package as well? (no other site uses Nginx)" no; then
       if run apt-get purge -y nginx nginx-common nginx-core; then
         run rm -rf /etc/nginx /var/log/nginx
@@ -333,44 +428,33 @@ section_nginx() {
 # ══════════════════════════════════════════════════════════════════
 section_ssl() {
   header "3) SSL certificate"
+  # Only a certificate that Nobino's own Nginx file points at belongs to it.
+  # In coexistence mode Nobino has no certificate at all: Apache (and any other
+  # site) keeps using its own, so nothing is listed or deleted here.
+  local cert_path="" cert_name=""
+  if [ -f "$NGINX_CONF" ]; then
+    cert_path="$(sed -nE 's/^[[:space:]]*ssl_certificate[[:space:]]+([^;]+);.*/\1/p' "$NGINX_CONF" | head -1)"
+  fi
+  if [ -z "$cert_path" ]; then
+    info "Nobino has no certificate of its own; Apache/other sites keep theirs. Skipping."
+    mark_kept "SSL: none managed by Nobino"
+    return
+  fi
+  case "$cert_path" in
+    /etc/letsencrypt/live/*/fullchain.pem|/etc/letsencrypt/live/*/cert.pem)
+      cert_name="$(printf '%s' "$cert_path" | awk -F/ '{print $5}')" ;;
+    *)
+      warn "Certificate '${cert_path}' is not managed by Certbot; leaving it alone."
+      mark_kept "SSL: ${cert_path}"
+      return ;;
+  esac
   if ! command -v certbot >/dev/null 2>&1; then
-    info "Certbot is not installed (remove self-signed/other certificates manually)."
+    warn "Certbot is not installed; delete ${cert_path} manually if needed."
+    mark_kept "SSL: $cert_name"
     return
   fi
 
-  local list cert_name="" cert_domains="" name domains
-  list="$(certbot certificates 2>/dev/null | awk '
-    /Certificate Name:/ { name=$3 }
-    /Domains:/ { sub(/^[^:]*Domains:[ ]*/, ""); print name "\t" $0 }
-  ')"
-  if [ -z "$list" ]; then
-    info "No certificates are registered with Certbot."
-    return
-  fi
-
-  while IFS=$'\t' read -r name domains; do
-    [ -n "$name" ] || continue
-    if [ -n "$DOMAIN" ] && { [ "$name" = "$DOMAIN" ] || [[ " $domains " == *" $DOMAIN "* ]] || [[ "$name" == *"$DOMAIN"* ]]; }; then
-      cert_name="$name"; cert_domains="$domains"; break
-    fi
-    if [ -z "$DOMAIN" ] && [ -z "$cert_name" ]; then
-      cert_name="$name"; cert_domains="$domains"
-    fi
-  done <<< "$list"
-
-  if [ -z "$cert_name" ]; then
-    warn "No certificate matched '${DOMAIN:-$APP_NAME}'. Available certificates:"
-    printf '%s\n' "$list" | awk -F'\t' '{ printf "    - %s (%s)\n", $1, $2 }'
-    cert_name="$(ask_val "Certificate name to delete (empty = skip)" "")"
-    [ -n "$cert_name" ] || { mark_kept "SSL: certificate"; return; }
-    cert_domains="$(printf '%s\n' "$list" | awk -F'\t' -v n="$cert_name" '$1==n { print $2 }')"
-  fi
-
-  if [ -n "$DOMAIN" ] && [[ " $cert_domains " != *" $DOMAIN "* ]] && [[ "$cert_name" != *"$DOMAIN"* ]]; then
-    warn "This certificate is not issued for '$DOMAIN'; another site may be using it."
-  fi
-
-  if ask_yes "Delete SSL certificate '$cert_name' (${cert_domains:-?})?" no; then
+  if ask_yes "Delete the Nobino SSL certificate '$cert_name' (only this one)?" no; then
     if run certbot delete --cert-name "$cert_name" --non-interactive >/dev/null 2>&1; then
       ok "SSL certificate removed."
       mark_removed "SSL: $cert_name"
@@ -482,17 +566,26 @@ section_firewall() {
     info "UFW is not active."
     return
   fi
-  if ufw status 2>/dev/null | grep -qE "(^|[[:space:]])${PORT}/tcp"; then
-    if ask_yes "Remove the firewall rule that allows port ${PORT}?" no; then
-      run ufw delete allow "${PORT}/tcp" >/dev/null 2>&1 || true
-      ok "Rule for port ${PORT} removed."
-      mark_removed "UFW: port $PORT"
+
+  # Only the ports this install opened: the public Nginx port(s) and the
+  # internal app port. Apache's 80/443 rules are never listed or removed.
+  local p seen=" "
+  for p in ${NGINX_PORTS:-} ${PORT}; do
+    [ -n "$p" ] || continue
+    case "$seen" in *" $p "*) continue ;; esac
+    seen="${seen}${p} "
+    if ufw status 2>/dev/null | grep -qE "(^|[[:space:]])${p}/tcp"; then
+      if ask_yes "Remove the firewall rule that allows port ${p}?" no; then
+        run ufw delete allow "${p}/tcp" >/dev/null 2>&1 || true
+        ok "Rule for port ${p} removed."
+        mark_removed "UFW: port $p"
+      else
+        mark_kept "UFW: port $p"
+      fi
     else
-      mark_kept "UFW: port $PORT"
+      info "No UFW rule found for port ${p}."
     fi
-  else
-    info "No UFW rule found for port ${PORT}."
-  fi
+  done
 }
 
 # ══════════════════════════════════════════════════════════════════
@@ -548,7 +641,7 @@ section_folder() {
   parent="$(readlink -f -- "$parent" 2>/dev/null || printf '%s' "$parent")"
   normalized="${parent%/}/$base"
   case "$normalized" in
-    /|/var|/var/www|/usr|/usr/local|/etc|/root|/home|"${HOME:-/root}")
+    /|/var|/var/www|/var/lib|/opt|/srv|/usr|/usr/local|/etc|/root|/home|"${HOME:-/root}")
       warn "Path '$normalized' is protected; deletion skipped."
       mark_kept "Folder: protected path"
       return ;;
@@ -598,6 +691,49 @@ section_folder() {
   fi
 }
 
+# ══════════════════════════════════════════════════════════════════
+#  8) Service user — dedicated, unprivileged account of this install
+# ══════════════════════════════════════════════════════════════════
+section_user() {
+  header "8) Service user"
+  if ! id -u "$APP_USER" >/dev/null 2>&1; then
+    info "User '${APP_USER}' does not exist; nothing to remove."
+    return
+  fi
+  case "$APP_USER" in
+    root|www-data|postgres|mysql|nobody)
+      warn "'${APP_USER}' is a system/shared account; keeping it."
+      mark_kept "User: $APP_USER (system account)"
+      return ;;
+  esac
+  # This account was created for Nobino only, with its own home directory.
+  warn "This removes '${APP_USER}' and its home '${APP_HOME}' (PM2 data, logs)."
+  warn "The PostgreSQL role/database are separate and stay unless section 4 removed them."
+  if ! ask_yes "Remove the service user '${APP_USER}'?" no; then
+    mark_kept "User: $APP_USER"
+    return
+  fi
+  if [ "$DRY_RUN" -eq 1 ]; then
+    run pkill -u "$APP_USER" -TERM
+    run userdel -r "$APP_USER"
+    mark_removed "User: $APP_USER"
+    return
+  fi
+  pkill -u "$APP_USER" -TERM >/dev/null 2>&1 || true
+  sleep 1
+  if userdel -r "$APP_USER" >/dev/null 2>&1; then
+    ok "User '${APP_USER}' and its home removed."
+    mark_removed "User: $APP_USER"
+  elif userdel "$APP_USER" >/dev/null 2>&1; then
+    warn "User removed, but its home '${APP_HOME}' could not be deleted automatically."
+    mark_removed "User: $APP_USER"
+    PROBLEMS+=("Home folder: $APP_HOME")
+  else
+    warn "Failed to remove the user (manual: userdel -r ${APP_USER})."
+    PROBLEMS+=("User: remove $APP_USER")
+  fi
+}
+
 # ─── Run ──────────────────────────────────────────────────────────
 section_pm2
 section_nginx
@@ -606,6 +742,7 @@ section_db
 section_firewall
 section_node
 section_folder
+section_user
 
 # ─── Final summary ────────────────────────────────────────────────
 header "Summary"
@@ -629,6 +766,7 @@ else
   info "Uninstall finished."
 fi
 echo "  Reminder: disable DNS/Cloudflare records and external services (SMS, payments) separately."
+echo "  Apache, PHP and MySQL/MariaDB were never touched (their sites and data stay online)."
 if [ -d "$BACKUP_DIR" ]; then
   echo "  Backups: $BACKUP_DIR"
 fi

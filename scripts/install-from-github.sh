@@ -18,14 +18,25 @@
 #  Environment overrides (passed straight through to deploy-ubuntu.sh):
 #    REPO_URL        git repository to clone   (default: public Nobino repo)
 #    GIT_REF         branch/tag/commit         (default: main)
-#    APP_DIR         install directory         (default: /var/www/nobino)
+#    APP_USER        service user for the app  (default: nobino)
+#    APP_HOME        home of that user         (default: /var/lib/nobino)
+#    APP_DIR         install directory         (default: /opt/nobino)
 #    PORT            internal Next.js port     (default: 3000)
-#    NGINX_PORT      public Nginx port         (default: 80)
-#    DOMAIN          domain for SSL (empty = IP only)
+#    NGINX_PORT      public Nginx port         (default: 80, or a free port
+#                                               when Apache owns 80)
+#    COEXIST         auto|1|0 keep an existing Apache/MySQL/PHP stack intact
+#    MANAGE_UFW      auto|1|0 firewall handling
+#    ENABLE_SSL      auto|1|0 certbot for DOMAIN
+#    DOMAIN          domain for SSL (empty = IP/port only)
 #    SSL_EMAIL       certbot contact email
 #    APP_URL         public app URL
 #    ROOT_DOMAIN     root domain for subdomains
 #    NONINTERACTIVE  1 = never prompt, use defaults/env values
+#
+#  Safe on a server that already runs Apache + PHP 8 + MySQL (a Telegram bot,
+#  phpMyAdmin, etc.): nothing of that stack is installed, upgraded, restarted
+#  or reconfigured. Nobino gets its own user, its own folder, its own Node
+#  process and its own Nginx file on a free port.
 #
 #  Re-running it is safe: the repository is updated and the deployment
 #  phases that are already satisfied are skipped.
@@ -51,7 +62,8 @@ ask() { # ask <prompt> <default> — reads the terminal, never stdin (it holds t
 
 REPO_URL="${REPO_URL:-https://github.com/alisystemit/Nobino.git}"
 GIT_REF="${GIT_REF:-main}"
-APP_DIR="${APP_DIR:-/var/www/nobino}"
+# Outside /var/www on purpose: an existing Apache/PHP site keeps its folders.
+APP_DIR="${APP_DIR:-/opt/nobino}"
 
 # ─── Sanity checks ────────────────────────────────────────────────
 [ "$(uname -s)" = "Linux" ] || fail "This installer only runs on Linux/Ubuntu."
@@ -73,7 +85,13 @@ if [ "$(id -u)" -ne 0 ]; then
 fi
 
 export REPO_URL GIT_REF APP_DIR
-export PORT="${PORT:-3000}" NGINX_PORT="${NGINX_PORT:-80}"
+export APP_USER="${APP_USER:-nobino}"
+[ -n "${APP_HOME:-}" ] && export APP_HOME || true
+export PORT="${PORT:-3000}"
+# NGINX_PORT is only exported when asked for: deploy-ubuntu.sh then chooses 80
+# on a dedicated server, or a free port (8080+) when Apache already owns 80.
+[ -n "${NGINX_PORT:-}" ] && export NGINX_PORT || true
+export COEXIST="${COEXIST:-auto}" MANAGE_UFW="${MANAGE_UFW:-auto}" ENABLE_SSL="${ENABLE_SSL:-auto}"
 export NONINTERACTIVE="${NONINTERACTIVE:-0}"
 export DEBIAN_FRONTEND=noninteractive
 
@@ -132,6 +150,7 @@ DEPLOY_SCRIPT="$APP_DIR/scripts/deploy-ubuntu.sh"
 chmod +x "$DEPLOY_SCRIPT"
 
 echo ""
-info "Starting the Nobino deployment (PostgreSQL, Node.js, build, PM2, Nginx, SSL, UFW)..."
+info "Starting the Nobino deployment (service user, PostgreSQL, Node.js, build, PM2, Nginx on its own port)..."
+info "Apache, PHP and MySQL already on this server are left exactly as they are."
 echo ""
 exec bash "$DEPLOY_SCRIPT"

@@ -9,12 +9,27 @@
 #  Behavior: existing components are reused (not reinstalled);
 #            only missing ones are installed and configured.
 #
+#  Safe next to an existing stack (Apache/LAMP + MySQL/MariaDB + Telegram bot):
+#    * MySQL/MariaDB is never installed, restarted or reconfigured.
+#    * Apache and its sites, folders and SSL certificates are never touched.
+#    * The app runs as its own unprivileged user, never as root.
+#    * When Apache owns port 80, Nginx is put on a free port instead.
+#    * certbot and UFW are skipped in that mode (nothing of the existing
+#      server changes); a ready Apache reverse-proxy snippet is printed.
+#
 #  Environment overrides (all optional):
 #    REPO_URL        git repository to clone      (default: public Nobino repo)
 #    GIT_REF         branch/tag/commit to deploy  (default: main)
-#    APP_DIR         install directory            (default: /var/www/nobino)
+#    APP_USER        unprivileged service user    (default: nobino)
+#    APP_HOME        home of that user            (default: /var/lib/nobino)
+#    APP_DIR         install directory            (default: /opt/nobino)
 #    PORT            internal Next.js port        (default: 3000)
-#    NGINX_PORT      public Nginx port            (default: 80)
+#    NGINX_PORT      public Nginx port            (default: 80, or a free port
+#                                                  when Apache occupies 80)
+#    COEXIST         auto|1|0  keep an existing Apache/MySQL stack untouched
+#                              (auto = on when Apache is detected)
+#    MANAGE_UFW      auto|1|0  configure the firewall (auto = off in coexistence)
+#    ENABLE_SSL      auto|1|0  run certbot for DOMAIN (auto = off in coexistence)
 #    DOMAIN          domain name for SSL; empty   = IP-only install
 #    SSL_EMAIL       certbot contact email
 #    APP_URL         public app URL (https://...)
@@ -81,7 +96,11 @@ fi
 export DEBIAN_FRONTEND=noninteractive
 
 APP_NAME="nobino"
-APP_DIR="${APP_DIR:-/var/www/nobino}"
+# The app never runs as root and lives outside the Apache web root, so an
+# existing LAMP/PHP site keeps its folders exactly as they are.
+APP_USER="${APP_USER:-nobino}"
+APP_HOME="${APP_HOME:-/var/lib/${APP_USER}}"
+APP_DIR="${APP_DIR:-/opt/nobino}"
 PORT="${PORT:-3000}"
 NODE_REQUIRED="18"
 # The public repository is the default source, so a bare Enter accepts it.
@@ -89,16 +108,119 @@ REPO_URL="${REPO_URL:-https://github.com/alisystemit/Nobino.git}"
 GIT_REF="${GIT_REF:-main}"
 # Pre-set DOMAIN/APP_URL/NGINX_PORT/SSL_EMAIL to run unattended.
 DOMAIN="${DOMAIN:-}"
+COEXIST="${COEXIST:-auto}"
+MANAGE_UFW="${MANAGE_UFW:-auto}"
+ENABLE_SSL="${ENABLE_SSL:-auto}"
+NGINX_CONF="/etc/nginx/sites-available/${APP_NAME}.conf"
+
+# ══════════════════════════════════════════════════════════════════
+#  Phase 0a — detect the existing stack (read-only) and pick safe defaults
+# ══════════════════════════════════════════════════════════════════
+APACHE_PRESENT=0
+if command -v apache2ctl >/dev/null 2>&1 || command -v apachectl >/dev/null 2>&1 ||
+   [ -d /etc/apache2 ] || pgrep -x apache2 >/dev/null 2>&1; then
+  APACHE_PRESENT=1
+fi
+MYSQL_PRESENT=0
+if [ -d /etc/mysql ] || command -v mysqld >/dev/null 2>&1 || command -v mariadbd >/dev/null 2>&1 ||
+   systemctl list-unit-files 2>/dev/null | grep -qE '^(mysql|mariadb)\.service'; then
+  MYSQL_PRESENT=1
+fi
+PHP_PRESENT=0
+if command -v php >/dev/null 2>&1 || ls /etc/php >/dev/null 2>&1; then PHP_PRESENT=1; fi
+
+[ "$APACHE_PRESENT" -eq 1 ] && info "Apache detected — coexistence mode keeps it untouched."
+[ "$MYSQL_PRESENT" -eq 1 ] && info "MySQL/MariaDB detected — it will not be installed, restarted or reconfigured."
+[ "$PHP_PRESENT" -eq 1 ] && info "PHP detected (existing sites) — no PHP packages are changed."
+
+case "${COEXIST,,}" in
+  auto) if [ "$APACHE_PRESENT" -eq 1 ]; then COEXIST=1; else COEXIST=0; fi ;;
+  1|yes|true) COEXIST=1 ;;
+  0|no|false) COEXIST=0 ;;
+  *) warn "Unknown COEXIST='${COEXIST}'; falling back to auto."; COEXIST=$([ "$APACHE_PRESENT" -eq 1 ] && echo 1 || echo 0) ;;
+esac
+[ "$COEXIST" -eq 1 ] && info "Coexistence mode: Nginx gets its own port; certbot and UFW are not touched."
+
+# ─── Port helpers (read-only) ─────────────────────────────────────
+port_in_use() { # port_in_use <port>
+  local p="$1"
+  if command -v ss >/dev/null 2>&1; then
+    ss -H -ltn "sport = :$p" 2>/dev/null | grep -q . && return 0
+    return 1
+  fi
+  if command -v netstat >/dev/null 2>&1; then
+    netstat -ltn 2>/dev/null | awk 'NR>2 {print $4}' | grep -qE "[:.]${p}\$" && return 0
+  fi
+  return 1
+}
+free_port() { # free_port <start> [end] — first unused port in the range
+  local p="$1" end="${2:-$(( $1 + 20 ))}"
+  while [ "$p" -le "$end" ]; do
+    port_in_use "$p" || { printf '%s\n' "$p"; return 0; }
+    p=$(( p + 1 ))
+  done
+  return 1
+}
+# A re-run must keep the port that this install already uses: when Nginx is the
+# one listening, the port is taken by ourselves, not by a foreign service.
+nginx_owns_port() { # nginx_owns_port <port>
+  [ -f "$NGINX_CONF" ] || return 1
+  grep -qE "^[[:space:]]*listen[[:space:]]+$1([[:space:];]|$)" "$NGINX_CONF" 2>/dev/null
+}
+
+# Default public port: 80 on a dedicated server, but never fight Apache for it.
+DEFAULT_NGINX_PORT=80
+if port_in_use 80 && ! nginx_owns_port 80; then
+  if [ "$COEXIST" -eq 1 ]; then
+    if FREE_NGINX_PORT="$(free_port 8080 8099)"; then
+      DEFAULT_NGINX_PORT="$FREE_NGINX_PORT"
+      warn "Port 80 is already taken (Apache); Nginx will listen on ${DEFAULT_NGINX_PORT} instead."
+    else
+      fail "Ports 8080-8099 are all busy; set NGINX_PORT manually."
+    fi
+  else
+    warn "Port 80 is already taken by another service."
+    if FREE_NGINX_PORT="$(free_port 8080 8099)"; then
+      DEFAULT_NGINX_PORT="$FREE_NGINX_PORT"
+      warn "Nginx will listen on ${DEFAULT_NGINX_PORT} instead (override with NGINX_PORT)."
+    fi
+  fi
+fi
+
+# ─── Dedicated unprivileged user: the app never runs as root ──────
+if id -u "$APP_USER" >/dev/null 2>&1; then
+  info "Service user '${APP_USER}' already exists; reusing it."
+else
+  info "Creating the service user '${APP_USER}'..."
+  useradd --system --create-home --home-dir "$APP_HOME" --shell /bin/bash "$APP_USER" \
+    || fail "Could not create the service user '${APP_USER}'."
+fi
+APP_GROUP="$(id -gn "$APP_USER")"
+
+as_app() { # as_app <command...> — run as the service user with its own home/PM2
+  if [ "$(id -un)" = "$APP_USER" ]; then
+    "$@"
+  elif command -v sudo >/dev/null 2>&1; then
+    sudo -u "$APP_USER" -H env HOME="$APP_HOME" PM2_HOME="$APP_HOME/.pm2" "$@"
+  else
+    runuser -u "$APP_USER" -- env HOME="$APP_HOME" PM2_HOME="$APP_HOME/.pm2" "$@"
+  fi
+}
+app_sh() { # app_sh '<shell snippet>' — executed inside APP_DIR as the service user
+  as_app bash -lc "cd '$APP_DIR' && $1"
+}
 
 # ══════════════════════════════════════════════════════════════════
 #  Phase 0 — system prerequisites (missing only)
 # ══════════════════════════════════════════════════════════════════
 info "Checking and installing base prerequisites (apt)..."
 apt-get update -y
-# apt knows which packages are already present and installs only what is missing.
+# Only the packages Nobino needs are named here: apache2, php*, mysql-server
+# and mariadb-server are deliberately absent, so apt never upgrades or
+# reconfigures the existing LAMP stack that other sites/robots rely on.
 apt-get install -y \
   curl wget git ca-certificates gnupg lsb-release \
-  ufw openssl build-essential python3 make g++ \
+  openssl build-essential python3 make g++ \
   postgresql postgresql-contrib \
   nginx \
   || warn "Some packages failed to install; continuing."
@@ -218,6 +340,18 @@ else
   ln -sf "$NVM_DIR/versions/node/$(nvm version)/bin/node" /usr/local/bin/node || true
   ln -sf "$NVM_DIR/versions/node/$(nvm version)/bin/npm" /usr/local/bin/npm || true
 fi
+# The service user must be able to run node/npm from its own login shell.
+if ! as_app bash -lc 'command -v node >/dev/null 2>&1 && command -v npm >/dev/null 2>&1'; then
+  NODE_BIN="$(command -v node || true)"
+  NPM_BIN="$(command -v npm || true)"
+  if [ -n "$NODE_BIN" ] && [ -n "$NPM_BIN" ]; then
+    ln -sf "$NODE_BIN" /usr/local/bin/node
+    ln -sf "$NPM_BIN" /usr/local/bin/npm
+    warn "Linked node/npm into /usr/local/bin so '${APP_USER}' can use them."
+  else
+    fail "node/npm are not usable by '${APP_USER}'. Install Node.js 18+ system-wide and rerun."
+  fi
+fi
 
 # ══════════════════════════════════════════════════════════════════
 #  Phase 3 — fetch the code (clone from GitHub, or update in place)
@@ -229,7 +363,11 @@ git config --global --add safe.directory "$APP_DIR" >/dev/null 2>&1 || true
 # Bring the working tree to $GIT_REF (branch, tag or commit).
 checkout_ref() {
   # Never discard hand-edited files on the server: a dirty tree is left alone.
-  if [ -n "$(git -C "$APP_DIR" status --porcelain 2>/dev/null)" ]; then
+  # package-lock.json is excluded because `npm install` legitimately rewrites it
+  # on the server (different npm version) and that must not block updates.
+  local dirty
+  dirty="$(git -C "$APP_DIR" status --porcelain --untracked-files=no 2>/dev/null | grep -v ' package-lock.json$' || true)"
+  if [ -n "$dirty" ]; then
     warn "$APP_DIR has uncommitted changes; not touching the working tree."
     warn "Commit or revert them to let this script update the code."
     return 0
@@ -266,29 +404,39 @@ else
   else
     mkdir -p "$APP_DIR"
     info "Cloning $REPO ($GIT_REF) into $APP_DIR..."
-    if git clone --branch "$GIT_REF" "$REPO" "$APP_DIR"; then
+    # Clone into a throwaway directory first so APP_DIR is never removed,
+    # even when the requested branch/tag does not resolve.
+    CLONE_TMP="$(mktemp -d)"
+    trap 'rm -rf "$CLONE_TMP"' EXIT
+    if git clone --branch "$GIT_REF" "$REPO" "$CLONE_TMP/repo" >/dev/null 2>&1; then
       :
     else
       warn "git clone --branch failed (tag/commit ref?); cloning the default branch instead."
-      rm -rf "$APP_DIR"
-      mkdir -p "$APP_DIR"
-      git clone "$REPO" "$APP_DIR"
-      GIT_REF="$(git -C "$APP_DIR" rev-parse --abbrev-ref HEAD)"
+      git clone "$REPO" "$CLONE_TMP/repo" >/dev/null 2>&1 || { rm -rf "$CLONE_TMP"; trap - EXIT; fail "Could not clone $REPO."; }
+      if ! git -C "$CLONE_TMP/repo" checkout "$GIT_REF" >/dev/null 2>&1; then
+        warn "Ref '$GIT_REF' not found; using the default branch."
+        GIT_REF="$(git -C "$CLONE_TMP/repo" rev-parse --abbrev-ref HEAD)"
+      fi
     fi
+    cp -a "$CLONE_TMP/repo/." "$APP_DIR/"
+    rm -rf "$CLONE_TMP"
+    trap - EXIT
     checkout_ref
   fi
 fi
 cd "$APP_DIR"
+# Everything below runs as the service user; hand the tree over to it.
+chown -R "$APP_USER":"$APP_GROUP" "$APP_DIR" 2>/dev/null || warn "Could not chown $APP_DIR to ${APP_USER}."
 
 # ══════════════════════════════════════════════════════════════════
 #  Phase 4 — npm dependencies (reuse existing node_modules)
 # ══════════════════════════════════════════════════════════════════
 if [ -d node_modules ]; then
   info "node_modules exists; running an incremental npm install."
-  npm install || warn "npm install reported errors; continuing."
+  app_sh "npm install" || warn "npm install reported errors; continuing."
 else
   info "Installing dependencies (npm install)..."
-  npm install
+  app_sh "npm install"
 fi
 
 # ══════════════════════════════════════════════════════════════════
@@ -336,26 +484,27 @@ for key in JWT_SECRET CRON_SECRET; do
     ''|replace-with-*|change-me|secret) warn "${key} still looks like a placeholder; set a real value (openssl rand -base64 32)." ;;
   esac
 done
-# Keep .env private.
+# Keep .env private and owned by the service user (root wrote it).
 chmod 600 .env
+chown "$APP_USER":"$APP_GROUP" .env 2>/dev/null || true
 
 # ══════════════════════════════════════════════════════════════════
 #  Phase 6 — Prisma: generate + migrate + seed
 # ══════════════════════════════════════════════════════════════════
 info "Generating Prisma Client and applying the schema..."
-npx prisma generate
-npx prisma migrate deploy || { info "migrate deploy failed; trying db push..."; npx prisma db push; }
+app_sh "npx prisma generate"
+app_sh "npx prisma migrate deploy" || { info "migrate deploy failed; trying db push..."; app_sh "npx prisma db push"; }
 info "Seeding initial data..."
-node prisma/seed.mjs || warn "seed reported errors (data may already exist)."
+app_sh "node prisma/seed.mjs" || warn "seed reported errors (data may already exist)."
 
 # ══════════════════════════════════════════════════════════════════
-#  Phase 7 — production build
+#  Phase 7 — production build (as the service user)
 # ══════════════════════════════════════════════════════════════════
 info "Building for production (npm run build)..."
-npm run build || fail "Build failed."
+app_sh "npm run build" || fail "Build failed."
 
 # ══════════════════════════════════════════════════════════════════
-#  Phase 8 — PM2 (installed only if missing)
+#  Phase 8 — PM2, running as the service user (never as root)
 # ══════════════════════════════════════════════════════════════════
 if command -v pm2 >/dev/null 2>&1; then
   info "PM2 is present ($(pm2 --version))."
@@ -363,8 +512,13 @@ else
   info "Installing PM2 (global)..."
   npm install -g pm2
 fi
+if ! as_app bash -lc 'command -v pm2 >/dev/null 2>&1'; then
+  PM2_BIN="$(command -v pm2 || true)"
+  [ -n "$PM2_BIN" ] && ln -sf "$PM2_BIN" /usr/local/bin/pm2
+  warn "Linked pm2 into /usr/local/bin so '${APP_USER}' can use it."
+fi
 
-# PM2 ecosystem file
+# PM2 ecosystem file (owned by the service user)
 cat > ecosystem.config.cjs <<EOF
 module.exports = {
   apps: [{
@@ -379,21 +533,32 @@ module.exports = {
   }]
 };
 EOF
+chown "$APP_USER":"$APP_GROUP" ecosystem.config.cjs 2>/dev/null || true
 
-info "Starting with PM2..."
-pm2 startOrRestart ecosystem.config.cjs
-pm2 save
-pm2 startup systemd -u root --hp /root >/dev/null 2>&1 || true
+info "Starting ${APP_NAME} with PM2 as '${APP_USER}'..."
+app_sh "pm2 startOrRestart ecosystem.config.cjs --update-env" || fail "PM2 could not start the app."
+app_sh "pm2 save" || warn "pm2 save failed; the process will not survive a reboot until 'pm2 startup' is fixed."
+# Autostart on boot for this user only (a separate PM2 instance per user).
+pm2 startup systemd -u "$APP_USER" --hp "$APP_HOME" >/dev/null 2>&1 || \
+  warn "pm2 startup failed; run: pm2 startup systemd -u ${APP_USER} --hp ${APP_HOME}"
 
 # ══════════════════════════════════════════════════════════════════
 #  Phase 9 — Nginx reverse proxy (config created if missing)
 #  Nginx listens on a user-chosen port to avoid conflicts with
 #  other services on the server.
 # ══════════════════════════════════════════════════════════════════
-NGINX_CONF="/etc/nginx/sites-available/${APP_NAME}"
-NGINX_PORT="${NGINX_PORT:-$(ask "Port Nginx should listen on (default 80)" "80")}"
-# Validate that the port is numeric
-case "$NGINX_PORT" in ''|*[!0-9]*) NGINX_PORT="80";; esac
+NGINX_PORT="${NGINX_PORT:-$(ask "Port Nginx should listen on" "$DEFAULT_NGINX_PORT")}"
+# Validate that the port is numeric and actually free (a port this very site
+# already listens on is not a conflict, so re-runs keep it).
+case "$NGINX_PORT" in ''|*[!0-9]*) NGINX_PORT="$DEFAULT_NGINX_PORT";; esac
+if port_in_use "$NGINX_PORT" && ! nginx_owns_port "$NGINX_PORT"; then
+  if ALT_PORT="$(free_port 8080 8099)"; then
+    warn "Port ${NGINX_PORT} is already in use; using ${ALT_PORT} instead."
+    NGINX_PORT="$ALT_PORT"
+  else
+    fail "Port ${NGINX_PORT} is in use and no free fallback was found; set NGINX_PORT."
+  fi
+fi
 if ! command -v nginx >/dev/null 2>&1; then
   info "Installing Nginx..."
   apt-get install -y nginx
@@ -437,8 +602,22 @@ server {
 ${PROXY_BLOCK}
 }
 EOF
+elif [ "$COEXIST" -eq 1 ]; then
+  # Coexistence: Apache keeps 80/443. Nginx is a private proxy for one port
+  # only, so nothing about the existing sites changes.
+  info "Coexistence mode: Nginx answers on port ${NGINX_PORT} only (Apache keeps 80/443)."
+  cat > "$NGINX_CONF" <<EOF
+server {
+    listen ${NGINX_PORT};
+    server_name ${DOMAIN};
+
+    client_max_body_size 20M;
+
+${PROXY_BLOCK}
+}
+EOF
 else
-  # With domain: port 80 (for SSL) plus the chosen port
+  # Standalone server with a domain: port 80 (for SSL) plus the chosen port
   info "Creating Nginx config for ${DOMAIN} on port ${NGINX_PORT}..."
   if [ "$NGINX_PORT" = "80" ]; then
     LISTEN_LINE="listen 80;"
@@ -458,15 +637,42 @@ ${PROXY_BLOCK}
 EOF
 fi
 
-ln -sf "$NGINX_CONF" /etc/nginx/sites-enabled/${APP_NAME}
-# Remove the default site if it conflicts
-[ -f /etc/nginx/sites-enabled/default ] && rm -f /etc/nginx/sites-enabled/default
-nginx -t && systemctl reload nginx
+ln -sf "$NGINX_CONF" /etc/nginx/sites-enabled/"${APP_NAME}.conf"
+
+# The stock Nginx default site binds port 80. When Apache already owns 80,
+# nginx refuses to start until that file is out of the way. Only the stock
+# file is touched: any custom site is reported and left alone.
+if [ -f /etc/nginx/sites-enabled/default ] && port_in_use 80; then
+  if grep -q "Default server configuration" /etc/nginx/sites-enabled/default 2>/dev/null; then
+    info "Disabling the stock Nginx default site (port 80 belongs to another service)."
+    rm -f /etc/nginx/sites-enabled/default
+  else
+    warn "/etc/nginx/sites-enabled/default is not the stock file; leaving it untouched."
+    warn "If nginx fails below, disable that site manually or pick another NGINX_PORT."
+  fi
+fi
+
+if nginx -t; then
+  if systemctl is-active --quiet nginx; then
+    systemctl reload nginx || warn "nginx reload failed."
+  else
+    systemctl enable --now nginx || warn "nginx could not be started."
+  fi
+else
+  warn "nginx -t failed; fix the config and run: nginx -t && systemctl restart nginx"
+fi
 
 # ══════════════════════════════════════════════════════════════════
-#  Phase 10 — SSL certificate with Certbot (if missing)
+#  Phase 10 — SSL (standalone servers only; Apache keeps its own certs)
 # ══════════════════════════════════════════════════════════════════
-if [ -n "$DOMAIN" ]; then
+case "${ENABLE_SSL,,}" in
+  auto) if [ -n "$DOMAIN" ] && [ "$COEXIST" -eq 0 ]; then ENABLE_SSL=1; else ENABLE_SSL=0; fi ;;
+  1|yes|true) ENABLE_SSL=1 ;;
+  0|no|false) ENABLE_SSL=0 ;;
+  *) warn "Unknown ENABLE_SSL='${ENABLE_SSL}'; skipping SSL."; ENABLE_SSL=0 ;;
+esac
+
+if [ "$ENABLE_SSL" -eq 1 ] && [ -n "$DOMAIN" ]; then
   SYSTEMD_EDITOR=true
   if ! command -v certbot >/dev/null 2>&1; then
     info "Installing Certbot..."
@@ -475,18 +681,48 @@ if [ -n "$DOMAIN" ]; then
   certbot --nginx -d "$DOMAIN" -d "www.${DOMAIN}" --non-interactive --agree-tos \
     -m "${SSL_EMAIL:-$(ask "Email for the SSL certificate (optional)" "admin@${DOMAIN}")}" \
     --redirect || warn "certbot reported errors; rerun after fixing DNS: certbot --nginx -d ${DOMAIN}"
+elif [ -n "$DOMAIN" ]; then
+  info "SSL is left to Apache: Nginx serves plain HTTP on 127.0.0.1:${NGINX_PORT}."
+  info "To publish Nobino on your existing HTTPS domain, add this to the Apache"
+  info "vhost of ${DOMAIN} (a2enmod proxy proxy_http, then reload Apache):"
+  cat <<SNIPPET
+
+    ProxyPreserveHost On
+    ProxyPass        / http://127.0.0.1:${NGINX_PORT}/ retry=0
+    ProxyPassReverse / http://127.0.0.1:${NGINX_PORT}/
+
+SNIPPET
+  info "Nothing in /etc/apache2 was modified."
+else
+  info "No domain supplied; skipping SSL (the site is reachable on port ${NGINX_PORT})."
 fi
 
 # ══════════════════════════════════════════════════════════════════
-#  Phase 11 — UFW firewall
+#  Phase 11 — firewall (never surprises a running server)
 # ══════════════════════════════════════════════════════════════════
-info "Configuring the UFW firewall..."
-ufw allow 22/tcp >/dev/null || true
-ufw allow "${NGINX_PORT}/tcp" >/dev/null || true
-ufw allow 443/tcp >/dev/null || true
-# The Next.js port stays private: Nginx proxies to 127.0.0.1:${PORT}.
-info "Keeping the internal app port (${PORT}) closed to the public."
-ufw --force enable || true
+case "${MANAGE_UFW,,}" in
+  auto) if [ "$COEXIST" -eq 1 ]; then MANAGE_UFW=0; else MANAGE_UFW=1; fi ;;
+  1|yes|true) MANAGE_UFW=1 ;;
+  0|no|false) MANAGE_UFW=0 ;;
+  *) warn "Unknown MANAGE_UFW='${MANAGE_UFW}'; leaving the firewall alone."; MANAGE_UFW=0 ;;
+esac
+
+if [ "$MANAGE_UFW" -eq 1 ]; then
+  command -v ufw >/dev/null 2>&1 || apt-get install -y ufw
+  info "Configuring the UFW firewall..."
+  ufw allow 22/tcp >/dev/null || true
+  ufw allow "${NGINX_PORT}/tcp" >/dev/null || true
+  [ "$ENABLE_SSL" -eq 1 ] && ufw allow 443/tcp >/dev/null || true
+  # The Next.js port stays private: Nginx proxies to 127.0.0.1:${PORT}.
+  info "Keeping the internal app port (${PORT}) closed to the public."
+  ufw --force enable || true
+else
+  info "Firewall left untouched (coexistence mode keeps the server exactly as it was)."
+  if command -v ufw >/dev/null 2>&1 && ufw status 2>/dev/null | grep -q "Status: active"; then
+    warn "UFW is active: allow ${NGINX_PORT}/tcp yourself if you want the app reachable"
+    warn "from outside, e.g.  ufw allow ${NGINX_PORT}/tcp"
+  fi
+fi
 
 # ══════════════════════════════════════════════════════════════════
 #  Phase 12 — summary
@@ -495,20 +731,29 @@ echo ""
 echo "${C_GREEN}+------------------------------------------------------+${C_RESET}"
 echo "${C_GREEN}|   Nobino deployed successfully                       |${C_RESET}"
 echo "${C_GREEN}+------------------------------------------------------+${C_RESET}"
-echo "  App directory : $APP_DIR"
-echo "  Internal port : ${PORT}"
+echo "  App directory : $APP_DIR  (owned by ${APP_USER})"
+echo "  Service user  : ${APP_USER}  (the app never runs as root)"
+echo "  Internal port : ${PORT}  (127.0.0.1 only)"
 echo "  Nginx port    : ${NGINX_PORT}"
-if [ -n "$DOMAIN" ]; then
+if [ -n "$DOMAIN" ] && [ "$ENABLE_SSL" -eq 1 ]; then
   echo "  Site URL      : https://${DOMAIN}"
+elif [ "$COEXIST" -eq 1 ] && [ -n "$DOMAIN" ]; then
+  echo "  Site URL      : https://${DOMAIN}  (via your Apache proxy)"
+  echo "  Direct URL    : http://$(curl -4 -s ifconfig.me || echo 'IP_SERVER'):${NGINX_PORT}"
 else
   echo "  Site URL      : http://$(curl -4 -s ifconfig.me || echo 'IP_SERVER'):${NGINX_PORT}"
 fi
-echo "  PM2 status    : pm2 status"
-echo "  Logs          : pm2 logs ${APP_NAME}"
+echo "  PM2 status    : sudo -u ${APP_USER} -H env PM2_HOME=${APP_HOME}/.pm2 pm2 status"
+echo "  Logs          : sudo -u ${APP_USER} -H env PM2_HOME=${APP_HOME}/.pm2 pm2 logs ${APP_NAME}"
 echo "  Database      : ${DB_NAME} (user: ${DB_USER})"
 echo ""
 echo "  Update later   : sudo bash ${APP_DIR}/scripts/deploy-ubuntu.sh"
 echo "  (or pull a tag) : GIT_REF=v1.2.0 sudo bash ${APP_DIR}/scripts/deploy-ubuntu.sh"
 echo ""
+if [ "$COEXIST" -eq 1 ]; then
+  info "Untouched on purpose: Apache + its sites/SSL, MySQL/MariaDB, PHP, and /var/www."
+  [ "$MYSQL_PRESENT" -eq 1 ] && info "MySQL/MariaDB was not installed, restarted or reconfigured."
+  info "Nginx only adds its own file: /etc/nginx/sites-available/${APP_NAME}.conf"
+fi
 warn "Default seeded admin: phone 09120000000 (default password in prisma/seed.mjs)."
 warn "Change the password after the first login."

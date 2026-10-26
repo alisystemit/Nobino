@@ -334,20 +334,33 @@ Nobino/
 
 ## ب) VPS اوبونتو با یک فرمان از GitHub
 
-روی سرور تازه، کد از ریپوی عمومی گرفته و همه‌چیز خودکار پیکربندی می‌شود
-(PostgreSQL، Node.js، build، PM2، Nginx، SSL، UFW):
+روی سرور، کد از ریپوی عمومی گرفته و همه‌چیز خودکار پیکربندی می‌شود
+(PostgreSQL، Node.js، build، PM2، Nginx):
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/alisystemit/Nobino/main/scripts/install-from-github.sh | sudo bash
 ```
 
-- نصب بی‌سؤال: `sudo DOMAIN=nobino.ir NONINTERACTIVE=1 bash -c '…'` (یا متغیرها را
-  قبل از `bash` بگذارید). گزینه‌های دیگر: `REPO_URL`، `GIT_REF`، `APP_DIR`، `PORT`،
-  `NGINX_PORT`، `SSL_EMAIL`، `APP_URL`، `ROOT_DOMAIN`.
-- به‌روزرسانی بعدی: `sudo bash /var/www/nobino/scripts/deploy-ubuntu.sh`
+**هم‌زیستی با LAMP (Apache + PHP 8 + MySQL/MariaDB):**
+
+- MySQL/MariaDB، PHP و Apache نه نصب، نه ارتقا و نه ری‌استارت می‌شوند؛
+  `/etc/apache2`، پوشه‌های سایت‌ها، دامنه‌ها، SSL و `/var/www` دست‌نخورده می‌مانند.
+- اپ با کاربر اختصاصی `nobino` (خانه: `/var/lib/nobino`) و در `/opt/nobino` اجرا
+  می‌شود؛ هیچ‌چیز با root اجرا نمی‌شود.
+- اگر پورت 80 برای Apache باشد، Nginx روی اولین پورت آزاد 8080–8099 می‌آید و
+  فقط فایل `nobino.conf` را اضافه می‌کند؛ certbot و UFW دست نمی‌خورند و یک
+  قطعه `ProxyPass` برای vhost آپاچی چاپ می‌شود.
+- چیزهایی که نصب می‌شوند: Node.js، PM2، PostgreSQL، Nginx (هر کدام از قبل باشد،
+  دوباره نصب نمی‌شود).
+
+- نصب بی‌سؤال: متغیرها را قبل از `bash` بگذارید (`DOMAIN=nobino.ir
+  NONINTERACTIVE=1`). گزینه‌های دیگر: `REPO_URL`، `GIT_REF`، `APP_USER`،
+  `APP_DIR`، `PORT`، `NGINX_PORT`، `COEXIST`، `MANAGE_UFW`، `ENABLE_SSL`،
+  `SSL_EMAIL`، `APP_URL`، `ROOT_DOMAIN`.
+- به‌روزرسانی بعدی: `sudo bash /opt/nobino/scripts/deploy-ubuntu.sh`
   (با `GIT_REF=v1.0.0` می‌توان تگ مشخصی را استقرار داد).
-- حذف کامل و مرحله‌ای: `sudo bash /var/www/nobino/scripts/uninstall-ubuntu.sh`
-  (پیش‌نمایش: `--dry-run`).
+- حذف کامل و مرحله‌ای: `sudo bash /opt/nobino/scripts/uninstall-ubuntu.sh`
+  (پیش‌نمایش: `--dry-run`)؛ Apache/PHP/MySQL هیچ‌وقت لمس نمی‌شوند.
 - توضیح کامل در [README](./README.md#-نصب-خودکار-روی-vps-اوبونتو--فقط-با-لینک-github).
 
 ---

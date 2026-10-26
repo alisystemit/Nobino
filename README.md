@@ -98,22 +98,32 @@ npm run dev
 
 ## 🖥 نصب خودکار روی VPS اوبونتو — فقط با لینک GitHub
 
-روی یک سرور اوبونتوی تازه، **یک فرمان** کافی است؛ کد از همین ریپوی عمومی
-دریافت می‌شود و نیازی به آپلود دستی فایل‌ها نیست:
+روی سرور اوبونتو **یک فرمان** کافی است؛ کد از همین ریپوی عمومی دریافت می‌شود و
+نیازی به آپلود دستی فایل‌ها نیست:
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/alisystemit/Nobino/main/scripts/install-from-github.sh | sudo bash
 ```
 
-اسکریپت به ترتیب: پیش‌نیازها را با `apt` نصب می‌کند، ریپو را در `/var/www/nobino`
-`clone` می‌کند، سپس `scripts/deploy-ubuntu.sh` را از همان فایل اجرا می‌کند
-(PostgreSQL، Node.js عبر nvm، `npm install`، ساخت `.env` با رمزهای تصادفی،
-مهاجرت و seed دیتابیس، `npm run build`، PM2، کانفیگ Nginx، گواهینامه SSL با
-certbot و بستن پورت‌ها با UFW). هر بخش اگر از قبل باشد، **دوبارده نصب نمی‌شود**.
+### هم‌زیستی با سرور فعلی (Apache + PHP 8 + MySQL/MariaDB)
 
-> اجرا از طریق pipe است، ولی سؤال‌ها از ترمینال (`/dev/tty`) خوانده می‌شوند؛ پس
-> تعامل کامل کار می‌کند. اگر کد را از قبل روی سرور دارید، همان
-> `sudo bash scripts/deploy-ubuntu.sh` را اجرا کنید.
+این اسکریپت برای سروری نوشته شده که **از قبل** یک LAMP کامل دارد (ربات تلگرام،
+phpMyAdmin، سایت‌های PHP با SSL):
+
+- **MySQL/MariaDB، PHP و Apache** نه نصب می‌شوند، نه ارتقا، نه ری‌استارت و نه
+  دوباره تنظیم؛ فایل `/etc/apache2`، پوشه‌های سایت‌ها، دامنه‌ها و گواهی‌های SSL
+  آن‌ها دست‌نخورده می‌مانند (هیچ تغییری در `/var/www` هم داده نمی‌شود).
+- اپ با یک **کاربر اختصاصی و کم‌دسترس** (`nobino`) اجرا می‌شود، نه root؛
+  پوشه نصب `/opt/nobino` و خانه کاربر `/var/lib/nobino` است.
+- اگر پورت 80 در اختیار Apache باشد، Nginx روی اولین پورت آزاد **8080 تا 8099**
+  بالا می‌آید و فقط فایل اختصاصی خودش (`nobino.conf`) را اضافه می‌کند.
+- در همین حالت certbot و UFW **دست نمی‌خورند** و فقط یک قطعه آماده برای
+  reverse-proxy در vhost آپاچی چاپ می‌شود (که خودتان در صورت نیاز اضافه کنید).
+- چیزهایی که تازه نصب می‌شوند: Node.js، PM2، PostgreSQL و Nginx. هر کدام از قبل
+  باشد، دوباره نصب نمی‌شود.
+
+> سؤال‌ها از ترمینال (`/dev/tty`) خوانده می‌شوند، پس اجرای pipe تعامل را از بین
+> نمی‌برد. اگر کد از قبل روی سرور است: `sudo bash scripts/deploy-ubuntu.sh`.
 
 **انتخاب‌های دلخواه با متغیر محیطی** (همه اختیاری):
 
@@ -121,44 +131,60 @@ certbot و بستن پورت‌ها با UFW). هر بخش اگر از قبل ب
 |---|---|---|
 | `REPO_URL` | `https://github.com/alisystemit/Nobino.git` | ریپوی منبع (برای ریپوی خصوصی با توکن هم کار می‌کند) |
 | `GIT_REF` | `main` | برنچ، تگ یا کامیت برای استقرار |
-| `APP_DIR` | `/var/www/nobino` | پوشه نصب |
-| `PORT` | `3000` | پورت داخلی Next (پشت Nginx می‌ماند و عمومی نیست) |
-| `NGINX_PORT` | `80` | پورت عمومی Nginx |
-| `DOMAIN` | _(خالی)_ | دامنه برای SSL؛ خالی = نصب فقط با IP |
+| `APP_USER` | `nobino` | کاربر سرویس (بدون دسترسی root) |
+| `APP_DIR` | `/opt/nobino` | پوشه نصب (بیرون از web root آپاچی) |
+| `PORT` | `3000` | پورت داخلی Next (فقط روی 127.0.0.1) |
+| `NGINX_PORT` | `80` یا پورت آزاد 8080+ | پورت عمومی Nginx |
+| `COEXIST` | `auto` | `auto/1/0` نگه‌داشتن دست‌نخوردهٔ Apache/MySQL/PHP (auto = روشن وقتی Apache دیده شود) |
+| `MANAGE_UFW` | `auto` | `auto/1/0` تنظیم فایروال (در حالت هم‌زیستی خاموش) |
+| `ENABLE_SSL` | `auto` | `auto/1/0` گرفتن گواهی با certbot (در حالت هم‌زیستی خاموش) |
+| `DOMAIN` | _(خالی)_ | دامنه؛ خالی = نصب فقط با IP و پورت |
 | `SSL_EMAIL` | `admin@DOMAIN` | ایمیل تماس certbot |
 | `APP_URL` / `ROOT_DOMAIN` | از `DOMAIN` | آدرس عمومی و دامنه ریشه ساب‌دامین‌ها |
 | `NONINTERACTIVE` | `0` | با `1` هیچ سؤالی پرسیده نمی‌شود |
 
-نصب بی‌سؤال (مثلاً برای دامنه `nobino.ir`):
+نصب بی‌سؤال (مثلاً روی سرور اختصاصی با دامنه `nobino.ir`):
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/alisystemit/Nobino/main/scripts/install-from-github.sh \
   | sudo DOMAIN=nobino.ir SSL_EMAIL=admin@nobino.ir NONINTERACTIVE=1 bash
 ```
 
-**به‌روزرسانی بعدی** (همان مسیر، فقط کد را می‌کشد و سرویس را ری‌استارت می‌کند):
+برای انتشار روی **دامنهٔ HTTPS موجود در آپاچی** (بدون دست‌زدن به SSL آن)، بعد از
+نصب این را داخل vhost همان دامنه بگذارید (`a2enmod proxy proxy_http` و سپس
+`systemctl reload apache2`):
+
+```apache
+ProxyPreserveHost On
+ProxyPass        / http://127.0.0.1:8080/ retry=0
+ProxyPassReverse / http://127.0.0.1:8080/
+```
+
+(پورت `8080` همان چیزی است که اسکریپت در پایان نصب چاپ می‌کند.)
+
+**به‌روزرسانی بعدی** (کد را می‌کشد و سرویس را با همان کاربر ری‌استارت می‌کند):
 
 ```bash
-sudo bash /var/www/nobino/scripts/deploy-ubuntu.sh
+sudo bash /opt/nobino/scripts/deploy-ubuntu.sh
 # یا یک تگ مشخص:
-sudo GIT_REF=v1.0.0 bash /var/www/nobino/scripts/deploy-ubuntu.sh
+sudo GIT_REF=v1.0.0 bash /opt/nobino/scripts/deploy-ubuntu.sh
 ```
 
 اگر پوشهٔ نصب تغییرات دست‌ی (commit‌نشده) داشته باشد، اسکریپت آن را **پاک نمی‌کند**
 و فقط هشدار می‌دهد.
 
-**حذف کامل:** هر بخش (PM2، Nginx، SSL، دیتابیس، فایروال، Node، پوشه) جداگانه
-پرسیده می‌شود و فقط چیزی که تأیید کنید حذف می‌شود؛ قبل از حذف دیتابیس هم پشتیبان
-`pg_dump` گرفته می‌شود:
+**حذف کامل:** هر بخش (PM2، Nginx، SSL، دیتابیس، فایروال، Node، پوشه، کاربر سرویس)
+جداگانه پرسیده می‌شود و فقط چیزی که تأیید کنید حذف می‌شود؛ قبل از حذف دیتابیس هم
+پشتیبان `pg_dump` گرفته می‌شود. Apache/PHP/MySQL هیچ‌وقت لمس نمی‌شوند:
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/alisystemit/Nobino/main/scripts/uninstall-ubuntu.sh \
   | sudo bash -s -- --dry-run      # پیش‌نمایش، بدون هیچ تغییری
-sudo bash /var/www/nobino/scripts/uninstall-ubuntu.sh
+sudo bash /opt/nobino/scripts/uninstall-ubuntu.sh
 ```
 
 پس از نصب، ادمین پیش‌فرض سید با شماره `09120000000` وارد شوید و رمز را عوض کنید
-(`node scripts/reset-admin-password.mjs رمز-جدید`).
+(`sudo -u nobino -H env HOME=/var/lib/nobino bash -lc 'cd /opt/nobino && node scripts/reset-admin-password.mjs رمز-جدید'`).
 
 ---
 
