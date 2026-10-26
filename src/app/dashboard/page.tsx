@@ -8,6 +8,7 @@ import {
   Store,
   CalendarDays,
   Mic,
+  PhoneCall,
   User,
   Search,
   Percent,
@@ -37,7 +38,8 @@ export default async function DashboardPage() {
       ? [
           { title: "سالن من", desc: "صفحه عمومی، خدمات، گالری و ساعات کاری", href: "/dashboard/salon", icon: Store, cls: "bg-pink-100 text-pink-600 dark:bg-pink-900/40 dark:text-pink-300" },
           { title: "نوبت‌ها", desc: "تأیید و مدیریت نوبت‌ها", href: "/dashboard/appointments", icon: CalendarDays, cls: "bg-sky-100 text-sky-600 dark:bg-sky-900/40 dark:text-sky-300" },
-          { title: "رزرو صوتی", desc: "ثبت نوبت با صدای فارسی", href: "/dashboard/voice-booking", icon: Mic, cls: "bg-purple-100 text-purple-600 dark:bg-purple-900/40 dark:text-purple-300" },
+          { title: "رزرو دستی", desc: "ثبت نوبت با تایپ — مشتری تلفنی یا حضوری", href: "/dashboard/new-appointment", icon: PhoneCall, cls: "bg-teal-100 text-teal-600 dark:bg-teal-900/40 dark:text-teal-300" },
+          { title: "رزرو صوتی هوشمند", desc: "ثبت نوبت با صدای فارسی و هوش مصنوعی", href: "/dashboard/voice-booking", icon: Mic, cls: "bg-purple-100 text-purple-600 dark:bg-purple-900/40 dark:text-purple-300" },
         ]
       : []),
     ...(user.role === "CUSTOMER"

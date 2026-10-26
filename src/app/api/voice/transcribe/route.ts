@@ -1,6 +1,7 @@
 import { prisma } from "@/lib/prisma";
-import { transcribeWithFallback } from "@/lib/ai/stt";
+import { transcribeWithFallback, type SttProvider } from "@/lib/ai/stt";
 import { extractAppointment, extractSingleField, type ExtractedAppointment, type ExtractedField } from "@/lib/ai/parser";
+import { mergeExtracted } from "@/lib/ai/merge";
 import { storeFile } from "@/lib/storage";
 import { withinLimit } from "@/lib/plans/limits";
 import { json, apiError } from "@/lib/utils";
@@ -14,6 +15,11 @@ const FIELDS: ExtractedField[] = ["name", "phone", "service", "date", "time"];
  * حالت دوم (پرسش مجدد فیلد): اگر ربات فیلدی را نفهمید، مشتری فقط همان
  * فیلد را می‌گوید؛ با پارامترهای `field` و `partial` مقدار جدید با نتیجه
  * قبلی ادغام می‌شود و خروجی کامل دوباره در دیتابیس ثبت می‌گردد.
+ *
+ * حالت سوم (بدون میکروفون): روی بستر ناامن (http) مرورگر میکروفون را قفل می‌کند،
+ * پس اگر به‌جای `audio` فیلد `text` بیاید، همان متن به‌عنوان گفتارِ تبدیل‌شده
+ * استفاده و فقط مرحلهٔ استخراج اجرا می‌شود. آپلود فایل صوتی هم از همین مسیر
+ * عبور می‌کند (فقط `audio` بدون `getUserMedia`).
  */
 export async function POST(req: Request) {
   try {
@@ -24,8 +30,9 @@ export async function POST(req: Request) {
     const field = (form.get("field") as string) ?? "";
     const partialRaw = (form.get("partial") as string) ?? "";
     const voiceCallId = (form.get("voiceCallId") as string) ?? "";
+    const typedText = ((form.get("text") as string) ?? "").trim();
 
-    if (!audio) return json({ success: false, error: "فایل صوتی ارسال نشده است" }, { status: 400 });
+    if (!audio && !typedText) return json({ success: false, error: "فایل صوتی یا متن ارسال نشده است" }, { status: 400 });
     if (!salonId) return json({ success: false, error: "salonId الزامی است" }, { status: 400 });
     if (field && !FIELDS.includes(field as ExtractedField)) {
       return json({ success: false, error: "فیلد نامعتبر است" }, { status: 400 });
@@ -41,16 +48,26 @@ export async function POST(req: Request) {
       );
     }
 
-    // ذخیره فایل صوتی (Blob در پروداکشن، محلی در توسعه)
-    const stored = await storeFile(audio, { dir: "voice" });
+    // ذخیره فایل صوتی (Blob در پروداکشن، محلی در توسعه) — در حالت متنی فایلی نیست
+    let stored: { url: string } | null = null;
+    let transcript: string;
+    let provider: SttProvider | "text";
 
-    const buffer = Buffer.from(await audio.arrayBuffer());
-
-    // پردازش با زنجیره ربات‌های STT (OpenAI → Groq → Mock)
-    const { transcript, provider } = await transcribeWithFallback(new Uint8Array(buffer), {
-      filename: audio.name || "recording.webm",
-      mimeType: audio.type,
-    });
+    if (audio) {
+      stored = await storeFile(audio, { dir: "voice" });
+      const buffer = Buffer.from(await audio.arrayBuffer());
+      // پردازش با زنجیره ربات‌های STT (OpenAI → Groq → Mock)
+      const stt = await transcribeWithFallback(new Uint8Array(buffer), {
+        filename: audio.name || "recording.webm",
+        mimeType: audio.type,
+      });
+      transcript = stt.transcript;
+      provider = stt.provider;
+    } else {
+      // ورودی تایپ‌شده (پشتیبانِ میکروفون روی بستر ناامن): بدون STT، فقط استخراج
+      transcript = typedText;
+      provider = "text";
+    }
 
     // خدمات واقعی سالن برای تطبیق دقیق‌تر سرویس در استخراج
     const services = await prisma.service.findMany({
@@ -74,7 +91,7 @@ export async function POST(req: Request) {
         serviceNames,
       });
       const value = single[field as ExtractedField] as string | undefined;
-      const extracted: Partial<ExtractedAppointment> = value ? { ...partial, [field]: value } : { ...partial };
+      const extracted: Partial<ExtractedAppointment> = mergeExtracted(partial, value ? ({ [field]: value } as Partial<ExtractedAppointment>) : {});
 
       // ادغام و ثبت مجدد در همان رکورد تماس صوتی (خروجی کامل → دیتابیس)
       let recordId = voiceCallId;
@@ -86,8 +103,8 @@ export async function POST(req: Request) {
         const vc = await prisma.voiceCall.create({
           data: {
             salonId,
-            audioUrl: stored.url,
-            durationSec: Math.round(audio.size / 8000),
+            audioUrl: stored?.url ?? null,
+            durationSec: audio ? Math.round(audio.size / 8000) : null,
             status: "PROCESSING",
             extracted: { salonSlug: salon.slug, phone: userPhone } as never,
           },
@@ -100,7 +117,7 @@ export async function POST(req: Request) {
       await prisma.voiceCall.update({
         where: { id: recordId },
         data: {
-          audioUrl: stored.url,
+          audioUrl: stored?.url ?? record?.audioUrl ?? null,
           transcript: record?.transcript
             ? `${record.transcript}\n[پاسخ تکمیلی ${field}]: ${transcript}`
             : transcript,
@@ -125,17 +142,28 @@ export async function POST(req: Request) {
     const voiceCall = await prisma.voiceCall.create({
       data: {
         salonId,
-        audioUrl: stored.url,
-        durationSec: Math.round(audio.size / 8000),
+        audioUrl: stored?.url ?? null,
+        durationSec: audio ? Math.round(audio.size / 8000) : null,
         status: "PROCESSING",
+        rawText: audio ? null : typedText,
         extracted: { salonSlug: salon.slug, phone: userPhone } as never,
       },
     });
 
-    const extracted = await extractAppointment(transcript, {
+    const fresh = await extractAppointment(transcript, {
       timezone: salon.timezone,
       serviceNames,
     });
+
+    // اگر این برش ادامهٔ یک گفتگوی نیمه‌تمام باشد (متن/فایل بعد از ضبط‌های قبلی)،
+    // مقادیر تازه فقط فیلدهای پرشده را جایگزین نتیجهٔ پیشین می‌کنند.
+    let prior: Partial<ExtractedAppointment> = {};
+    try {
+      prior = partialRaw ? (JSON.parse(partialRaw) as Partial<ExtractedAppointment>) : {};
+    } catch {
+      prior = {};
+    }
+    const extracted = mergeExtracted(prior, fresh);
 
     await prisma.voiceCall.update({
       where: { id: voiceCall.id },

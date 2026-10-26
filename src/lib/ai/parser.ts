@@ -1,4 +1,5 @@
 import { env } from "@/lib/env";
+import { extractNameFromText } from "./text-fields";
 
 /**
  * استخراج اطلاعات نوبت از متن فارسی.
@@ -307,8 +308,8 @@ function extractTime(text: string): string | undefined {
 }
 
 function extractName(text: string): string | undefined {
-  const m = text.match(/(?:اسم من|نام من|مِنم|من)\s+([\u0600-\u06FF]{2,30})/);
-  return m ? m[1].trim() : undefined;
+  // الگوهای فارسی در ماژول خالص `text-fields` هستند تا قابل تست بمانند
+  return extractNameFromText(text);
 }
 
 const SERVICE_KEYWORDS: [RegExp, string][] = [

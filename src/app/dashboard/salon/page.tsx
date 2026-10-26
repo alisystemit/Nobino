@@ -12,7 +12,7 @@ import DailyStats from "@/components/DailyStats";
 import DailyBoard from "@/components/DailyBoard";
 import DashboardShell from "@/components/DashboardShell";
 import { StatCard, PanelCard, Badge } from "@/components/ui/Stats";
-import { CalendarDays, Scissors, Images, Star, Settings, Rocket, ClipboardList, Mic, Store, Gauge, Plus } from "lucide-react";
+import { CalendarDays, Scissors, Images, Star, Settings, Rocket, ClipboardList, Mic, PenLine, Store, Gauge, Plus } from "lucide-react";
 
 export const instant = false;
 
@@ -166,34 +166,52 @@ export default async function SalonDashboardPage({ searchParams }: { searchParam
           subtitle="نوبت‌های روزانه با ساعت، وضعیت و یادآوری پیامکی"
           icon={<ClipboardList className="h-5 w-5" />}
           action={
-            <Link
-              href="/dashboard/voice-booking"
-              className="inline-flex items-center gap-2 rounded-xl bg-[#1c2434] px-4 py-2 text-sm font-bold text-white transition hover:bg-[#2a3450]"
-            >
-              <Mic className="h-4 w-4" />
-              صفحه رزرو صوتی
-            </Link>
+            <div className="flex items-center gap-2">
+              <Link
+                href="/dashboard/new-appointment"
+                className="inline-flex items-center gap-2 rounded-xl border border-neutral-200 bg-white px-3 py-2 text-xs font-bold text-neutral-700 transition hover:bg-neutral-50 dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-200"
+              >
+                <PenLine className="h-4 w-4" />
+                رزرو دستی
+              </Link>
+              <Link
+                href="/dashboard/voice-booking"
+                className="inline-flex items-center gap-2 rounded-xl bg-[#1c2434] px-4 py-2 text-sm font-bold text-white transition hover:bg-[#2a3450]"
+              >
+                <Mic className="h-4 w-4" />
+                صفحه رزرو صوتی
+              </Link>
+            </div>
           }
           bodyClassName="p-5"
         >
           <DailyBoard salonId={salon.id} />
 
-          {/* نوار اکشن ثبت نوبت */}
+          {/* دو مسیر مجزا برای ثبت نوبت: صوتی (هوش مصنوعی) و دستی (تایپ) */}
           <div className="mt-5 flex flex-wrap items-center justify-between gap-4 rounded-2xl bg-gradient-to-l from-purple-600 to-pink-600 p-5 text-white shadow-lg shadow-pink-500/20">
             <div className="flex items-center gap-4">
               <span className="flex h-12 w-12 items-center justify-center rounded-full bg-white/20 text-2xl backdrop-blur">🎙️</span>
               <div>
-                <div className="text-base font-black">ثبت نوبت دستی با صوت</div>
-                <div className="mt-0.5 text-xs text-white/80">نوبت جدید را دستی وارد کنید یا با ضبط صدا، هوش مصنوعی اطلاعات را استخراج و ثبت کند</div>
+                <div className="text-base font-black">ثبت نوبت — دو مسیر جدا</div>
+                <div className="mt-0.5 text-xs text-white/80">صوتی: گفتار فارسی را هوش مصنوعی استخراج می‌کند · دستی: فرم را خودتان تایپ می‌کنید</div>
               </div>
             </div>
-            <Link
-              href="/dashboard/voice-booking"
-              className="inline-flex items-center gap-2 rounded-xl bg-white px-6 py-3 text-sm font-black text-rose-600 shadow-xl transition hover:scale-[1.03]"
-            >
-              <Mic className="h-4 w-4" />
-              + ثبت نوبت جدید
-            </Link>
+            <div className="flex flex-wrap gap-2">
+              <Link
+                href="/dashboard/voice-booking"
+                className="inline-flex items-center gap-2 rounded-xl bg-white px-5 py-3 text-sm font-black text-rose-600 shadow-xl transition hover:scale-[1.03]"
+              >
+                <Mic className="h-4 w-4" />
+                رزرو صوتی هوشمند
+              </Link>
+              <Link
+                href="/dashboard/new-appointment"
+                className="inline-flex items-center gap-2 rounded-xl border border-white/60 bg-white/10 px-5 py-3 text-sm font-black text-white backdrop-blur transition hover:bg-white/20"
+              >
+                <PenLine className="h-4 w-4" />
+                رزرو دستی نوبت
+              </Link>
+            </div>
           </div>
         </PanelCard>
       </div>

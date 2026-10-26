@@ -48,6 +48,13 @@
       "icons": [{ "src": "/icons/icon-192.png", "sizes": "192x192" }]
     },
     {
+      "name": "رزرو دستی نوبت",
+      "short_name": "رزرو دستی",
+      "description": "ثبت نوبت با تایپ اطلاعات (مشتری تلفنی یا حضوری)",
+      "url": "/dashboard/new-appointment",
+      "icons": [{ "src": "/icons/icon-192.png", "sizes": "192x192" }]
+    },
+    {
       "name": "راهنمای نوبینو",
       "short_name": "راهنما",
       "description": "مرکز راهنما و سوالات متداول",
