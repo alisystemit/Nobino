@@ -642,14 +642,26 @@ cd "$APP_DIR"
 chown -R "$APP_USER":"$APP_GROUP" "$APP_DIR" 2>/dev/null || warn "Could not chown $APP_DIR to ${APP_USER}."
 
 # ══════════════════════════════════════════════════════════════════
-#  Phase 4 — npm dependencies (reuse existing node_modules)
+#  Phase 4 — npm dependencies (reuse an existing node_modules)
 # ══════════════════════════════════════════════════════════════════
+DEPS_OK=0
 if [ -d node_modules ]; then
-  info "node_modules exists; running an incremental npm install."
-  app_sh "npm install" || warn "npm install reported errors; continuing."
+  info "node_modules exists; updating dependencies incrementally (npm install)..."
+  app_sh "npm install --no-audit --no-fund" && DEPS_OK=1
+elif [ -f package-lock.json ]; then
+  info "Installing dependencies from package-lock.json (npm ci)..."
+  if app_sh "npm ci --no-audit --no-fund"; then
+    DEPS_OK=1
+  else
+    warn "npm ci failed; trying npm install..."
+    app_sh "npm install --no-audit --no-fund" && DEPS_OK=1
+  fi
 else
   info "Installing dependencies (npm install)..."
-  app_sh "npm install"
+  app_sh "npm install --no-audit --no-fund" && DEPS_OK=1
+fi
+if [ "$DEPS_OK" -eq 0 ]; then
+  fail "npm could not install the dependencies. This is usually an ERESOLVE peer conflict: fetch the current repository (its package-lock.json is committed) and rerun. Update first with: git -C ${APP_DIR} pull --ff-only"
 fi
 
 # ══════════════════════════════════════════════════════════════════
