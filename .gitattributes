@@ -1,2 +1,7 @@
 # Auto detect text files and perform LF normalization
 * text=auto
+
+# Shell scripts must stay LF: they are piped straight into `bash` from
+# raw.githubusercontent.com and a stray CR aborts the install on Ubuntu.
+*.sh    text eol=lf
+*.bash  text eol=lf

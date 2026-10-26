@@ -50,3 +50,6 @@ public/uploads/
 
 # local automation logs
 /logs/
+
+# ad-hoc build output captured locally
+/build.log
