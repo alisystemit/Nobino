@@ -14,7 +14,8 @@ async function isCustomer(): Promise<boolean> {
   }
 }
 
-type Pkg = { id: string; name: string; description?: string; price: number; yearlyPrice?: number | null; durationDays: number; features: string[] };
+type Feature = { key: string | null; label: string; icon: string };
+type Pkg = { id: string; name: string; description?: string; price: number; yearlyPrice?: number | null; durationDays: number; features: Feature[] };
 type Gateway = { id: string; name: string; sandbox: boolean };
 
 export default function PackagesPage() {
@@ -121,9 +122,11 @@ export default function PackagesPage() {
                   </p>
                   <ul className="mt-6 flex-1 space-y-2.5">
                     {(p.features ?? []).map((f, i) => (
-                      <li key={i} className="flex items-center gap-2 text-sm text-neutral-700 dark:text-neutral-300">
-                        <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-emerald-100 text-[11px] font-black text-emerald-600 dark:bg-emerald-900/40">✓</span>
-                        {f}
+                      <li key={f.key ?? `f-${i}`} className="flex items-center gap-2 text-sm text-neutral-700 dark:text-neutral-300">
+                        <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-emerald-100 text-[12px] dark:bg-emerald-900/40" aria-hidden>
+                          {f.icon}
+                        </span>
+                        <span>{f.label}</span>
                       </li>
                     ))}
                   </ul>

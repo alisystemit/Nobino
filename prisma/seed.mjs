@@ -109,10 +109,34 @@ async function main() {
     });
   }
 
+  // ماژول‌ها با کلید از کاتالوگ سامانه (src/lib/plans/modules.ts) انتخاب می‌شوند؛
+  // برچسب سقف‌ها (کارمند/شعبه) هنگام نمایش از محدودیت زندهٔ همان پلن ساخته می‌شود.
   const packages = [
-    { id: "pkg-0", name: "پلن پایه", plan: "BASIC", durationDays: 30, price: 990000, yearlyPrice: 9900000, features: ["۱ سالن", "نوبت صوتی", "۱۰ پیامک/ماه", "۵ کارمند"] },
-    { id: "pkg-1", name: "پلن حرفه‌ای", plan: "PRO", durationDays: 30, price: 1890000, yearlyPrice: 18900000, features: ["۱ سالن", "نوبت صوتی", "پیامک نامحدود", "گالری نامحدود", "۲۰ کارمند", "وب‌هوک"] },
-    { id: "pkg-2", name: "پلن سازمانی", plan: "ENTERPRISE", durationDays: 30, price: 3290000, yearlyPrice: 32900000, features: ["چند شعبه", "نوبت صوتی", "پیامک نامحدود", "کارکنان نامحدود", "دامنه اختصاصی", "پشتیبانی اختصاصی"] },
+    {
+      id: "pkg-0", name: "پلن پایه", plan: "BASIC", durationDays: 30, price: 990000, yearlyPrice: 9900000,
+      features: [
+        { key: "booking" }, { key: "staff" }, { key: "branches" }, { key: "voiceBooking" },
+        { key: "smsReminders" }, { key: "webapp" }, { key: "gallery" }, { key: "reviews" },
+      ],
+    },
+    {
+      id: "pkg-1", name: "پلن حرفه‌ای", plan: "PRO", durationDays: 30, price: 1890000, yearlyPrice: 18900000,
+      features: [
+        { key: "booking" }, { key: "staff" }, { key: "branches" }, { key: "voiceBooking" },
+        { key: "smsReminders" }, { key: "webapp" }, { key: "csvExport" }, { key: "customDomain" },
+        { key: "api" }, { key: "gallery" }, { key: "reviews" }, { key: "campaigns" },
+        { key: "waitlist" }, { key: "wallet" }, { key: "invoices" }, { key: "loyalty" },
+      ],
+    },
+    {
+      id: "pkg-2", name: "پلن سازمانی", plan: "ENTERPRISE", durationDays: 30, price: 3290000, yearlyPrice: 32900000,
+      features: [
+        { key: "booking" }, { key: "staff" }, { key: "branches" }, { key: "voiceBooking" },
+        { key: "smsReminders" }, { key: "webapp" }, { key: "csvExport" }, { key: "customDomain" },
+        { key: "api" }, { key: "gallery" }, { key: "reviews" }, { key: "campaigns" },
+        { key: "waitlist" }, { key: "wallet" }, { key: "invoices" }, { key: "loyalty" }, { key: "support" },
+      ],
+    },
   ];
   for (const p of packages) {
     await prisma.package.upsert({

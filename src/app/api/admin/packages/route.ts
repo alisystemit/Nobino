@@ -4,17 +4,42 @@ import { z } from "zod";
 import { requireRole } from "@/lib/auth/guards";
 import { prisma } from "@/lib/prisma";
 import { logAudit } from "@/lib/audit";
+import { getPlanLimitsForPlan, normalizePlan } from "@/lib/plans/limits";
+import { resolveFeatures } from "@/lib/plans/modules";
 import { json, apiError } from "@/lib/utils";
 
 export async function GET() {
   try {
     await requireRole(["ADMIN"]);
     const packages = await prisma.package.findMany({ orderBy: { price: "asc" } });
-    return json({ success: true, packages });
+    const plans = [...new Set(packages.map((p) => normalizePlan(p.plan)))];
+    const limitsByPlan = Object.fromEntries(
+      await Promise.all(plans.map(async (plan) => [plan, await getPlanLimitsForPlan(plan)] as const))
+    );
+    return json({
+      success: true,
+      packages: packages.map((p) => {
+        const plan = normalizePlan(p.plan);
+        return {
+          ...p,
+          plan,
+          featureLabels: resolveFeatures(p.features, limitsByPlan[plan]).map((f) => f.label),
+        };
+      }),
+    });
   } catch (err) {
     return apiError(err);
   }
 }
+
+/** ماژول پکیج: یا کلید کاتالوگ (اختیاری: سقف عددی) یا متن دلخواه */
+const featureSchema = z.union([
+  z.string().min(1).max(120),
+  z.object({
+    key: z.string().min(1).max(60),
+    value: z.number().int().min(0).max(100000).nullish(),
+  }),
+]);
 
 const patchSchema = z.object({
   id: z.string(),
@@ -23,7 +48,7 @@ const patchSchema = z.object({
   price: z.number().int().min(0).optional(),
   yearlyPrice: z.number().int().min(0).nullable().optional(),
   durationDays: z.number().int().positive().optional(),
-  features: z.array(z.string()).optional(),
+  features: z.array(featureSchema).optional(),
   isActive: z.boolean().optional(),
 });
 
@@ -33,7 +58,7 @@ const createSchema = z.object({
   price: z.number().int().min(0),
   yearlyPrice: z.number().int().min(0).nullable().optional(),
   durationDays: z.number().int().positive().default(30),
-  features: z.array(z.string()).default([]),
+  features: z.array(featureSchema).default([]),
 });
 
 export async function PATCH(req: Request) {

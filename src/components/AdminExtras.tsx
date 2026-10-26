@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 import AdminCharts from "@/components/AdminCharts";
 import SalonIcon from "@/components/icons/SalonIcon";
+import { MODULES, findModule, moduleIcon, moduleLabel, normalizeFeatures, type StoredFeature } from "@/lib/plans/modules";
 
 /* ─── تایپ‌ها ────────────────────────────────────────────────────────── */
 
@@ -38,8 +39,8 @@ type Review = {
 type AuditLog = { id: string; action: string; entityType: string; actorPhone?: string | null; createdAt: string };
 type Subscription = { id: string; salon?: { name: string } | null; package?: { name: string } | null; endsAt: string; period: string; status: string };
 type UserRow = { id: string; name?: string | null; phone: string; email?: string | null; loyaltyPoints: number; role: string; isActive: boolean };
-type Pkg = { id: string; name: string; plan: string; price: number; yearlyPrice: number | null; durationDays: number; features: string[]; isActive: boolean };
-type PkgDraft = { id: string | null; name: string; plan: string; price: number; yearlyPrice: number | null; durationDays: number; features: string[]; isActive: boolean };
+type Pkg = { id: string; name: string; plan: string; price: number; yearlyPrice: number | null; durationDays: number; features: StoredFeature[]; featureLabels?: string[]; isActive: boolean };
+type PkgDraft = { id: string | null; name: string; plan: string; price: number; yearlyPrice: number | null; durationDays: number; features: StoredFeature[]; isActive: boolean };
 type Ticket = {
   id: string;
   subject: string;
@@ -648,6 +649,7 @@ function UserManager({ ctx }: { ctx: Ctx }) {
 function PackageManager({ ctx }: { ctx: Ctx }) {
   const [pkgs, setPkgs] = useState<Pkg[]>([]);
   const [editing, setEditing] = useState<PkgDraft | null>(null);
+  const [customText, setCustomText] = useState("");
 
   const reload = useCallback(async () => {
     const r = await fetch("/api/admin/packages");
@@ -678,16 +680,26 @@ function PackageManager({ ctx }: { ctx: Ctx }) {
     }
   }
 
-  function addFeature() {
-    setEditing((e) => (e ? { ...e, features: [...e.features, ""] } : e));
+  function addCustom() {
+    const text = customText.trim();
+    if (!text) return;
+    setEditing((e) => (e ? { ...e, features: [...e.features, text] } : e));
+    setCustomText("");
   }
-  function setFeature(i: number, v: string) {
+  function toggleModule(key: string) {
     setEditing((e) => {
       if (!e) return e;
-      const f = [...e.features];
-      f[i] = v;
-      return { ...e, features: f };
+      const on = e.features.some((f) => typeof f !== "string" && f.key === key);
+      if (on) return { ...e, features: e.features.filter((f) => !(typeof f !== "string" && f.key === key)) };
+      const def = findModule(key);
+      return { ...e, features: [...e.features, def?.kind === "count" ? { key, value: null } : { key }] };
     });
+  }
+  function setModuleValue(key: string, raw: string) {
+    const value = raw === "" ? null : Math.max(0, Math.floor(Number(raw) || 0));
+    setEditing((e) =>
+      e ? { ...e, features: e.features.map((f) => (typeof f !== "string" && f.key === key ? { key, value } : f)) } : e
+    );
   }
   function removeFeature(i: number) {
     setEditing((e) => (e ? { ...e, features: e.features.filter((_, idx) => idx !== i) } : e));
@@ -714,14 +726,90 @@ function PackageManager({ ctx }: { ctx: Ctx }) {
             <input className={input} type="number" placeholder="مدت (روز)" aria-label="مدت" value={editing.durationDays} onChange={(e) => setEditing({ ...editing, durationDays: Number(e.target.value) })} />
           </div>
           <div className="mt-3">
-            <div className="mb-1 text-xs font-bold text-neutral-600 dark:text-neutral-300">ماژول‌ها / ویژگی‌ها</div>
-            {editing.features.map((f, i) => (
-              <div key={i} className="mb-2 flex gap-2">
-                <input className={input} value={f} onChange={(e) => setFeature(i, e.target.value)} placeholder={`ویژگی ${i + 1}`} aria-label={`ویژگی ${i + 1}`} />
-                <button onClick={() => removeFeature(i)} className={dangerBtn}>حذف</button>
+            <div className="mb-1 text-xs font-bold text-neutral-600 dark:text-neutral-300">
+              ماژول‌ها — از امکانات واقعی سامانه انتخاب کنید
+            </div>
+            <div className="grid gap-1.5 sm:grid-cols-2 lg:grid-cols-3">
+              {MODULES.map((m) => {
+                const selected = editing.features.find((f) => typeof f !== "string" && f.key === m.key);
+                const on = Boolean(selected);
+                return (
+                  <div
+                    key={m.key}
+                    className={`flex items-center justify-between gap-2 rounded-xl border px-2.5 py-1.5 text-xs transition ${
+                      on
+                        ? "border-pink-300 bg-white text-neutral-800 shadow-sm dark:border-pink-700 dark:bg-neutral-900 dark:text-neutral-100"
+                        : "border-neutral-200 bg-transparent text-neutral-500 dark:border-neutral-700"
+                    }`}
+                  >
+                    <label className="flex min-w-0 flex-1 cursor-pointer items-center gap-1.5">
+                      <input
+                        type="checkbox"
+                        checked={on}
+                        onChange={() => toggleModule(m.key)}
+                        aria-label={m.label}
+                        className="h-3.5 w-3.5 shrink-0 accent-pink-600"
+                      />
+                      <span className="shrink-0">{m.icon}</span>
+                      <span className="truncate font-medium">{m.label}</span>
+                    </label>
+                    {m.kind === "count" && on && (
+                      <input
+                        type="number"
+                        min={0}
+                        value={typeof selected === "object" ? selected.value ?? "" : ""}
+                        onChange={(e) => setModuleValue(m.key, e.target.value)}
+                        placeholder="پلن"
+                        aria-label={`سقف ${m.label}`}
+                        className="w-16 shrink-0 rounded-lg border border-neutral-200 bg-white px-1.5 py-1 text-center text-xs outline-none focus:border-pink-400 dark:border-neutral-700 dark:bg-neutral-800"
+                      />
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+
+            {editing.features.filter((f): f is string => typeof f === "string").length > 0 && (
+              <div className="mt-3 space-y-1.5">
+                <div className="text-[11px] font-bold text-neutral-500">ماژول‌های دلخواه (متنی)</div>
+                {editing.features.map((f, i) =>
+                  typeof f === "string" ? (
+                    <div key={i} className="flex items-center gap-2">
+                      <span className="flex-1 truncate rounded-lg bg-white px-2.5 py-1.5 text-xs text-neutral-700 dark:bg-neutral-800 dark:text-neutral-200">
+                        {f}
+                      </span>
+                      <button onClick={() => removeFeature(i)} className={dangerBtn}>حذف</button>
+                    </div>
+                  ) : null
+                )}
               </div>
-            ))}
-            <button onClick={addFeature} className={ghostBtn}>+ افزودن ماژول</button>
+            )}
+
+            <div className="mt-2 flex gap-2">
+              <input
+                className={input}
+                value={customText}
+                onChange={(e) => setCustomText(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") {
+                    e.preventDefault();
+                    addCustom();
+                  }
+                }}
+                placeholder="افزودن ماژول دلخواه (اختیاری)"
+                aria-label="ماژول دلخواه"
+              />
+              <button onClick={addCustom} className={ghostBtn}>+</button>
+            </div>
+
+            <div className="mt-2 rounded-xl bg-white/70 px-3 py-2 text-[11px] text-neutral-600 dark:bg-neutral-900/40 dark:text-neutral-300">
+              پیش‌نمایش در سایت:{" "}
+              {editing.features.length === 0
+                ? "هیچ ماژولی انتخاب نشده — صفحهٔ پکیج‌ها فهرست پیش‌فرض پلن را نشان می‌دهد."
+                : normalizeFeatures(editing.features)
+                    .map((f) => `${moduleIcon(f)} ${moduleLabel(f)}`)
+                    .join(" | ")}
+            </div>
           </div>
           <div className="mt-4 flex gap-2">
             <button onClick={save} className={darkBtn}>ذخیره</button>
@@ -741,10 +829,19 @@ function PackageManager({ ctx }: { ctx: Ctx }) {
               <div className="text-xs text-neutral-500 dark:text-neutral-400">
                 ماهانه: {p.price.toLocaleString("fa-IR")} — سالانه: {(p.yearlyPrice ?? p.price * 10).toLocaleString("fa-IR")} — {p.features?.length ?? 0} ماژول
               </div>
+              {p.featureLabels && p.featureLabels.length > 0 && (
+                <div className="mt-1 flex max-w-xl flex-wrap gap-1">
+                  {p.featureLabels.map((label, i) => (
+                    <span key={i} className="rounded-lg bg-neutral-100 px-2 py-0.5 text-[11px] text-neutral-600 dark:bg-neutral-800 dark:text-neutral-300">
+                      {label}
+                    </span>
+                  ))}
+                </div>
+              )}
             </div>
             <div className="flex items-center gap-2">
               <button
-                onClick={() => setEditing({ id: p.id, name: p.name, plan: p.plan, price: p.price, yearlyPrice: p.yearlyPrice, durationDays: p.durationDays, features: p.features ?? [], isActive: p.isActive })}
+                onClick={() => setEditing({ id: p.id, name: p.name, plan: p.plan, price: p.price, yearlyPrice: p.yearlyPrice, durationDays: p.durationDays, features: normalizeFeatures(p.features), isActive: p.isActive })}
                 className={ghostBtn}
               >
                 ویرایش

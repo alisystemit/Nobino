@@ -86,13 +86,8 @@ async function readOverride(plan: PlanName, key: keyof PlanLimits) {
   return getSetting(`plan.limit.${key}`);
 }
 
-/** محدودیت‌های پلن جاری یک سالن (اگر salonId ندهید، پلن رایگان برمی‌گردد) */
-export async function getPlanLimits(salonId?: string): Promise<PlanLimits> {
-  let plan: PlanName = "FREE";
-  if (salonId) {
-    const salon = await prisma.salon.findUnique({ where: { id: salonId }, select: { plan: true } });
-    plan = normalizePlan(salon?.plan);
-  }
+/** محدودیت‌های یک پلن (با اعمال تنظیمات دست‌ی سوپرادمین) */
+export async function getPlanLimitsForPlan(plan: PlanName): Promise<PlanLimits> {
   const defaults = PLAN_DEFAULTS[plan];
 
   const num = async (key: "staff" | "branches") => {
@@ -117,6 +112,16 @@ export async function getPlanLimits(salonId?: string): Promise<PlanLimits> {
     smsReminders: await bool("smsReminders"),
     api: await bool("api"),
   };
+}
+
+/** محدودیت‌های پلن جاری یک سالن (اگر salonId ندهید، پلن رایگان برمی‌گردد) */
+export async function getPlanLimits(salonId?: string): Promise<PlanLimits> {
+  let plan: PlanName = "FREE";
+  if (salonId) {
+    const salon = await prisma.salon.findUnique({ where: { id: salonId }, select: { plan: true } });
+    plan = normalizePlan(salon?.plan);
+  }
+  return getPlanLimitsForPlan(plan);
 }
 
 /** پلن جاری سالن (برای نمایش در پنل و صفحه پکیج‌ها) */

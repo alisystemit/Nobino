@@ -5,6 +5,8 @@ import SafeImage from "@/components/SafeImage";
 import SalonIcon from "@/components/icons/SalonIcon";
 import { prisma } from "@/lib/prisma";
 import { formatToman, toPersianDigits } from "@/lib/utils";
+import { getPlanLimitsForPlan, normalizePlan } from "@/lib/plans/limits";
+import { resolveFeatures } from "@/lib/plans/modules";
 
 export const instant = false;
 
@@ -88,11 +90,18 @@ export default async function HomePage() {
     : [];
   const ratingMap = new Map(ratings.map((r) => [r.salonId, r]));
 
-  const packages = await prisma.package.findMany({
+  const activePackages = await prisma.package.findMany({
     where: { isActive: true },
     orderBy: { price: "asc" },
     take: 3,
   });
+  // ماژول‌ها از کاتالوگ + محدودیت زندهٔ پلن ساخته می‌شوند (نه متن ثابت)
+  const packages = await Promise.all(
+    activePackages.map(async (p) => ({
+      ...p,
+      featureList: resolveFeatures(p.features, await getPlanLimitsForPlan(normalizePlan(p.plan))),
+    }))
+  );
 
   return (
     <main className="flex-1 overflow-hidden">
@@ -431,7 +440,7 @@ export default async function HomePage() {
           <div className="mt-10 grid gap-6 md:grid-cols-3">
             {packages.map((p, idx) => {
               const featured = idx === Math.min(1, packages.length - 1);
-              const feats = Array.isArray(p.features) ? (p.features as string[]) : [];
+              const feats = p.featureList;
               return (
                 <div key={p.id} className={`relative flex flex-col rounded-3xl border p-7 shadow-sm ${featured ? "border-pink-300 bg-gradient-to-b from-white to-pink-50/60 ring-2 ring-pink-200 dark:border-pink-800 dark:from-neutral-900 dark:to-pink-950/20" : "border-neutral-200 bg-white dark:border-neutral-800 dark:bg-neutral-900"}`}>
                   {featured && <span className="absolute -top-3 right-6 rounded-full bg-pink-600 px-3 py-1 text-[10px] font-black text-white">پیشنهاد ما</span>}
@@ -443,8 +452,8 @@ export default async function HomePage() {
                   </div>
                   <ul className="mt-5 flex-1 space-y-2 text-sm text-neutral-600 dark:text-neutral-300">
                     {feats.slice(0, 6).map((f) => (
-                      <li key={f} className="flex items-start gap-2">
-                        <span className="text-emerald-500">✓</span> {f}
+                      <li key={f.key ?? f.label} className="flex items-start gap-2">
+                        <span className="text-emerald-500">{f.icon}</span> {f.label}
                       </li>
                     ))}
                   </ul>
