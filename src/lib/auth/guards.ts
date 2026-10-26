@@ -1,6 +1,7 @@
 import { cookies } from "next/headers";
 import { prisma } from "@/lib/prisma";
 import { verifyToken, JwtPayload } from "@/lib/auth/jwt";
+import { httpError } from "@/lib/utils";
 
 export const AUTH_COOKIE = "nobino_token";
 
@@ -29,13 +30,6 @@ export async function getCurrentUser() {
   const user = await prisma.user.findUnique({ where: { id: payload.sub } });
   if (!user || !user.isActive) return null;
   return user;
-}
-
-/** یاریاب داخلی: تبدیل خطا با وضعیت */
-function httpError(message: string, status: number) {
-  const err = new Error(message) as Error & { status?: number };
-  err.status = status;
-  return err;
 }
 
 /** نیازمند ورود موفق؛ در غیر این صورت null */

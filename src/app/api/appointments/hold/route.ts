@@ -2,9 +2,9 @@ import { z } from "zod";
 import { prisma } from "@/lib/prisma";
 import { createAppointmentSafe } from "@/lib/bookings/create";
 import { json, apiError } from "@/lib/utils";
+import { HOLD_MARKER } from "@/lib/markers";
 
 const HOLD_MINUTES = 15;
-const HOLD_MARKER = "__HOLD__";
 
 const schema = z.object({
   salonId: z.string(),

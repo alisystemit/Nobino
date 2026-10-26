@@ -1,8 +1,8 @@
 import { prisma } from "@/lib/prisma";
 import { json } from "@/lib/utils";
+import { HOLD_MARKER } from "@/lib/markers";
 
 const CRON_SECRET = process.env.CRON_SECRET ?? "";
-const HOLD_MARKER = "__HOLD__";
 
 /** پاک‌سازی قفل‌های موقت منقضی‌شده (آزادسازی بازه) */
 export async function GET(req: Request) {

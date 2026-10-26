@@ -2,9 +2,8 @@ import { z } from "zod";
 import { prisma } from "@/lib/prisma";
 import { enqueueSms } from "@/lib/notifications/queue";
 import { dispatchWebhook } from "@/lib/webhooks";
-import { json, apiError } from "@/lib/utils";
-
-export const HOLD_MARKER = "__HOLD__";
+import { json, apiError, httpError } from "@/lib/utils";
+import { HOLD_MARKER } from "@/lib/markers";
 
 const schema = z.object({
   appointmentId: z.string(),
@@ -23,13 +22,29 @@ export async function POST(req: Request) {
       include: { salon: { select: { name: true, id: true, timezone: true } } },
     });
     if (!appointment) return json({ success: false, error: "نوبت یافت نشد" }, { status: 404 });
+    // فقط نوبت‌هایی که واقعاً قفل موقت (hold) هستند قابل تأییدند؛ در غیر این صورت
+    // هر شناسهٔ نوبت دیگری نمی‌تواند به نام شخص دیگری ثبت شود.
+    if (appointment.note !== HOLD_MARKER) {
+      return json({ success: false, error: "این نوبت قفل موقت نیست" }, { status: 409 });
+    }
     if (!appointment.tempLockExpiresAt || appointment.tempLockExpiresAt < new Date()) {
       return json({ success: false, error: "قفل موقت منقضی شده است؛ دوباره تلاش کنید" }, { status: 410 });
     }
 
-    const confirmed = await prisma.appointment.update({
-      where: { id: appointment.id },
-      data: { customerName: body.customerName, customerPhone: phone, tempLockExpiresAt: null, note: null, status: "REQUESTED" },
+    // به‌روزرسانی مشروط: اگر هم‌زمان انقضا یا لغو شده، تعداد رکوردهای تغییر‌یافته صفر است
+    const confirmed = await prisma.$transaction(async (tx) => {
+      const updated = await tx.appointment.updateMany({
+        where: {
+          id: appointment.id,
+          note: HOLD_MARKER,
+          tempLockExpiresAt: { gt: new Date() },
+        },
+        data: { customerName: body.customerName, customerPhone: phone, tempLockExpiresAt: null, note: null, status: "REQUESTED" },
+      });
+      if (updated.count !== 1) {
+        throw httpError("قفل موقت منقضی شده است؛ دوباره تلاش کنید", 410);
+      }
+      return tx.appointment.findUniqueOrThrow({ where: { id: appointment.id } });
     });
 
     const time = new Intl.DateTimeFormat("fa-IR", { timeStyle: "short", timeZone: appointment.salon.timezone }).format(confirmed.startAt);

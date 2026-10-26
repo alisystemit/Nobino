@@ -140,6 +140,19 @@ async function main() {
     if (holdId) {
       const confirm = await req("/api/appointments/hold/confirm", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ appointmentId: holdId, customerName: "نگار", customerPhone: "09124440000" }) });
       report("Hold", "تأیید قفل → نوبت", confirm.status === 200, confirm.status);
+
+      // تأیید دوبارهٔ همان نوبت نباید ممکن باشد (نه قفل موقت است)
+      const again = await req("/api/appointments/hold/confirm", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ appointmentId: holdId, customerName: "نگار", customerPhone: "09124440000" }) });
+      report("Hold", "تأیید تکراری → 409", again.status === 409, again.status);
+
+      // نوبت عادی (بدون قفل موقت) قابل تصاحب با confirm نیست
+      const plainSlot = av.json?.slots?.[4]?.startAt;
+      if (plainSlot) {
+        const plain = await req("/api/appointments", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ salonId: salon.id, serviceId: svc.id, customerName: "معمولی", customerPhone: "09121119933", startAt: plainSlot, channel: "WEBAPP" }) }, owner);
+        const plainId = plain.json?.appointment?.id;
+        const steal = await req("/api/appointments/hold/confirm", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ appointmentId: plainId, customerName: "متجاوز", customerPhone: "09129999999" }) });
+        report("Hold", "تأیید نوبت غیرقفل‌شده → 409", steal.status === 409 && !!plainId, `${steal.status}/${plain?.status}`);
+      }
     }
   }
 

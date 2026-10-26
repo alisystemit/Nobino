@@ -1,8 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-
-const KEEP_SECRET = "__KEEP__";
+import { KEEP_SECRET } from "@/lib/markers";
 
 type Field = { key: string; label: string; type: "secret" | "string" | "number"; placeholder?: string };
 type Provider = { id: string; name: string; description: string; fields: Field[] };

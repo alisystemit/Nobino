@@ -10,6 +10,16 @@ export function cn(...inputs: (string | undefined | null | false)[]) {
   return twMerge(clsx(inputs));
 }
 
+/**
+ * خطای HTTP با کد وضعیت.
+ * در لایهٔ منطق تجاری پرتاب می‌شود و `apiError` آن را به پاسخ JSON نگاشت می‌کند.
+ */
+export function httpError(message: string, status: number): Error & { status: number } {
+  const err = new Error(message) as Error & { status: number };
+  err.status = status;
+  return err;
+}
+
 /** پاسخ JSON استاندارد برای Route Handlers */
 export function json(data: unknown, init?: ResponseInit) {
   return Response.json(data, {
@@ -18,7 +28,28 @@ export function json(data: unknown, init?: ResponseInit) {
   });
 }
 
+/**
+ * خطاهای کنترلی Next (مثل لغو prerender هنگام دسترسی به cookies()/headers()).
+ * این خطاها نشانهٔ «این مسیر داینامیک است» هستند و نباید به پاسخ JSON تبدیل
+ * شوند؛ باید به Next برگردانده شوند تا رندر به زمان درخواست موکول شود.
+ * بلعیدن آن‌ها باعث شکست `next build` در حالت Cache Components می‌شود.
+ */
+export function isNextControlledError(error: unknown): boolean {
+  if (!error || typeof error !== "object") return false;
+  const digest = (error as { digest?: unknown }).digest;
+  if (typeof digest !== "string") return false;
+  return (
+    digest === "HANGING_PROMISE_REJECTION" ||
+    digest === "DYNAMIC_CODE_USAGE" ||
+    digest === "NEXT_REDIRECT" ||
+    digest === "NEXT_NOT_FOUND" ||
+    digest === "CLIENT_HOOK_DYNAMIC"
+  );
+}
+
 export function apiError(error: unknown) {
+  // خطاهای کنترلی Next را دوباره پرتاب می‌کنیم (تبدیلشان به Response غلط است)
+  if (isNextControlledError(error)) throw error;
   // خطاهای اعتبارسنجی Zod را به 400 نگاشت می‌کنیم
   let status = (error as { status?: number })?.status ?? 500;
   let message = error instanceof Error ? error.message : "خطای ناشناخته";

@@ -5,9 +5,7 @@ import { requireRole } from "@/lib/auth/guards";
 import { getAllSettings, updateSetting, invalidateSettings } from "@/lib/settings";
 import { smsProviderMeta, resolveActiveSmsProviderId } from "@/lib/sms/providers";
 import { json, apiError } from "@/lib/utils";
-
-/** اگر فیلد secret همین مقدار را داشته باشد یعنی کاربر قصد تغییر ندارد */
-export const KEEP_SECRET = "__KEEP__";
+import { KEEP_SECRET } from "@/lib/markers";
 
 export async function GET() {
   try {
