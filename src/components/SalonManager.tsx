@@ -7,6 +7,7 @@ import DailyBoard from "@/components/DailyBoard";
 import JalaliDatePicker from "@/components/ui/JalaliDatePicker";
 import TimeField from "@/components/ui/TimeField";
 import { zonedTimeToIso } from "@/lib/time/zoned";
+import { formatJalali, toPersianDigits } from "@/lib/time/jalali";
 import { useI18n } from "@/lib/i18n";
 
 /* ─── انواع ─────────────────────────────────────────────────────────── */
@@ -922,9 +923,9 @@ function HolidaysView({ ctx }: { ctx: Ctx }) {
         {holidays.map((h) => (
           <div key={h.id} className="flex items-center justify-between rounded-2xl border border-neutral-200 bg-white px-4 py-3 shadow-sm dark:border-neutral-800 dark:bg-neutral-900">
             <div>
-              <div className="font-bold text-neutral-800 dark:text-neutral-100" dir="ltr">{String(h.date).slice(0, 10)}</div>
+              <div className="font-bold text-neutral-800 dark:text-neutral-100">{formatJalali(String(h.date).slice(0, 10))}</div>
               <div className="text-xs text-neutral-500 dark:text-neutral-400">
-                {h.isClosed ? "تعطیل کامل" : `ساعت ${h.openTime} تا ${h.closeTime}`}
+                {h.isClosed ? "تعطیل کامل" : `ساعت ${toPersianDigits(h.openTime ?? "")} تا ${toPersianDigits(h.closeTime ?? "")}`}
                 {h.branch?.name ? ` — ${h.branch.name}` : " — کل سالن"}
                 {h.reason ? ` (${h.reason})` : ""}
               </div>
