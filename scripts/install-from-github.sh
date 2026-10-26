@@ -25,8 +25,9 @@
 #    PORT            internal Next.js port     (default: 3000)
 #    WEB_SERVER      auto|apache|nginx         (auto = reuse what exists,
 #                                               Nginx on a clean server)
-#    WEB_PORT        public port               (default: 80 with a domain,
-#                                               otherwise a free 8080-8099)
+#    WEB_PORT        public port               (default: 80 with a free domain,
+#                                               else a free 8080-8099; an
+#                                               explicit value is honored)
 #    INSTALL_PHP     auto|0                    (auto = reuse or install PHP)
 #    MANAGE_UFW      auto|1|0 firewall handling
 #    ENABLE_SSL      auto|1|0 certbot for DOMAIN
@@ -160,7 +161,7 @@ DEPLOY_SCRIPT="$APP_DIR/scripts/deploy-ubuntu.sh"
 chmod +x "$DEPLOY_SCRIPT"
 
 echo ""
-info "Starting the Nobino deployment (service user, PostgreSQL, Node.js, build, PM2, Nginx on its own port)..."
-info "Apache, PHP and MySQL already on this server are left exactly as they are."
+info "Starting the Nobino deployment (service user, PostgreSQL, Node.js, build, PM2)..."
+info "An existing Apache/Nginx is reused with its own site file; other sites are left exactly as they are."
 echo ""
 exec bash "$DEPLOY_SCRIPT"
