@@ -19,7 +19,9 @@
     "automate:once": "node scripts/automate.cjs --once",
     "automate:list": "node scripts/automate.cjs --list",
     "audit": "npm audit --audit-level=high",
-    "verify": "npm run lint && npm test && npm run build"
+    "verify": "npm run lint && npm test && npm run build",
+    "deploy:ubuntu": "bash scripts/deploy-ubuntu.sh",
+    "uninstall:ubuntu": "bash scripts/uninstall-ubuntu.sh"
   },
   "prisma": {
     "seed": "node prisma/seed.mjs"
