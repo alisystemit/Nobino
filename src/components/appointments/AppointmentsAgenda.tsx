@@ -134,6 +134,7 @@ export default function AppointmentsAgenda({ items: serverItems, dayISO, todayIS
   const spotlight = useMemo(() => (isToday ? nextAppointment(items, now) : null), [items, isToday, now]);
   const live = useMemo(() => (isToday ? items.filter((i) => !isDone(i.status) && new Date(i.startAt).getTime() <= now && now < new Date(i.endAt).getTime()) : []), [items, isToday, now]);
   const hero = live[0] ?? spotlight;
+  const heroIsLive = Boolean(hero && live.length > 0 && hero.id === live[0]!.id);
 
   const { upcoming, past } = useMemo(() => splitDay(visible, now), [visible, now]);
   const showPast = pastOpen ?? !isToday;
@@ -220,7 +221,7 @@ export default function AppointmentsAgenda({ items: serverItems, dayISO, todayIS
               type="button"
               onClick={() => setFilter(f.key)}
               aria-pressed={filter === f.key}
-              className={`shrink-0 rounded-full px-3 py-2 text-xs font-bold transition ${
+              className={`h-11 shrink-0 inline-flex items-center rounded-full px-4 text-sm font-bold transition ${
                 filter === f.key
                   ? "bg-[#1c2434] text-white dark:bg-white dark:text-neutral-900"
                   : "bg-neutral-100 text-neutral-600 dark:bg-neutral-800 dark:text-neutral-300"
@@ -233,7 +234,7 @@ export default function AppointmentsAgenda({ items: serverItems, dayISO, todayIS
             type="button"
             onClick={() => setSearchOpen((s) => !s)}
             aria-pressed={searchOpen}
-            className={`shrink-0 rounded-full p-2 transition ${searchOpen ? "bg-[#1c2434] text-white dark:bg-white dark:text-neutral-900" : "bg-neutral-100 text-neutral-600 dark:bg-neutral-800 dark:text-neutral-300"}`}
+            className={`h-11 w-11 shrink-0 inline-flex items-center justify-center rounded-full transition ${searchOpen ? "bg-[#1c2434] text-white dark:bg-white dark:text-neutral-900" : "bg-neutral-100 text-neutral-600 dark:bg-neutral-800 dark:text-neutral-300"}`}
             aria-label="جستجو در نوبت‌های امروز"
           >
             {searchOpen ? <X className="h-4 w-4" /> : <Search className="h-4 w-4" />}
@@ -304,7 +305,9 @@ export default function AppointmentsAgenda({ items: serverItems, dayISO, todayIS
               </div>
               <div className="shrink-0 text-left">
                 <div className="text-2xl leading-none font-black">{timeIn(hero.startAt, tzOf(hero, timezone))}</div>
-                <div className="mt-1 text-[11px] font-bold text-white/70">{untilLabel(hero.startAt, now)}</div>
+                <div className="mt-1 text-[11px] font-bold text-white/70">
+                  {heroIsLive ? `تا ${timeIn(hero.endAt, tzOf(hero, timezone))}` : untilLabel(hero.startAt, now)}
+                </div>
                 <a href={`tel:${hero.customerPhone}`} className="mt-1.5 inline-flex h-9 items-center gap-1 rounded-xl bg-white/15 px-3 text-xs font-black backdrop-blur transition active:scale-95">
                   تماس
                 </a>
