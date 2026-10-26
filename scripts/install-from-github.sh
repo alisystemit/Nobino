@@ -21,7 +21,10 @@
 #    GIT_REF         branch/tag/commit         (default: main)
 #    APP_USER        service user for the app  (default: nobino)
 #    APP_HOME        home of that user         (default: /var/lib/nobino)
-#    APP_DIR         install directory         (default: /var/www/nobino)
+#    APP_DIR         install directory         (default: /var/www/nobino;
+#                                               an existing /opt/nobino from
+#                                               older installs is upgraded in
+#                                               place when APP_DIR is not set)
 #    PORT            internal Next.js port     (default: 3000)
 #    WEB_SERVER      auto|apache|nginx         (auto = reuse what exists,
 #                                               Nginx on a clean server)
@@ -70,6 +73,8 @@ ask() { # ask <prompt> <default> — reads the terminal, never stdin (it holds t
 
 REPO_URL="${REPO_URL:-https://github.com/alisystemit/Nobino.git}"
 GIT_REF="${GIT_REF:-main}"
+APP_DIR_EXPLICIT=0
+if [ -n "${APP_DIR:-}" ]; then APP_DIR_EXPLICIT=1; fi
 # Next to the existing document roots; each site keeps its own vhost/domain.
 APP_DIR="${APP_DIR:-/var/www/nobino}"
 
@@ -90,6 +95,14 @@ if [ "$(id -u)" -ne 0 ]; then
     exec sudo -E bash "$0" "$@"
   fi
   fail "Root is required. Run: curl -fsSL <this script URL> | sudo bash"
+fi
+
+# ─── Upgrade an older install in place ────────────────────────────
+# Installs made by previous versions lived in /opt/nobino. Unless APP_DIR was
+# given explicitly, that folder is upgraded instead of creating a second copy.
+if [ "$APP_DIR_EXPLICIT" -eq 0 ] && [ ! -d "$APP_DIR" ] && [ -d /opt/nobino ]; then
+  info "An earlier installation was found in /opt/nobino; upgrading it in place."
+  APP_DIR=/opt/nobino
 fi
 
 export REPO_URL GIT_REF APP_DIR

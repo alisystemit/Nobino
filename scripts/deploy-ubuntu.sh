@@ -184,7 +184,7 @@ fi
 
 [ "$WEB_INSTALLED" -eq 1 ] && info "Clean server: Nginx will be installed as the web server."
 [ "$WEB_INSTALLED" -eq 0 ] && info "Existing ${WEB_KIND} detected — it will be reused, not replaced."
-[ "$POSTGRES_PRESENT" -eq 1 ] && info "PostgreSQL detected — the existing server is reused."
+[ "$POSTGRES_PRESENT" -eq 1 ] && info "PostgreSQL client detected — Phase 1 reuses the server if one is running, or installs it."
 
 # ─── Port helpers (read-only) ─────────────────────────────────────
 port_in_use() { # port_in_use <port>
@@ -261,6 +261,98 @@ fi
 [ -n "$DOMAIN" ] && info "Nobino will be published on its own domain: ${DOMAIN}"
 
 # ══════════════════════════════════════════════════════════════════
+#  Phase 0b — decide how Nobino is published, before anything is installed
+#  Every install owns its domain. If that domain already serves another site,
+#  that site is left alone and Nobino is published on a free port instead.
+# ══════════════════════════════════════════════════════════════════
+# ─── port-decision:start ───
+domain_taken() { # domain_taken <domain> — is it served by another site already?
+  local d="${1:-}" esc
+  [ -n "$d" ] || return 1
+  esc="${d//./\\.}"
+  if [ "$WEB_KIND" = "apache" ]; then
+    grep -RIsE "Server(Name|Alias)[^#]*[[:space:]]${esc}([[:space:]]|$)" \
+      /etc/apache2/sites-enabled/ /etc/apache2/apache2.conf 2>/dev/null \
+      | grep -v "${APP_NAME}" | grep -q . && return 0
+  else
+    grep -RIsE "server_name[^;]*[[:space:]]${esc}([[:space:];]|$)" \
+      /etc/nginx/sites-enabled/ 2>/dev/null \
+      | grep -v "${APP_NAME}" | grep -q . && return 0
+  fi
+  return 1
+}
+prior_public_port() { # the port this install used on an earlier run, if any
+  if [ -f "$NGINX_CONF" ]; then
+    sed -nE 's/^[[:space:]]*listen[[:space:]]+([0-9]+).*/\1/p' "$NGINX_CONF" | head -1
+  elif [ -f "$APACHE_SITE" ]; then
+    sed -nE 's/.*<VirtualHost[[:space:]]+\*:([0-9]+)>.*/\1/p' "$APACHE_SITE" | head -1
+  fi
+}
+
+DOMAIN_TAKEN=0
+DEDICATED_PORT=0
+if [ -z "$DOMAIN" ]; then
+  DEDICATED_PORT=1
+elif domain_taken "$DOMAIN"; then
+  DOMAIN_TAKEN=1
+  warn "The domain '${DOMAIN}' is already used by another site on this server."
+  warn "It will not be touched; Nobino is published on its own port instead."
+  DEDICATED_PORT=1
+fi
+
+PUBLIC_PORT=80
+# An explicit WEB_PORT is honored even when the domain itself is free.
+if [ -n "$PUBLIC_PORT_OVERRIDE" ] && [[ "$PUBLIC_PORT_OVERRIDE" =~ ^[0-9]+$ ]]; then
+  PUBLIC_PORT="$PUBLIC_PORT_OVERRIDE"
+fi
+
+# Port 80 is only shared through name-based vhosts, which needs a free domain;
+# otherwise Nobino gets a port of its own and no other site can be shadowed.
+if [ "$PUBLIC_PORT" != "80" ]; then
+  DEDICATED_PORT=1
+elif [ -z "$DOMAIN" ] || [ "$DOMAIN_TAKEN" -eq 1 ]; then
+  DEDICATED_PORT=1
+  if [ -n "$PUBLIC_PORT_OVERRIDE" ]; then
+    warn "WEB_PORT=80 cannot be used without a free domain; choosing a dedicated port."
+  fi
+fi
+
+if [ "$DEDICATED_PORT" -eq 1 ]; then
+  # No explicit port: keep the one from an earlier run, else pick a free one.
+  if [ "$PUBLIC_PORT" = "80" ]; then
+    PRIOR_PORT="$(prior_public_port)"
+    if [ -n "$PRIOR_PORT" ] && [ "$PRIOR_PORT" != "80" ]; then
+      PUBLIC_PORT="$PRIOR_PORT"
+    elif FREE_WEB_PORT="$(free_port 8080 8099)"; then
+      PUBLIC_PORT="$FREE_WEB_PORT"
+    else
+      fail "No free port found in 8080-8099; set WEB_PORT to a free port."
+    fi
+  fi
+  if port_in_use "$PUBLIC_PORT" && ! our_site_uses_port "$PUBLIC_PORT"; then
+    if ALT_PORT="$(free_port 8080 8099)"; then
+      warn "Port ${PUBLIC_PORT} is already in use; using ${ALT_PORT} instead."
+      PUBLIC_PORT="$ALT_PORT"
+    else
+      fail "Port ${PUBLIC_PORT} is in use and no free fallback was found; set WEB_PORT."
+    fi
+  fi
+  info "Nobino will answer directly on port ${PUBLIC_PORT} (no other site is touched)."
+else
+  info "Nobino will answer on port 80 for its own domain: ${DOMAIN}"
+fi
+# ─── port-decision:end ───
+
+SERVER_IP="$(curl -4 -s --max-time 5 ifconfig.me 2>/dev/null || true)"
+SERVER_IP="${SERVER_IP:-IP_SERVER}"
+if [ "$DEDICATED_PORT" -eq 1 ]; then
+  PUBLIC_BASE="http://${DOMAIN:-$SERVER_IP}:${PUBLIC_PORT}"
+else
+  PUBLIC_BASE="https://${DOMAIN}"
+fi
+info "Public address of this install: ${PUBLIC_BASE}"
+
+# ══════════════════════════════════════════════════════════════════
 #  Phase 0 — system prerequisites (missing only)
 # ══════════════════════════════════════════════════════════════════
 info "Checking and installing base prerequisites (apt)..."
@@ -279,60 +371,42 @@ if [ "$WEB_INSTALLED" -eq 1 ]; then
 fi
 
 # ══════════════════════════════════════════════════════════════════
-#  Phase 1 — PostgreSQL (use the existing server if present)
+#  Phase 1 — PostgreSQL — the only database this app uses
+#  Absent  → installed and configured from scratch.
+#  Present → reused; an existing role and its password are never changed.
 # ══════════════════════════════════════════════════════════════════
-info "Checking PostgreSQL..."
-if command -v psql >/dev/null 2>&1; then
-  info "PostgreSQL is present ($(psql --version | awk '{print $3}'))."
-  systemctl enable --now postgresql || true
-else
-  warn "PostgreSQL not found; installing..."
-  apt-get install -y postgresql postgresql-contrib
-  systemctl enable --now postgresql
-fi
-
 EXISTING_URL=""
 DB_USER="nobino"
 DB_NAME="nobino"
 DB_PASS=""
 DB_HOST="localhost"
+DB_PORT="5432"
 DB_CONFLICT=0
-# Reuse the previous database if an .env file already exists.
+
+# A previous .env wins: its credentials are reused exactly as they are.
 if [ -f "$APP_DIR/.env" ] && grep -q '^DATABASE_URL=' "$APP_DIR/.env"; then
   EXISTING_URL="$(grep '^DATABASE_URL=' "$APP_DIR/.env" | head -1 | cut -d= -f2- | tr -d '"')"
   info "Using the existing DATABASE_URL from $APP_DIR/.env"
 fi
 
-# Parse user / password / host / database out of the existing URL, so a
+# Parse user / password / host / port / database out of the existing URL, so a
 # re-run reuses the same credentials instead of resetting them.
 if [ -n "$EXISTING_URL" ] && [[ "$EXISTING_URL" =~ ^postgres(ql)?://([^:@/]+)(:([^@]*))?@([^:/?]+)(:([0-9]+))?/([^?]+) ]]; then
   DB_USER="${BASH_REMATCH[2]}"
   DB_PASS="${BASH_REMATCH[4]}"
   DB_HOST="${BASH_REMATCH[5]}"
-  DB_PORT="${BASH_REMATCH[7]:-5432}"
+  DB_PORT="${BASH_REMATCH[7]:-$DB_PORT}"
   DB_NAME="${BASH_REMATCH[8]}"
 fi
 
-DB_USER="$(ask "Database user" "$DB_USER")"
-DB_NAME="$(ask "Database name" "$DB_NAME")"
-if [ -n "$EXISTING_URL" ]; then
-  DATABASE_URL="$EXISTING_URL"
-else
-  DB_PASS="$(ask "Database password (empty = auto-generate)" "")"
-  if [ -z "$DB_PASS" ]; then DB_PASS="$(openssl rand -hex 16)"; fi
-  DATABASE_URL="postgresql://${DB_USER}:${DB_PASS}@localhost:5432/${DB_NAME}?schema=public"
-fi
-
-# Only a local PostgreSQL cluster is managed by this script; a managed or
-# remote database is left untouched.
+# Only a local cluster is managed here. A managed or remote database means no
+# PostgreSQL server is installed on this machine at all.
 LOCAL_DB=1
 case "$DB_HOST" in
   localhost|127.0.0.1|::1|unix|'') : ;;
   *) LOCAL_DB=0 ;;
 esac
 
-info "Ensuring the PostgreSQL user and database exist..."
-# Create only if missing (never destroy existing data).
 as_postgres() {
   if command -v sudo >/dev/null 2>&1; then sudo -u postgres "$@";
   elif command -v runuser >/dev/null 2>&1; then runuser -u postgres -- "$@";
@@ -343,6 +417,52 @@ pg_can_login() { # pg_can_login <user> <password> — do these credentials work?
   [ -n "$2" ] || return 1
   PGPASSWORD="$2" psql -h 127.0.0.1 -p "${DB_PORT:-5432}" -U "$1" -d postgres -tAc 'SELECT 1' >/dev/null 2>&1
 }
+pg_accepting() { # does some cluster actually answer connections?
+  if command -v pg_isready >/dev/null 2>&1; then
+    pg_isready -q -h 127.0.0.1 -p "${DB_PORT:-5432}" 2>/dev/null && return 0
+    return 1
+  fi
+  command -v psql >/dev/null 2>&1 && as_postgres psql -tAc 'SELECT 1' >/dev/null 2>&1
+}
+pg_wait() { # give a started or freshly installed cluster time to come up
+  local i
+  for i in 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15; do
+    pg_accepting && return 0
+    sleep 1
+  done
+  return 1
+}
+
+if [ "$LOCAL_DB" -eq 0 ]; then
+  info "DATABASE_URL points at ${DB_HOST}: no local database server is needed, so nothing is installed."
+elif pg_accepting; then
+  info "PostgreSQL is already running ($(psql --version 2>/dev/null | awk '{print $3}')) — the existing server is reused."
+else
+  if command -v psql >/dev/null 2>&1; then
+    info "PostgreSQL client found but no running cluster; starting the service..."
+    systemctl enable --now postgresql >/dev/null 2>&1 || true
+  fi
+  if ! pg_wait; then
+    info "Installing PostgreSQL (this app's only database)..."
+    apt-get install -y postgresql postgresql-contrib || \
+      fail "PostgreSQL could not be installed; install it and rerun this script."
+    systemctl enable --now postgresql >/dev/null 2>&1 || true
+    pg_wait || warn "PostgreSQL is installed but no cluster answers yet: systemctl start postgresql"
+  fi
+fi
+
+DB_USER="$(ask "Database user" "$DB_USER")"
+DB_NAME="$(ask "Database name" "$DB_NAME")"
+if [ -n "$EXISTING_URL" ]; then
+  DATABASE_URL="$EXISTING_URL"
+else
+  DB_PASS="$(ask "Database password (empty = auto-generate)" "")"
+  if [ -z "$DB_PASS" ]; then DB_PASS="$(openssl rand -hex 16)"; fi
+  DATABASE_URL="postgresql://${DB_USER}:${DB_PASS}@localhost:${DB_PORT}/${DB_NAME}?schema=public"
+fi
+
+info "Ensuring the PostgreSQL user and database exist..."
+# Create only if missing (never destroy existing data).
 
 if [ "$LOCAL_DB" -eq 0 ]; then
   warn "DATABASE_URL points at ${DB_HOST} (not local); skipping role/database creation."
@@ -535,18 +655,16 @@ fi
 # ══════════════════════════════════════════════════════════════════
 #  Phase 5 — .env file (created from .env.example if missing)
 # ══════════════════════════════════════════════════════════════════
+ENV_PREEXISTED=1
 if [ ! -f .env ]; then
+  ENV_PREEXISTED=0
   info "Creating .env from .env.example..."
   [ -f .env.example ] || fail ".env.example not found."
   cp .env.example .env
 
-  # App URL (DOMAIN from the environment is the default when provided)
+  # App URL: the address decided in Phase 0b (own domain, or IP + own port).
   if [ -z "${APP_URL:-}" ]; then
-    if [ -n "$DOMAIN" ]; then
-      APP_URL="$(ask "Public app URL (https://...)" "https://${DOMAIN}")"
-    else
-      APP_URL="$(ask "Public app URL (https://...)" "http://localhost:${PORT}")"
-    fi
+    APP_URL="$(ask "Public app URL" "$PUBLIC_BASE")"
   fi
   if [ -z "${ROOT_DOMAIN:-}" ]; then
     ROOT_DOMAIN="$(ask "Root domain (for subdomains)" "${DOMAIN:-localhost}")"
@@ -568,7 +686,13 @@ fi
 grep -q '^DATABASE_URL=' .env || echo "DATABASE_URL=\"${DATABASE_URL}\"" >> .env
 if ! grep -q '^NEXT_PUBLIC_SITE_URL=' .env; then
   APP_FROM_ENV="$(grep '^NEXT_PUBLIC_APP_URL=' .env | head -1 | cut -d= -f2- | tr -d '"')"
-  set_env_var NEXT_PUBLIC_SITE_URL "${APP_FROM_ENV:-http://localhost:${PORT}}"
+  set_env_var NEXT_PUBLIC_SITE_URL "${APP_FROM_ENV:-$PUBLIC_BASE}"
+fi
+# An existing .env is never rewritten silently, but a stale address is worth a warning.
+ENV_URL="$(grep '^NEXT_PUBLIC_APP_URL=' .env | head -1 | cut -d= -f2- | tr -d '"')"
+if [ "$ENV_PREEXISTED" -eq 1 ] && [ -n "$ENV_URL" ] && [ -z "${APP_URL:-}" ] && [ "$ENV_URL" != "$PUBLIC_BASE" ]; then
+  warn ".env still points at ${ENV_URL}, while this install publishes at ${PUBLIC_BASE}."
+  warn "To adopt the new address: APP_URL=${PUBLIC_BASE} sudo bash ${APP_DIR}/scripts/deploy-ubuntu.sh"
 fi
 # Warn (never silently rotate) about placeholder secrets in an existing .env.
 for key in JWT_SECRET CRON_SECRET; do
@@ -636,87 +760,11 @@ pm2 startup systemd -u "$APP_USER" --hp "$APP_HOME" >/dev/null 2>&1 || \
   warn "pm2 startup failed; run: pm2 startup systemd -u ${APP_USER} --hp ${APP_HOME}"
 
 # ══════════════════════════════════════════════════════════════════
-#  Phase 9 — publish the app on its OWN site/vhost
+#  Phase 9 — write the site/vhost decided in Phase 0b
 #  An existing Apache/Nginx is reused; only a new site file is added and the
 #  server is reloaded. Sites, domains and certificates of other apps are never
-#  edited. Without a free domain, Nobino gets its own port instead.
+#  edited, and Nobino keeps its own domain (or its own port).
 # ══════════════════════════════════════════════════════════════════
-domain_taken() { # domain_taken <domain> — is it served by another site already?
-  local d="${1:-}" esc
-  [ -n "$d" ] || return 1
-  esc="${d//./\\.}"
-  if [ "$WEB_KIND" = "apache" ]; then
-    grep -RIsE "Server(Name|Alias)[^#]*[[:space:]]${esc}([[:space:]]|$)" \
-      /etc/apache2/sites-enabled/ /etc/apache2/apache2.conf 2>/dev/null \
-      | grep -v "${APP_NAME}" | grep -q . && return 0
-  else
-    grep -RIsE "server_name[^;]*[[:space:]]${esc}([[:space:];]|$)" \
-      /etc/nginx/sites-enabled/ 2>/dev/null \
-      | grep -v "${APP_NAME}" | grep -q . && return 0
-  fi
-  return 1
-}
-prior_public_port() { # the port this install used on an earlier run, if any
-  if [ -f "$NGINX_CONF" ]; then
-    sed -nE 's/^[[:space:]]*listen[[:space:]]+([0-9]+).*/\1/p' "$NGINX_CONF" | head -1
-  elif [ -f "$APACHE_SITE" ]; then
-    sed -nE 's/.*<VirtualHost[[:space:]]+\*:([0-9]+)>.*/\1/p' "$APACHE_SITE" | head -1
-  fi
-}
-
-DOMAIN_TAKEN=0
-DEDICATED_PORT=0
-if [ -z "$DOMAIN" ]; then
-  DEDICATED_PORT=1
-elif domain_taken "$DOMAIN"; then
-  DOMAIN_TAKEN=1
-  warn "The domain '${DOMAIN}' is already used by another site on this server."
-  warn "It will not be touched; Nobino is published on its own port instead."
-  DEDICATED_PORT=1
-fi
-
-PUBLIC_PORT=80
-# An explicit WEB_PORT is honored even when the domain itself is free.
-if [ -n "$PUBLIC_PORT_OVERRIDE" ] && [[ "$PUBLIC_PORT_OVERRIDE" =~ ^[0-9]+$ ]]; then
-  PUBLIC_PORT="$PUBLIC_PORT_OVERRIDE"
-fi
-
-# Port 80 is only shared through name-based vhosts, which needs a free domain;
-# otherwise Nobino gets a port of its own and no other site can be shadowed.
-if [ "$PUBLIC_PORT" != "80" ]; then
-  DEDICATED_PORT=1
-elif [ -z "$DOMAIN" ] || [ "$DOMAIN_TAKEN" -eq 1 ]; then
-  DEDICATED_PORT=1
-  if [ -n "$PUBLIC_PORT_OVERRIDE" ]; then
-    warn "WEB_PORT=80 cannot be used without a free domain; choosing a dedicated port."
-  fi
-fi
-
-if [ "$DEDICATED_PORT" -eq 1 ]; then
-  # No explicit port: keep the one from an earlier run, else pick a free one.
-  if [ "$PUBLIC_PORT" = "80" ]; then
-    PRIOR_PORT="$(prior_public_port)"
-    if [ -n "$PRIOR_PORT" ] && [ "$PRIOR_PORT" != "80" ]; then
-      PUBLIC_PORT="$PRIOR_PORT"
-    elif FREE_WEB_PORT="$(free_port 8080 8099)"; then
-      PUBLIC_PORT="$FREE_WEB_PORT"
-    else
-      fail "No free port found in 8080-8099; set WEB_PORT to a free port."
-    fi
-  fi
-  if port_in_use "$PUBLIC_PORT" && ! our_site_uses_port "$PUBLIC_PORT"; then
-    if ALT_PORT="$(free_port 8080 8099)"; then
-      warn "Port ${PUBLIC_PORT} is already in use; using ${ALT_PORT} instead."
-      PUBLIC_PORT="$ALT_PORT"
-    else
-      fail "Port ${PUBLIC_PORT} is in use and no free fallback was found; set WEB_PORT."
-    fi
-  fi
-  info "Nobino will answer directly on port ${PUBLIC_PORT} (no other site is touched)."
-else
-  info "Nobino will answer on port 80 for its own domain: ${DOMAIN}"
-fi
-
 WEB_OK=0
 if [ "$WEB_KIND" = "apache" ]; then
   # ── Apache: new vhost + optional extra port, existing sites untouched ──
@@ -953,18 +1001,16 @@ else
   echo "  Site config   : ${NGINX_CONF}"
 fi
 echo "  Public port   : ${PUBLIC_PORT}"
-SERVER_IP="$(curl -4 -s --max-time 5 ifconfig.me 2>/dev/null || true)"
-SERVER_IP="${SERVER_IP:-IP_SERVER}"
-if [ "$SSL_OK" -eq 1 ] && [ -n "$DOMAIN" ]; then
-  echo "  Site URL      : https://${DOMAIN}"
-elif [ -n "$DOMAIN" ] && [ "$DEDICATED_PORT" -eq 0 ]; then
-  echo "  Site URL      : http://${DOMAIN}"
-elif [ -n "$DOMAIN" ] && [ "$DOMAIN_TAKEN" -eq 1 ]; then
-  echo "  Site URL      : http://${DOMAIN}:${PUBLIC_PORT}  (domain kept by another site on 80)"
-elif [ -n "$DOMAIN" ]; then
-  echo "  Site URL      : http://${DOMAIN}:${PUBLIC_PORT}  (custom WEB_PORT)"
+if [ "$DEDICATED_PORT" -eq 0 ]; then
+  if [ "$SSL_OK" -eq 1 ]; then
+    echo "  Site URL      : https://${DOMAIN}"
+  else
+    echo "  Site URL      : http://${DOMAIN}"
+  fi
+elif [ "$DOMAIN_TAKEN" -eq 1 ]; then
+  echo "  Site URL      : http://${DOMAIN}:${PUBLIC_PORT}  (its domain stays with the other site)"
 else
-  echo "  Site URL      : http://${SERVER_IP}:${PUBLIC_PORT}"
+  echo "  Site URL      : ${PUBLIC_BASE}"
 fi
 echo "  PM2 status    : sudo -u ${APP_USER} -H env PM2_HOME=${APP_HOME}/.pm2 pm2 status"
 echo "  Logs          : sudo -u ${APP_USER} -H env PM2_HOME=${APP_HOME}/.pm2 pm2 logs ${APP_NAME}"
