@@ -6,6 +6,7 @@ import { createHash } from "node:crypto";
 import { verifyOtp } from "@/lib/auth/otp";
 import { signToken } from "@/lib/auth/jwt";
 import { AUTH_COOKIE } from "@/lib/auth/guards";
+import { authCookieSecure } from "@/lib/auth/session";
 import { prisma } from "@/lib/prisma";
 import { json, apiError } from "@/lib/utils";
 
@@ -54,7 +55,7 @@ export async function POST(req: Request) {
     const store = await cookies();
     store.set(AUTH_COOKIE, token, {
       httpOnly: true,
-      secure: process.env.NODE_ENV === "production",
+      secure: await authCookieSecure(),
       sameSite: "lax",
       path: "/",
       maxAge: 60 * 60 * 24 * 7,

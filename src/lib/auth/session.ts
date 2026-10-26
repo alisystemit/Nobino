@@ -3,11 +3,40 @@ import { cookies, headers } from "next/headers";
 import { prisma } from "@/lib/prisma";
 import { signToken } from "@/lib/auth/jwt";
 import { AUTH_COOKIE } from "@/lib/auth/guards";
+import { resolveCookieSecure } from "@/lib/auth/cookie-secure";
 
 /** مدت اعتبار نشست (۷ روز) — در کوکی و رکورد دیتابیس یکسان استفاده می‌شود */
 export const SESSION_TTL_MS = 7 * 24 * 60 * 60 * 1000;
 
 type SessionUser = { id: string; phone: string; role: string };
+
+/** پروتکل اعلام‌شده توسط پروکس جلوی اپ (Apache/Nginx) */
+async function requestProto(): Promise<string | null> {
+  try {
+    const hdrs = await headers();
+    return (
+      hdrs.get("x-forwarded-proto") ??
+      hdrs.get("x-forwarded-protocol") ??
+      hdrs.get("x-url-type") ??
+      hdrs.get("front-end-https") ??
+      hdrs.get("x-real-scheme")
+    );
+  } catch {
+    // خارج از زمینهٔ درخواست (مثلاً در اسکریپت) — بدون هدر
+    return null;
+  }
+}
+
+/**
+ * آیا کوکی نشست باید پرچم `Secure` بگیرد؟
+ * منطق تصمیم در `resolveCookieSecure` (تابع خالص و قابل تست) آمده است.
+ */
+export async function authCookieSecure(): Promise<boolean> {
+  return resolveCookieSecure({
+    flag: process.env.AUTH_COOKIE_SECURE,
+    proto: await requestProto(),
+  });
+}
 
 /**
  * صدور نشست مشترک همهٔ مسیرهای ورود (OTP، رمز عبور، ورود سوپرادمین):
@@ -39,7 +68,7 @@ export async function issueSession(user: SessionUser): Promise<string> {
   const store = await cookies();
   store.set(AUTH_COOKIE, token, {
     httpOnly: true,
-    secure: process.env.NODE_ENV === "production",
+    secure: await authCookieSecure(),
     sameSite: "lax",
     path: "/",
     maxAge: SESSION_TTL_MS / 1000,

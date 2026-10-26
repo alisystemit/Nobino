@@ -411,6 +411,7 @@ curl -fsSL https://raw.githubusercontent.com/alisystemit/Nobino/main/scripts/ins
 | کد OTP نمی‌رسد | در حالت Mock در کنسول سرور ببینید؛ SMS_PROVIDER با mock |
 | `DATABASE_URL` خطا | `npm run db:local` یا مقداردهی .env |
 | کارت 401 هنگام ورود | چند نشست قدیمی؛ لاگین مجدد؛ باگ نشست رفع شده |
+| رمز درست است ولی بعد از «ورود به پنل» همان صفحه می‌ماند (روی HTTP) | کوکی نشست پرچم `Secure` دارد و مرورگر آن را روی آدرس `http://…:8080` ذخیره نمی‌کند. راه درست: سرویس روی HTTPS (گواهی TLS). راه تستی: `AUTH_COOKIE_SECURE=false` در `.env` سرور و `pm2 restart nobino --update-env`. اگر پروکس `X-Forwarded-Proto` بفرستد (اسکریپت نصب این کار را می‌کند) خودکار درست می‌شود. تشخیص: در DevTools → Network پاسخ `/api/admin/auth/login` را ببینید؛ `200` با `set-cookie: …; Secure` یعنی همین مشکل. |
 | پیامک با سرویس واقعی کار نمی‌کند | کلید را از پنل ادمین وارد کنید |
 | درگاه پرداخت تست | از `sandbox` استفاده کنید |
 | AI کار نمی‌کند | کلید `openai.api_key` را وارد کنید |
