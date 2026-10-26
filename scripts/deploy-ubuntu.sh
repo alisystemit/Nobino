@@ -10,21 +10,21 @@
 #            has Apache or Nginx, that server is reused and only a new site file
 #            is added. Existing components are never reinstalled or rewritten.
 #
-#  * Bare server      : Node.js, PostgreSQL, PHP CLI+FPM and Nginx are installed
-#                       and configured from scratch.
+#  * Bare server      : Node.js, PostgreSQL and Nginx are installed and
+#                       configured from scratch.
 #  * Existing Apache  : the project goes to /var/www/nobino and gets its own
 #    or Nginx          vhost/site file with its own domain; only Apache/Nginx
 #                       is reloaded. Other sites, their folders, domains and
 #                       certificates are not edited.
 #  * Domain conflict  : the other site keeps its domain; Nobino is published on
 #                       its own free port (8080-8099) instead.
-#  * PHP              : an installed PHP is reused as-is; when none exists,
-#                       PHP CLI + FPM are installed (mod_php is never used, so
-#                       Apache's configuration stays untouched).
-#  * Database         : PostgreSQL is reused when present. An existing role is
-#                       never altered: if its password is unknown, a separate
-#                       role + database (suffix) is created. MySQL/MariaDB is
-#                       never installed, started or reconfigured.
+#  * Database         : PostgreSQL is the only database: installed when missing,
+#                       reused when present. An existing role is never altered:
+#                       if its password is unknown, a separate role + database
+#                       (suffix) is created.
+#  * PHP / MySQL      : not dependencies of this app. They are never installed,
+#                       upgraded, restarted or reconfigured; an existing LAMP
+#                       stack used by other sites keeps working untouched.
 #  * The app runs as its own unprivileged user (never as root); the web server
 #    only proxies to 127.0.0.1:PORT.
 #
@@ -41,7 +41,6 @@
 #                                                  domain, else a free 8080-
 #                                                  8099; an explicit value is
 #                                                  honored, 80 needs a domain)
-#    INSTALL_PHP     auto|0                       (auto = reuse or install PHP)
 #    DOMAIN          own domain for this install  (empty = IP + port)
 #    SSL_EMAIL       certbot contact email
 #    MANAGE_UFW      auto|1|0  firewall (auto = only on a clean server)
@@ -123,7 +122,6 @@ GIT_REF="${GIT_REF:-main}"
 DOMAIN="${DOMAIN:-}"
 MANAGE_UFW="${MANAGE_UFW:-auto}"
 ENABLE_SSL="${ENABLE_SSL:-auto}"
-INSTALL_PHP="${INSTALL_PHP:-auto}"
 # auto | apache | nginx  — which web server serves Nobino (auto = reuse one
 # that is already on the server, or install Nginx on a clean server).
 WEB_SERVER="${WEB_SERVER:-auto}"
@@ -146,13 +144,8 @@ if command -v apache2ctl >/dev/null 2>&1 || command -v apachectl >/dev/null 2>&1
 fi
 NGINX_PRESENT=0
 if command -v nginx >/dev/null 2>&1 || [ -d /etc/nginx ]; then NGINX_PRESENT=1; fi
-MYSQL_PRESENT=0
-if [ -d /etc/mysql ] || command -v mysqld >/dev/null 2>&1 || command -v mariadbd >/dev/null 2>&1 ||
-   systemctl list-unit-files 2>/dev/null | grep -qE '^(mysql|mariadb)\.service'; then
-  MYSQL_PRESENT=1
-fi
-PHP_PRESENT=0
-if command -v php >/dev/null 2>&1 || ls /etc/php >/dev/null 2>&1; then PHP_PRESENT=1; fi
+# PHP and MySQL/MariaDB are not dependencies of Nobino: they are never detected
+# for installation, installed, upgraded or reconfigured. Only PostgreSQL matters.
 POSTGRES_PRESENT=0
 if command -v psql >/dev/null 2>&1; then POSTGRES_PRESENT=1; fi
 
@@ -191,8 +184,6 @@ fi
 
 [ "$WEB_INSTALLED" -eq 1 ] && info "Clean server: Nginx will be installed as the web server."
 [ "$WEB_INSTALLED" -eq 0 ] && info "Existing ${WEB_KIND} detected — it will be reused, not replaced."
-[ "$MYSQL_PRESENT" -eq 1 ] && info "MySQL/MariaDB detected — it will not be installed, restarted or reconfigured."
-[ "$PHP_PRESENT" -eq 1 ] && info "PHP detected — the installed version is reused and left untouched."
 [ "$POSTGRES_PRESENT" -eq 1 ] && info "PostgreSQL detected — the existing server is reused."
 
 # ─── Port helpers (read-only) ─────────────────────────────────────
@@ -275,8 +266,9 @@ fi
 info "Checking and installing base prerequisites (apt)..."
 apt-get update -y
 # apache2, php*, mysql-server and mariadb-server are deliberately absent:
-# an existing stack is reused as-is and never upgraded or reconfigured.
-# PostgreSQL is installed in Phase 1, only when it is really missing.
+# this app needs none of them. An existing LAMP stack belongs to other sites
+# and is never installed, upgraded or reconfigured here. PostgreSQL is the only
+# database and is installed in Phase 1, only when it is really missing.
 apt-get install -y \
   curl wget git ca-certificates gnupg lsb-release \
   openssl build-essential python3 make g++ \
@@ -285,28 +277,6 @@ if [ "$WEB_INSTALLED" -eq 1 ]; then
   info "Installing Nginx (this server has no web server yet)..."
   apt-get install -y nginx || fail "Nginx could not be installed."
 fi
-
-# ─── PHP: reuse what exists, install only when it is missing ──────
-# Nobino itself runs on Node.js; PHP is managed here because this installer
-# targets full-stack servers. Set INSTALL_PHP=0 to skip it entirely.
-case "${INSTALL_PHP,,}" in
-  0|no|false) info "PHP handling skipped (INSTALL_PHP=${INSTALL_PHP})." ;;
-  *)
-    if [ "$PHP_PRESENT" -eq 1 ]; then
-      info "PHP is present ($(php -v 2>/dev/null | head -1 | cut -d' ' -f1-2)); leaving it exactly as it is."
-    else
-      info "PHP is not installed; installing PHP CLI + FPM + common extensions (mod_php is not used, so Apache stays untouched)..."
-      apt-get install -y \
-        php-cli php-fpm php-common php-curl php-gd php-mbstring \
-        php-xml php-zip php-intl php-bcmath php-mysql php-sqlite3 \
-        || warn "PHP installation reported errors; continuing."
-      # Start whatever phpX.Y-fpm unit the distribution created.
-      for unit in $(systemctl list-unit-files --type=service --no-legend 2>/dev/null | awk '{print $1}' | grep -E '^php[0-9.]+-fpm\.service$'); do
-        systemctl enable --now "$unit" || warn "Could not start ${unit}."
-      done
-      command -v php >/dev/null 2>&1 && info "PHP installed: $(php -v | head -1 | cut -d' ' -f1-2)."
-    fi ;;
-esac
 
 # ══════════════════════════════════════════════════════════════════
 #  Phase 1 — PostgreSQL (use the existing server if present)
@@ -1009,11 +979,7 @@ if [ "$WEB_INSTALLED" -eq 0 ]; then
 else
   info "Nginx was installed for this app and only one site file is served."
 fi
-[ "$MYSQL_PRESENT" -eq 1 ] && info "MySQL/MariaDB was not installed, restarted or reconfigured."
-case "${INSTALL_PHP,,}" in
-  0|no|false) : ;;
-  *) if [ "$PHP_PRESENT" -eq 1 ]; then info "The installed PHP was reused untouched."; else info "PHP CLI + FPM were installed for future use (Apache was not modified)."; fi ;;
-esac
+info "PHP and MySQL/MariaDB are not dependencies of Nobino; neither was installed or changed."
 [ "$DB_CONFLICT" -eq 1 ] && info "The previous PostgreSQL role/database were kept; Nobino uses its own pair."
 warn "Default seeded admin: phone 09120000000 (default password in prisma/seed.mjs)."
 warn "Change the password after the first login."

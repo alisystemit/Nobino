@@ -28,7 +28,6 @@
 #    WEB_PORT        public port               (default: 80 with a free domain,
 #                                               else a free 8080-8099; an
 #                                               explicit value is honored)
-#    INSTALL_PHP     auto|0                    (auto = reuse or install PHP)
 #    MANAGE_UFW      auto|1|0 firewall handling
 #    ENABLE_SSL      auto|1|0 certbot for DOMAIN
 #    DOMAIN          own domain (empty = IP/port only)
@@ -37,8 +36,9 @@
 #    ROOT_DOMAIN     root domain for subdomains
 #    NONINTERACTIVE  1 = never prompt, use defaults/env values
 #
-#  Clean server: Node.js, PostgreSQL, PHP CLI+FPM and Nginx are installed and
-#  configured from scratch.
+#  Clean server: Node.js, PostgreSQL and Nginx are installed and configured
+#  from scratch. PHP and MySQL are not dependencies of Nobino and are never
+#  installed.
 #
 #  Existing Apache/Nginx (a Telegram bot, phpMyAdmin, another PHP site...):
 #  that server is reused and only one new vhost/site file is added. The project
@@ -101,7 +101,7 @@ export PORT="${PORT:-3000}"
 [ -n "${WEB_PORT:-}" ] && export WEB_PORT || true
 # Backwards compatibility with the old installer flag.
 [ -n "${NGINX_PORT:-}" ] && export WEB_PORT="${WEB_PORT:-$NGINX_PORT}" || true
-export WEB_SERVER="${WEB_SERVER:-auto}" INSTALL_PHP="${INSTALL_PHP:-auto}"
+export WEB_SERVER="${WEB_SERVER:-auto}"
 export MANAGE_UFW="${MANAGE_UFW:-auto}" ENABLE_SSL="${ENABLE_SSL:-auto}"
 export NONINTERACTIVE="${NONINTERACTIVE:-0}"
 export DEBIAN_FRONTEND=noninteractive

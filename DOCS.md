@@ -335,7 +335,8 @@ Nobino/
 ## ب) VPS اوبونتو با یک فرمان از GitHub
 
 روی سرور، کد از ریپوی عمومی گرفته و همه‌چیز خودکار پیکربندی می‌شود
-(PostgreSQL، Node.js، PHP در صورت نبود، build، PM2 و Apache/Nginx):
+(PostgreSQL، Node.js، build، PM2 و Apache/Nginx). این پروژه به PHP یا MySQL
+نیاز ندارد و هیچ‌کدام نصب نمی‌شوند:
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/alisystemit/Nobino/main/scripts/install-from-github.sh | sudo bash
@@ -343,26 +344,26 @@ curl -fsSL https://raw.githubusercontent.com/alisystemit/Nobino/main/scripts/ins
 
 **سرور خام یا سرور دارای Apache/Nginx؟**
 
-- **سرور خام:** Node.js، PostgreSQL، PHP (CLI + FPM)، Nginx، PM2، بیلد، SSL
-  (با دامنه) و UFW کامل نصب و تنظیم می‌شوند.
+- **سرور خام:** Node.js، PostgreSQL، Nginx، PM2، بیلد، SSL (با دامنه) و UFW
+  کامل نصب و تنظیم می‌شوند. PHP و MySQL نصب نمی‌شوند چون اپ به آن‌ها نیاز ندارد.
 - **Apache یا Nginx موجود:** همان وب‌سرور استفاده می‌شود؛ پروژه در
   `/var/www/nobino` قرار می‌گیرد و فقط یک فایل اختصاصی به آن اضافه می‌شود
   (`sites-available/nobino.conf`). سایت‌ها، دامنه‌ها، پوشه‌ها و SSL بقیهٔ
   برنامه‌ها تغییر نمی‌کنند و بستهٔ وب‌سرور دوباره نصب یا حذف نمی‌شود.
 - **دامنهٔ تکراری:** سایت قبلی دامنهٔ خودش را نگه می‌دارد؛ Nobino روی اولین
   پورت آزاد 8080–8099 منتشر می‌شود.
-- **PHP:** اگر موجود باشد همان استفاده می‌شود؛ اگر نباشد `php-cli` و `php-fpm`
-  با افزونه‌های رایج نصب می‌شوند. `mod_php` نصب نمی‌شود تا Apache دست‌نخورده بماند.
-- **دیتابیس:** PostgreSQL موجود استفاده می‌شود. یوزر/رمز قبلی هرگز تغییر نمی‌کند؛
-  در صورت هم‌نامی مشکوک (role با رمز نامعلوم یا دیتابیس متعلق به نقش دیگر) یک
-  role و دیتابیس جداگانه با پسوند ساخته می‌شود. MySQL/MariaDB دست نمی‌خورد.
+- **PHP و MySQL:** فقط برای برنامه‌های دیگر روی سرور باقی می‌مانند و هیچ تغییری
+  نمی‌گیرند؛ نصب، ارتقا، ری‌استارت یا بازتنظیم نمی‌شوند.
+- **دیتابیس:** اگر PostgreSQL موجود باشد استفاده می‌شود، وگرنه نصب می‌شود.
+  یوزر/رمز قبلی هرگز تغییر نمی‌کند؛ در صورت هم‌نامی مشکوک (role با رمز نامعلوم
+  یا دیتابیس متعلق به نقش دیگر) یک role و دیتابیس جداگانه با پسوند ساخته می‌شود.
 - اپ با کاربر اختصاصی `nobino` (خانه: `/var/lib/nobino`) اجرا می‌شود و فقط روی
   `127.0.0.1:3000` گوش می‌دهد؛ هیچ‌چیز با root اجرا نمی‌شود.
 
 - نصب بی‌سؤال: متغیرها را قبل از `bash` بگذارید (`DOMAIN=nobino.ir
   NONINTERACTIVE=1`). گزینه‌های دیگر: `REPO_URL`، `GIT_REF`، `APP_USER`،
-  `APP_DIR`، `PORT`، `WEB_SERVER`، `WEB_PORT`، `INSTALL_PHP`، `MANAGE_UFW`،
-  `ENABLE_SSL`، `SSL_EMAIL`، `APP_URL`، `ROOT_DOMAIN`.
+  `APP_DIR`، `PORT`، `WEB_SERVER`، `WEB_PORT`، `MANAGE_UFW`، `ENABLE_SSL`،
+  `SSL_EMAIL`، `APP_URL`، `ROOT_DOMAIN`.
 - به‌روزرسانی بعدی: `sudo bash /var/www/nobino/scripts/deploy-ubuntu.sh`
   (با `GIT_REF=v1.0.0` می‌توان تگ مشخصی را استقرار داد).
 - حذف کامل و مرحله‌ای: `sudo bash /var/www/nobino/scripts/uninstall-ubuntu.sh`
