@@ -1,9 +1,26 @@
 #!/usr/bin/env bash
 # ══════════════════════════════════════════════════════════════════
 #  Nobino — automated deployment on an Ubuntu VPS
-#  Run:  sudo bash scripts/deploy-ubuntu.sh
+#
+#  Run from an existing checkout:  sudo bash scripts/deploy-ubuntu.sh
+#  One-line install from GitHub:
+#    curl -fsSL https://raw.githubusercontent.com/alisystemit/Nobino/main/scripts/install-from-github.sh | sudo bash
+#
 #  Behavior: existing components are reused (not reinstalled);
 #            only missing ones are installed and configured.
+#
+#  Environment overrides (all optional):
+#    REPO_URL        git repository to clone      (default: public Nobino repo)
+#    GIT_REF         branch/tag/commit to deploy  (default: main)
+#    APP_DIR         install directory            (default: /var/www/nobino)
+#    PORT            internal Next.js port        (default: 3000)
+#    NGINX_PORT      public Nginx port            (default: 80)
+#    DOMAIN          domain name for SSL; empty   = IP-only install
+#    SSL_EMAIL       certbot contact email
+#    APP_URL         public app URL (https://...)
+#    ROOT_DOMAIN     root domain used for subdomains
+#    NONINTERACTIVE  set to 1 to never prompt; every question uses its
+#                    default or the env value above
 # ══════════════════════════════════════════════════════════════════
 set -euo pipefail
 
@@ -13,8 +30,22 @@ info()  { echo "${C_GREEN}[+]${C_RESET} $*"; }
 warn()  { echo "${C_YELLOW}[!]${C_RESET} $*"; }
 fail()  { echo "${C_RED}[x]${C_RESET} $*" >&2; exit 1; }
 ask()   { # ask <prompt> <default>
-  local prompt="${1:-}" default="${2:-}" ans
-  read -r -p "${C_CYAN}?${C_RESET} ${prompt} [${default}]: " ans
+  local prompt="${1:-}" default="${2:-}" ans=""
+  # NONINTERACTIVE=1 → never block on input (unattended installs).
+  if [ "${NONINTERACTIVE:-0}" = "1" ]; then
+    printf '%s\n' "$default"
+    return 0
+  fi
+  # Read from the terminal, never from stdin: this script is commonly piped
+  # (curl ... | sudo bash) and stdin then carries the script itself, so a plain
+  # `read` would swallow the next lines of code instead of the user's answer.
+  if [ -t 0 ]; then
+    read -r -p "${C_CYAN}?${C_RESET} ${prompt} [${default}]: " ans
+  elif [ -e /dev/tty ] && { : </dev/tty; } 2>/dev/null; then
+    read -r -p "${C_CYAN}?${C_RESET} ${prompt} [${default}]: " ans </dev/tty || ans=""
+  else
+    warn "No terminal available; using the default for '${prompt}'."
+  fi
   printf '%s\n' "${ans:-$default}"
 }
 set_env_var() { # set_env_var <KEY> <value> — writes KEY="value" into the .env in the current directory
@@ -53,6 +84,11 @@ APP_NAME="nobino"
 APP_DIR="${APP_DIR:-/var/www/nobino}"
 PORT="${PORT:-3000}"
 NODE_REQUIRED="18"
+# The public repository is the default source, so a bare Enter accepts it.
+REPO_URL="${REPO_URL:-https://github.com/alisystemit/Nobino.git}"
+GIT_REF="${GIT_REF:-main}"
+# Pre-set DOMAIN/APP_URL/NGINX_PORT/SSL_EMAIL to run unattended.
+DOMAIN="${DOMAIN:-}"
 
 # ══════════════════════════════════════════════════════════════════
 #  Phase 0 — system prerequisites (missing only)
@@ -184,19 +220,62 @@ else
 fi
 
 # ══════════════════════════════════════════════════════════════════
-#  Phase 3 — fetch the code (clone or pull)
+#  Phase 3 — fetch the code (clone from GitHub, or update in place)
 # ══════════════════════════════════════════════════════════════════
+# Git refuses to operate on a directory owned by another user; on a VPS the
+# app folder is often owned by www-data while this script runs as root.
+git config --global --add safe.directory "$APP_DIR" >/dev/null 2>&1 || true
+
+# Bring the working tree to $GIT_REF (branch, tag or commit).
+checkout_ref() {
+  # Never discard hand-edited files on the server: a dirty tree is left alone.
+  if [ -n "$(git -C "$APP_DIR" status --porcelain 2>/dev/null)" ]; then
+    warn "$APP_DIR has uncommitted changes; not touching the working tree."
+    warn "Commit or revert them to let this script update the code."
+    return 0
+  fi
+  if git -C "$APP_DIR" rev-parse --verify --quiet "origin/$GIT_REF" >/dev/null; then
+    # A remote branch: fast-forward onto it, keeping history linear.
+    git -C "$APP_DIR" checkout -B "$GIT_REF" "origin/$GIT_REF" >/dev/null
+  elif git -C "$APP_DIR" rev-parse --verify --quiet "$GIT_REF^{commit}" >/dev/null; then
+    # A tag or an explicit commit: detached checkout.
+    git -C "$APP_DIR" checkout --detach "$GIT_REF" >/dev/null
+  else
+    warn "Ref '$GIT_REF' was not found in the repository; keeping the current checkout."
+    return 0
+  fi
+  info "Code is at $(git -C "$APP_DIR" rev-parse --short HEAD) ($GIT_REF)."
+}
+
 if [ -d "$APP_DIR/.git" ]; then
-  info "$APP_DIR is already a git repository; running pull."
-  git -C "$APP_DIR" pull --ff-only || warn "pull failed; continuing."
+  info "$APP_DIR is already a git repository; updating it."
+  CURRENT_REMOTE="$(git -C "$APP_DIR" remote get-url origin 2>/dev/null || echo '')"
+  if [ -n "$CURRENT_REMOTE" ] && [ "${CURRENT_REMOTE%.git}" != "${REPO_URL%.git}" ]; then
+    warn "Its origin is $CURRENT_REMOTE (asked for $REPO_URL); using the existing remote."
+    REPO_URL="$CURRENT_REMOTE"
+  elif [ -z "$CURRENT_REMOTE" ]; then
+    git -C "$APP_DIR" remote add origin "$REPO_URL"
+  fi
+  git -C "$APP_DIR" fetch --tags --prune origin || warn "fetch failed; continuing with the local copy."
+  checkout_ref || warn "Could not update the code; continuing with the local copy."
 else
-  REPO="$(ask "GitHub repository URL (e.g., https://github.com/you/nobino.git)" "")"
-  [ -n "$REPO" ] || fail "Repository URL is required."
-  if [ -d "$APP_DIR" ] && [ -n "$(ls -A "$APP_DIR")" ]; then
-    warn "Directory $APP_DIR is not empty; using it as-is (no re-clone)."
+  REPO="$(ask "GitHub repository URL to clone" "$REPO_URL")"
+  [ -n "$REPO" ] || fail "Repository URL is required (or place the code in $APP_DIR yourself)."
+  if [ -d "$APP_DIR" ] && [ -n "$(ls -A "$APP_DIR" 2>/dev/null)" ]; then
+    warn "Directory $APP_DIR already has files; using it as-is (no clone)."
   else
     mkdir -p "$APP_DIR"
-    git clone "$REPO" "$APP_DIR"
+    info "Cloning $REPO ($GIT_REF) into $APP_DIR..."
+    if git clone --branch "$GIT_REF" "$REPO" "$APP_DIR"; then
+      :
+    else
+      warn "git clone --branch failed (tag/commit ref?); cloning the default branch instead."
+      rm -rf "$APP_DIR"
+      mkdir -p "$APP_DIR"
+      git clone "$REPO" "$APP_DIR"
+      GIT_REF="$(git -C "$APP_DIR" rev-parse --abbrev-ref HEAD)"
+    fi
+    checkout_ref
   fi
 fi
 cd "$APP_DIR"
@@ -220,9 +299,17 @@ if [ ! -f .env ]; then
   [ -f .env.example ] || fail ".env.example not found."
   cp .env.example .env
 
-  # App URL
-  APP_URL="$(ask "Public app URL (https://...)" "http://localhost:${PORT}")"
-  ROOT_DOMAIN="$(ask "Root domain (for subdomains)" "localhost")"
+  # App URL (DOMAIN from the environment is the default when provided)
+  if [ -z "${APP_URL:-}" ]; then
+    if [ -n "$DOMAIN" ]; then
+      APP_URL="$(ask "Public app URL (https://...)" "https://${DOMAIN}")"
+    else
+      APP_URL="$(ask "Public app URL (https://...)" "http://localhost:${PORT}")"
+    fi
+  fi
+  if [ -z "${ROOT_DOMAIN:-}" ]; then
+    ROOT_DOMAIN="$(ask "Root domain (for subdomains)" "${DOMAIN:-localhost}")"
+  fi
 
   # Generate secrets
   JWT_SECRET="$(openssl rand -base64 32)"
@@ -304,19 +391,24 @@ pm2 startup systemd -u root --hp /root >/dev/null 2>&1 || true
 #  other services on the server.
 # ══════════════════════════════════════════════════════════════════
 NGINX_CONF="/etc/nginx/sites-available/${APP_NAME}"
-NGINX_PORT="$(ask "Port Nginx should listen on (default 80)" "80")"
+NGINX_PORT="${NGINX_PORT:-$(ask "Port Nginx should listen on (default 80)" "80")}"
 # Validate that the port is numeric
 case "$NGINX_PORT" in ''|*[!0-9]*) NGINX_PORT="80";; esac
-DOMAIN=""
 if ! command -v nginx >/dev/null 2>&1; then
   info "Installing Nginx..."
   apt-get install -y nginx
 fi
 
-USE_DOMAIN="$(ask "Do you have a domain? (yes/no)" "no")"
-if [[ "${USE_DOMAIN,,}" == "y" || "${USE_DOMAIN,,}" == "yes" ]]; then
-  DOMAIN="$(ask "Domain name (e.g., nobino.ir)" "")"
-  [ -n "$DOMAIN" ] || DOMAIN=""
+# DOMAIN may already come from the environment (unattended install); only ask
+# when it was not supplied.
+if [ -n "$DOMAIN" ]; then
+  info "Using the domain supplied from the environment: ${DOMAIN}"
+else
+  USE_DOMAIN="$(ask "Do you have a domain? (yes/no)" "no")"
+  if [[ "${USE_DOMAIN,,}" == "y" || "${USE_DOMAIN,,}" == "yes" ]]; then
+    DOMAIN="$(ask "Domain name (e.g., nobino.ir)" "")"
+    [ -n "$DOMAIN" ] || DOMAIN=""
+  fi
 fi
 
 # Shared proxy body (Nginx variables stay literal)
@@ -381,7 +473,7 @@ if [ -n "$DOMAIN" ]; then
     apt-get install -y certbot python3-certbot-nginx
   fi
   certbot --nginx -d "$DOMAIN" -d "www.${DOMAIN}" --non-interactive --agree-tos \
-    -m "$(ask "Email for the SSL certificate (optional)" "admin@${DOMAIN}")" \
+    -m "${SSL_EMAIL:-$(ask "Email for the SSL certificate (optional)" "admin@${DOMAIN}")}" \
     --redirect || warn "certbot reported errors; rerun after fixing DNS: certbot --nginx -d ${DOMAIN}"
 fi
 
@@ -414,6 +506,9 @@ fi
 echo "  PM2 status    : pm2 status"
 echo "  Logs          : pm2 logs ${APP_NAME}"
 echo "  Database      : ${DB_NAME} (user: ${DB_USER})"
+echo ""
+echo "  Update later   : sudo bash ${APP_DIR}/scripts/deploy-ubuntu.sh"
+echo "  (or pull a tag) : GIT_REF=v1.2.0 sudo bash ${APP_DIR}/scripts/deploy-ubuntu.sh"
 echo ""
 warn "Default seeded admin: phone 09120000000 (default password in prisma/seed.mjs)."
 warn "Change the password after the first login."

@@ -4,6 +4,10 @@
 #  Run:  sudo bash scripts/uninstall-ubuntu.sh
 #        sudo bash scripts/uninstall-ubuntu.sh --dry-run   # preview only
 #        sudo bash scripts/uninstall-ubuntu.sh --yes       # confirm every section
+#  From GitHub, without a local checkout (questions still work; input is read
+#  from the terminal, not from the pipe):
+#        curl -fsSL https://raw.githubusercontent.com/alisystemit/Nobino/main/scripts/uninstall-ubuntu.sh \
+#          | sudo bash -s -- --dry-run
 #  Behavior: each section (PM2, Nginx, SSL, database, firewall, Node, app folder)
 #            is prompted separately; only confirmed items are removed.
 #  Overridable env vars: APP_NAME, APP_DIR, PORT, DOMAIN, BACKUP_DIR
@@ -24,6 +28,9 @@ Usage:
   sudo bash scripts/uninstall-ubuntu.sh              interactive (default for every section: no)
   sudo bash scripts/uninstall-ubuntu.sh --dry-run    preview actions, change nothing
   sudo bash scripts/uninstall-ubuntu.sh --yes        confirm every section (full removal)
+
+  Without a local checkout (fetch the script from GitHub):
+  curl -fsSL https://raw.githubusercontent.com/alisystemit/Nobino/main/scripts/uninstall-ubuntu.sh | sudo bash -s -- --dry-run
 
 Optional environment variables:
   APP_NAME=nobino  APP_DIR=/var/www/nobino  PORT=3000  DOMAIN=example.com
@@ -57,6 +64,21 @@ as_postgres() { # run a command as the postgres system user (sudo may be absent 
   else su postgres -c "$*"; fi
 }
 
+read_answer() { # read_answer "<prompt-text>" — reads the terminal, not stdin
+  # When the script is piped (curl ... | sudo bash) stdin carries the script
+  # itself, so a plain `read` would consume code instead of the answer.
+  local prompt="$1"
+  if [ -t 0 ]; then
+    read -r -p "$prompt" ans_input || ans_input=""
+  elif [ -e /dev/tty ] && { : </dev/tty; } 2>/dev/null; then
+    read -r -p "$prompt" ans_input </dev/tty || ans_input=""
+  else
+    echo "$prompt" >&2
+    warn "No terminal available; using the default answer."
+    ans_input=""
+  fi
+}
+
 ask_yes() { # ask_yes "<prompt>" yes|no  (default: no)
   local prompt="$1" def="${2:-no}" ans hint="no"
   [ "$def" = "yes" ] && hint="yes"
@@ -64,8 +86,8 @@ ask_yes() { # ask_yes "<prompt>" yes|no  (default: no)
     echo "${C_CYAN}?${C_RESET} ${prompt} (yes/no) [${hint}] -> yes (--yes)"
     return 0
   fi
-  read -r -p "${C_CYAN}?${C_RESET} ${prompt} (yes/no) [${hint}]: " ans || ans=""
-  ans="${ans,,}"
+  read_answer "${C_CYAN}?${C_RESET} ${prompt} (yes/no) [${hint}]: "
+  ans="${ans_input,,}"
   case "$ans" in
     y|yes) return 0 ;;
     n|no)  return 1 ;;
@@ -75,9 +97,9 @@ ask_yes() { # ask_yes "<prompt>" yes|no  (default: no)
 }
 
 ask_val() { # ask_val "<prompt>" "<default>"
-  local prompt="$1" default="${2:-}" ans
-  read -r -p "${C_CYAN}?${C_RESET} ${prompt}${default:+ [${default}]}: " ans || ans=""
-  printf '%s' "${ans:-$default}"
+  local prompt="$1" default="${2:-}"
+  read_answer "${C_CYAN}?${C_RESET} ${prompt}${default:+ [${default}]}: "
+  printf '%s' "${ans_input:-$default}"
 }
 
 # ─── Environment checks ───────────────────────────────────────────
