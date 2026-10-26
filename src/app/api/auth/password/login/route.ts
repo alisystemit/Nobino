@@ -1,15 +1,12 @@
 import { z } from "zod";
-import { cookies, headers } from "next/headers";
-import { createHash } from "node:crypto";
 import { prisma } from "@/lib/prisma";
-import { signToken } from "@/lib/auth/jwt";
-import { AUTH_COOKIE } from "@/lib/auth/guards";
 import {
   verifyPassword,
   assertLoginAllowed,
   recordFailedLogin,
   clearFailedLogins,
 } from "@/lib/auth/password";
+import { issueSession, publicUser } from "@/lib/auth/session";
 import { json, apiError } from "@/lib/utils";
 
 const schema = z.object({
@@ -53,38 +50,9 @@ export async function POST(req: Request) {
 
     await clearFailedLogins(login);
 
-    const token = await signToken({ sub: user.id, phone: user.phone, role: user.role });
+    await issueSession(user);
 
-    try {
-      const hdrs = await headers();
-      const ip = hdrs.get("x-forwarded-for")?.split(",")[0]?.trim() || hdrs.get("x-real-ip") || null;
-      const device = hdrs.get("user-agent") || null;
-      await prisma.session.create({
-        data: {
-          userId: user.id,
-          tokenHash: createHash("sha256").update(token).digest("hex"),
-          expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
-          device,
-          ip,
-        },
-      });
-    } catch {
-      // ثبت نشست اختیاری است
-    }
-
-    const store = await cookies();
-    store.set(AUTH_COOKIE, token, {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === "production",
-      sameSite: "lax",
-      path: "/",
-      maxAge: 60 * 60 * 24 * 7,
-    });
-
-    return json({
-      success: true,
-      user: { id: user.id, phone: user.phone, email: user.email, name: user.name, role: user.role },
-    });
+    return json({ success: true, user: publicUser(user) });
   } catch (err) {
     return apiError(err);
   }

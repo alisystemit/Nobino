@@ -233,6 +233,72 @@ function SalonManagerList({ ctx, salons, refresh }: { ctx: Ctx; salons: Salon[];
   );
 }
 
+/* ─── سوئیچ نمایش کدهای ارسالی (پیامک/ایمیل) ─────────────────────────── */
+
+const SHOW_SENT_CODES_KEY = "sms.show_sent_codes";
+
+/**
+ * با روشن‌کردن این سوئیچ، کد تأییدی که برای کاربر ارسال می‌شود دوباره در
+ * صفحهٔ ورود نمایش داده می‌شود (مثل حالت توسعه) — برای تست روی سرور واقعی.
+ * در محیط توسعه همیشه فعال است و نیازی به روشن‌کردن ندارد.
+ */
+function SentCodesToggle({ ctx }: { ctx: Ctx }) {
+  const [on, setOn] = useState(false);
+  const [loaded, setLoaded] = useState(false);
+  const [busy, setBusy] = useState(false);
+
+  useEffect(() => {
+    let cancelled = false;
+    ctx
+      .api<ApiRes<{ settings?: { key: string; value?: string | null }[] }>>("/api/admin/settings", "GET")
+      .then((d) => {
+        if (cancelled || !d) return;
+        const row = d.settings?.find((s) => s.key === SHOW_SENT_CODES_KEY);
+        setOn((row?.value ?? "false").trim().toLowerCase() === "true");
+        setLoaded(true);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [ctx]);
+
+  async function toggle(next: boolean) {
+    setBusy(true);
+    const r = await ctx.api<ApiRes>(
+      "/api/admin/settings",
+      "PATCH",
+      { updates: [{ key: SHOW_SENT_CODES_KEY, value: next ? "true" : "false", group: "sms", type: "select" }] },
+      next ? "نمایش کدهای ارسالی روشن شد" : "نمایش کدهای ارسالی خاموش شد",
+    );
+    if (r) setOn(next);
+    setBusy(false);
+  }
+
+  return (
+    <div className={`${card} mb-4 flex flex-wrap items-center justify-between gap-4`}>
+      <div className="min-w-0">
+        <h3 className="text-sm font-black text-neutral-900 dark:text-neutral-100">نمایش کدهای ارسالی در صفحه ورود</h3>
+        <p className="mt-1 text-xs leading-6 text-neutral-500 dark:text-neutral-400">
+          با روشن‌کردن، کد پیامک/ایمیل بلافاصله زیر فرم ورود نمایش داده می‌شود تا بدون دسترسی به سرویس پیامک بتوانید ورود را تست کنید.
+          <span className="font-bold text-amber-600 dark:text-amber-400"> در سرویس واقعی خاموشش کنید.</span>
+        </p>
+        {!loaded && <p className="mt-1 text-[11px] text-neutral-400">در حال خواندن وضعیت…</p>}
+      </div>
+      <button
+        type="button"
+        role="switch"
+        aria-checked={on}
+        disabled={busy || !loaded}
+        onClick={() => toggle(!on)}
+        className={`relative h-8 w-14 shrink-0 rounded-full transition disabled:opacity-50 ${on ? "bg-emerald-500" : "bg-neutral-300 dark:bg-neutral-700"}`}
+      >
+        <span className={`absolute top-1 h-6 w-6 rounded-full bg-white shadow transition-all ${on ? "right-1" : "right-7"}`} />
+        <span className="sr-only">{on ? "روشن" : "خاموش"}</span>
+      </button>
+    </div>
+  );
+}
+
 /* ─── تست پیامک ──────────────────────────────────────────────────────── */
 
 function SmsTest({ ctx }: { ctx: Ctx }) {
@@ -1125,7 +1191,12 @@ export default function AdminExtras({ initialTab = "metrics" }: { initialTab?: s
         {tab === "users" && <UserManager ctx={ctx} />}
         {tab === "packages" && <PackageManager ctx={ctx} />}
         {tab === "discounts" && <DiscountManager ctx={ctx} discounts={discounts} refresh={refreshDiscounts} />}
-        {tab === "sms" && <SmsTest ctx={ctx} />}
+        {tab === "sms" && (
+          <>
+            <SentCodesToggle ctx={ctx} />
+            <SmsTest ctx={ctx} />
+          </>
+        )}
         {tab === "broadcast" && <BroadcastView ctx={ctx} />}
         {tab === "audit" && <AuditView ctx={ctx} />}
         {tab === "security" && <SecurityView ctx={ctx} />}

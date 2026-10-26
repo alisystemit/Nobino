@@ -1,59 +1,37 @@
 /* eslint-disable */
 // Seed داده نمونه واقعی — چند سالن، کارکنان با عکس، نوبت‌ها، نظرات و CRM
 // اجرا: node scripts/seed-demo.mjs  (Idempotent — با خیال راحت چندبار اجرا کنید)
+// فقط تولید فایل‌های تصویر (بدون دیتابیس): node scripts/seed-demo.mjs --assets-only
 import { PrismaClient } from "@prisma/client";
-import { mkdir, writeFile } from "node:fs/promises";
-import { readFileSync } from "node:fs";
+import { mkdir, writeFile, access } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { SEED_URL, svgAvatar, svgBanner, svgGallery, svgHero, svgLogo } from "./lib/seed-art.mjs";
 
 const prisma = new PrismaClient();
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
-const ASSETS = path.join(ROOT, "public", "uploads", "seed");
+// تصاویر نمونه داخل ریپو نگهداری می‌شوند (برخلاف public/uploads که gitignore است):
+// یک کلون تازه روی سرور هم باید همین فایل‌ها را داشته باشد، وگرنه بنر سالن‌ها خالی می‌ماند.
+const ASSETS = path.join(ROOT, "public", "seed");
 
-/* ─────────────────────── ابزار تولید تصویر (SVG) ─────────────────────── */
-const esc = (s) => String(s).replaceAll("&", "&amp;").replaceAll("<", "&lt;").replaceAll(">", "&gt;");
+const ASSETS_ONLY = process.argv.includes("--assets-only");
+/** با --overwrite-assets فایل‌های موجود هم بازنویسی می‌شوند (برای بازتولید art بعد از تغییر طرح) */
+const FORCE_ASSETS = process.argv.includes("--overwrite-assets");
 
-// ── فونت‌های جاسازی‌شده — تا متن داخل SVG در هر محیطی با فونت فارسی دیده شود ──
-// (SVG وقتی به‌صورت <img> یا تصویر دیده می‌شود نمی‌تواند فونت بیرونی بار کند؛
-//  برای همین فایل فونت را به‌صورت base64 داخل خود SVG قرار می‌دهیم.)
-const fontB64 = (name) => {
-  try { return readFileSync(path.join(ROOT, "public", "fonts", name)).toString("base64"); }
-  catch { return ""; }
-};
-const _YekanBold = fontB64("Yekan-Bold.woff2");
-const _IranSans = fontB64("IRANSans-Regular.woff2");
-const SVG_FONTS =
-  (_YekanBold || _IranSans)
-    ? `<style><![CDATA[` +
-      (_YekanBold ? `@font-face{font-family:"Yekan";src:url(data:font/woff2;base64,${_YekanBold}) format("woff2");font-weight:700;}` : "") +
-      (_IranSans ? `@font-face{font-family:"IranSans";src:url(data:font/woff2;base64,${_IranSans}) format("woff2");font-weight:400;}` : "") +
-      `]]></style>`
-    : "";
-const F_YEKAN = "'Yekan','Vazirmatn',Tahoma,sans-serif";
-const F_IRANSANS = "'IranSans','Vazirmatn',Tahoma,sans-serif";
-
-function svgLogo(letter, c1, c2) {
-  return `<svg xmlns="http://www.w3.org/2000/svg" width="256" height="256" viewBox="0 0 256 256">${SVG_FONTS}<defs><linearGradient id="g" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="${c1}"/><stop offset="1" stop-color="${c2}"/></linearGradient></defs><rect width="256" height="256" rx="64" fill="url(#g)"/><circle cx="64" cy="52" r="30" fill="#fff" opacity="0.18"/><circle cx="204" cy="196" r="44" fill="#fff" opacity="0.10"/><text x="128" y="140" text-anchor="middle" dominant-baseline="central" font-size="112" font-weight="bold" fill="#fff" font-family="${F_YEKAN}">${esc(letter)}</text></svg>`;
-}
-
-function svgBanner(name, tagline, c1, c2) {
-  return `<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="400" viewBox="0 0 1200 400">${SVG_FONTS}<defs><linearGradient id="g" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="${c1}"/><stop offset="1" stop-color="${c2}"/></linearGradient></defs><rect width="1200" height="400" fill="url(#g)"/><circle cx="1030" cy="60" r="130" fill="#fff" opacity="0.10"/><circle cx="150" cy="360" r="100" fill="#fff" opacity="0.10"/><circle cx="1120" cy="330" r="70" fill="#fff" opacity="0.08"/><text x="600" y="170" text-anchor="middle" font-size="68" font-weight="bold" fill="#fff" font-family="${F_YEKAN}">${esc(name)}</text><text x="600" y="245" text-anchor="middle" font-size="32" fill="#ffffffd9" font-family="${F_IRANSANS}">${esc(tagline)}</text></svg>`;
-}
-
-function svgGallery(title, label, c1, c2, idx) {
-  const x = 400;
-  const y = 210 + idx * 30;
-  return `<svg xmlns="http://www.w3.org/2000/svg" width="800" height="600" viewBox="0 0 800 600">${SVG_FONTS}<defs><linearGradient id="g" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="${c1}"/><stop offset="1" stop-color="${c2}"/></linearGradient></defs><rect width="800" height="600" fill="url(#g)"/><circle cx="640" cy="110" r="90" fill="#fff" opacity="0.12"/><circle cx="160" cy="480" r="70" fill="#fff" opacity="0.12"/><text x="${x}" y="${y}" text-anchor="middle" dominant-baseline="central" font-size="170" font-weight="bold" fill="#ffffff4d" font-family="${F_YEKAN}">${esc(label)}</text><rect x="0" y="470" width="800" height="130" fill="#00000033"/><text x="400" y="540" text-anchor="middle" font-size="42" font-weight="bold" fill="#fff" font-family="${F_YEKAN}">${esc(title)}</text></svg>`;
-}
-
-function svgAvatar(initials, c1, c2) {
-  return `<svg xmlns="http://www.w3.org/2000/svg" width="256" height="256" viewBox="0 0 256 256">${SVG_FONTS}<defs><linearGradient id="g" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="${c1}"/><stop offset="1" stop-color="${c2}"/></linearGradient></defs><circle cx="128" cy="128" r="128" fill="url(#g)"/><text x="128" y="138" text-anchor="middle" dominant-baseline="central" font-size="86" font-weight="bold" fill="#fff" font-family="${F_YEKAN}">${esc(initials)}</text></svg>`;
-}
-
+/** نوشتن فایل فقط وقتی وجود ندارد (تا فایل commit‌شده بی‌دلیل بازنویسی/تغییر نیابد) */
 async function writeAsset(file, content) {
   await mkdir(ASSETS, { recursive: true });
-  await writeFile(path.join(ASSETS, file), content, "utf8");
+  const target = path.join(ASSETS, file);
+  if (!FORCE_ASSETS) {
+    try {
+      await access(target);
+      return false;
+    } catch {
+      /* وجود ندارد → می‌نویسیم */
+    }
+  }
+  await writeFile(target, content, "utf8");
+  return true;
 }
 
 /* ─────────────────────── داده پایه ─────────────────────── */
@@ -284,7 +262,47 @@ async function renameCustomers() {
 }
 
 /* ─────────────────────── ساخت/به‌روزرسانی یک سالن ─────────────────────── */
+
+/**
+ * اگر سالن/کارمند خودش تصویر آپلود کرده باشد، تصویر نمونه جای آن را نمی‌گیرد؛
+ * فقط مسیرهای نمونهٔ قدیمی (/uploads/seed/…) به مسیر جدید /seed/ ارتقا می‌یابند.
+ */
+function pickImage(current, seedUrl) {
+  if (!current) return seedUrl;
+  if (/^\/(uploads\/)?seed\//.test(current)) return seedUrl;
+  return current;
+}
+
+/** همهٔ تصویرهای یک سالن (بدون دیتابیس) — هم برای seed کامل، هم برای --assets-only */
+async function emitSalonAssets(def) {
+  const url = (f) => `${SEED_URL}/${f}`;
+  const a = {
+    ownerAvatar: `${def.slug}-owner.svg`,
+    logo: `${def.slug}-logo.svg`,
+    banner: `${def.slug}-banner.svg`,
+    staff: def.staff.map((_, i) => `${def.slug}-staff-${i}.svg`),
+    gallery: (def.gallery ?? []).map((_, g) => `${def.slug}-gallery-${g}.svg`),
+  };
+  await writeAsset(a.ownerAvatar, svgAvatar([...def.owner.name].slice(0, 2).join(""), def.c1, def.c2));
+  await writeAsset(a.logo, svgLogo([...def.name].find((c) => c !== " ") ?? def.name.slice(0, 1), def.c1, def.c2));
+  await writeAsset(a.banner, svgBanner(def.name, def.tagline, def.c1, def.c2, def.slug.length));
+  for (const [i, s] of def.staff.entries()) {
+    await writeAsset(a.staff[i], svgAvatar([...s.name].slice(0, 2).join(""), def.c1, def.c2));
+  }
+  for (const [g, title] of (def.gallery ?? []).entries()) {
+    await writeAsset(a.gallery[g], svgGallery(title, [...title][0] ?? "", def.c1, def.c2, g));
+  }
+  return {
+    ownerAvatarUrl: url(a.ownerAvatar),
+    logoUrl: url(a.logo),
+    bannerUrl: url(a.banner),
+    staffUrl: (i) => url(a.staff[i]),
+    galleryUrl: (g) => url(a.gallery[g]),
+  };
+}
+
 async function seedSalon(def, idx) {
+  const art = await emitSalonAssets(def);
   // صاحب سالن + کیف پول + آواتار
   let owner = await prisma.user.findUnique({ where: { phone: def.owner.phone } });
   if (!owner) {
@@ -296,16 +314,10 @@ async function seedSalon(def, idx) {
   }
   await prisma.wallet.upsert({ where: { ownerId: owner.id }, update: {}, create: { ownerId: owner.id } });
 
-  const avatarFile = `${def.slug}-owner.svg`;
-  await writeAsset(avatarFile, svgAvatar([...def.owner.name].slice(0, 2).join(""), def.c1, def.c2));
-  if (!owner.avatarUrl) {
-    await prisma.user.update({ where: { id: owner.id }, data: { avatarUrl: `/uploads/seed/${avatarFile}` } });
-  }
-
-  const logoFile = `${def.slug}-logo.svg`;
-  const bannerFile = `${def.slug}-banner.svg`;
-  await writeAsset(logoFile, svgLogo([...def.name].find((c) => c !== " "), def.c1, def.c2));
-  await writeAsset(bannerFile, svgBanner(def.name, def.tagline, def.c1, def.c2));
+  owner = await prisma.user.update({
+    where: { id: owner.id },
+    data: { avatarUrl: pickImage(owner.avatarUrl, art.ownerAvatarUrl) },
+  });
 
   const existing = await prisma.salon.findUnique({ where: { slug: def.slug } });
   const salon = existing
@@ -316,8 +328,8 @@ async function seedSalon(def, idx) {
           isApproved: true,
           isActive: true,
           subscriptionEndsAt: existing.subscriptionEndsAt ?? atDays(45, 12),
-          logoUrl: existing.logoUrl ?? `/uploads/seed/${logoFile}`,
-          bannerUrl: existing.bannerUrl ?? `/uploads/seed/${bannerFile}`,
+          logoUrl: pickImage(existing.logoUrl, art.logoUrl),
+          bannerUrl: pickImage(existing.bannerUrl, art.bannerUrl),
         },
       })
     : await prisma.salon.create({
@@ -329,8 +341,8 @@ async function seedSalon(def, idx) {
           address: def.address,
           description: `${def.tagline}. ${def.name} در ${def.city} با کادری مجرب و محیطی مدرن آماده ارائه خدمات آرایشی و زیبایی است؛ رزرو نوبت آنلاین و یادآوری خودکار پیامکی، خیال شما را راحت می‌کند.`,
           coverColor: def.c1,
-          logoUrl: `/uploads/seed/${logoFile}`,
-          bannerUrl: `/uploads/seed/${bannerFile}`,
+          logoUrl: art.logoUrl,
+          bannerUrl: art.bannerUrl,
           ownerId: owner.id,
           isApproved: true,
           isActive: true,
@@ -366,8 +378,7 @@ async function seedSalon(def, idx) {
   for (let i = 0; i < def.staff.length; i++) {
     const s = def.staff[i];
     let staff = await prisma.staff.findFirst({ where: { salonId: salon.id, name: s.name } });
-    const avatarFile = `${def.slug}-staff-${i}.svg`;
-    await writeAsset(avatarFile, svgAvatar([...s.name].slice(0, 2).join(""), def.c1, def.c2));
+    const staffImage = pickImage(staff?.avatarUrl, art.staffUrl(i));
     const data = {
       salonId: salon.id,
       branchId: mainBranchId,
@@ -376,7 +387,7 @@ async function seedSalon(def, idx) {
       role: s.role ?? "STYLIST",
       specialties: s.specialties,
       bio: `${s.title} در ${def.name} — ${s.specialties.join("، ") || "پذیرش و هماهنگی نوبت‌ها"}`,
-      avatarUrl: `/uploads/seed/${avatarFile}`,
+      avatarUrl: staffImage,
       commissionPercent: s.role === "RECEPTION" ? 0 : 15,
       schedule: staffSchedule(s.shift, s.shift + 9, (i + 2) % 7),
       isActive: true,
@@ -407,16 +418,21 @@ async function seedSalon(def, idx) {
     serviceList = await prisma.service.findMany({ where: { salonId: salon.id } });
   }
 
-  // گالری (برای سالن‌های جدید)
+  // گالری — تصویرها از پیش ساخته شده‌اند؛ سطرهای قدیمی هم به مسیر جدید می‌روند
   if (def.gallery) {
-    const existingGallery = await prisma.galleryItem.count({ where: { salonId: salon.id } });
+    const existingGallery = await prisma.galleryItem.findMany({
+      where: { salonId: salon.id },
+      select: { id: true, title: true, imageUrl: true },
+    });
     for (let g = 0; g < def.gallery.length; g++) {
       const title = def.gallery[g];
-      const file = `${def.slug}-gallery-${g}.svg`;
-      // همیشه خود تصویر را بازنویسی می‌کنیم تا فونت‌های جدید اعمال شوند
-      await writeAsset(file, svgGallery(title, [...title][0], def.c1, def.c2, g));
-      if (g >= existingGallery) {
-        await prisma.galleryItem.create({ data: { salonId: salon.id, title, imageUrl: `/uploads/seed/${file}`, sortOrder: g } });
+      const seedUrl = art.galleryUrl(g);
+      const row = existingGallery.find((e) => e.title === title) ?? existingGallery[g];
+      if (row) {
+        const next = pickImage(row.imageUrl, seedUrl);
+        if (next !== row.imageUrl) await prisma.galleryItem.update({ where: { id: row.id }, data: { imageUrl: next } });
+      } else {
+        await prisma.galleryItem.create({ data: { salonId: salon.id, title, imageUrl: seedUrl, sortOrder: g } });
       }
     }
   }
@@ -615,6 +631,24 @@ async function seedVoiceCalls(mah, serviceList, staffList, mainBranchId) {
 }
 
 /* ─────────────────────── اجرای اصلی ─────────────────────── */
+
+/** همهٔ تصویرهای نمونه (بدون دیتابیس) — هم برای seed کامل، هم برای --assets-only */
+async function emitAllAssets() {
+  let count = 0;
+  // بنر عمومی برای سالن‌هایی که هنوز تصویر ندارند (fallback در UI)
+  await writeAsset("hero.svg", svgHero());
+  for (const def of SALONS) {
+    await emitSalonAssets(def);
+    count += 3 + def.staff.length + (def.gallery?.length ?? 0);
+  }
+  console.log(`🖼️  ${count + 1} تصویر نمونه در public/seed آماده است (مسیر /seed/…)`);
+}
+
+if (ASSETS_ONLY) {
+  await emitAllAssets();
+  process.exit(0);
+}
+
 async function main() {
   console.log("🌱 شروع Seed داده نمونه...");
   await cleanupJunk();

@@ -45,17 +45,31 @@ export default function LoginPage() {
 
   const usingEmail = step === "email" || email.includes("@");
 
+  /**
+   * کد ارسال‌شده را از سرور می‌خواند (در توسعه همیشه؛ در پروداکشن فقط وقتی
+   * سوپرادمین سوئیچ «نمایش کدهای ارسالی» را روشن کرده باشد). اگر فعال نباشد
+   * سرور ۴۰۴ می‌دهد و چیزی نمایش داده نمی‌شود.
+   */
+  async function loadSentCode(target: { phone?: string; email?: string }) {
+    try {
+      const qs = target.email
+        ? `email=${encodeURIComponent(target.email)}`
+        : `phone=${encodeURIComponent(target.phone ?? "")}`;
+      const d = await (await fetch(`/api/auth/otp/dev-last?${qs}`)).json();
+      if (d.success && d.code) setDevCode(String(d.code));
+    } catch {
+      /* سرور کدی نداد — مثل قبل فقط پیام «ارسال شد» نمایش داده می‌شود */
+    }
+  }
+
   async function requestOtp() {
     setLoading(true); setError(""); setMsg(""); setDevCode("");
     try {
       const res = await fetch("/api/auth/otp/request", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ phone }) });
       const data = await res.json();
       if (!data.success) return setError(data.error || "خطا در ارسال کد");
-      // در حالت توسعه، کد را مستقیم روی صفحه نشان بده
-      try {
-        const d = await (await fetch(`/api/auth/otp/dev-last?phone=${encodeURIComponent(phone)}`)).json();
-        if (d.success && d.code) setDevCode(String(d.code));
-      } catch {}
+      // در حالت توسعه (یا با سوئیچ پنل) کد را مستقیم روی صفحه نشان بده
+      await loadSentCode({ phone });
       setMsg("کد تأیید به شماره شما ارسال شد.");
       setStep("code");
       startCooldown();
@@ -72,6 +86,7 @@ export default function LoginPage() {
       const res = await fetch("/api/auth/email/request", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ email }) });
       const data = await res.json();
       if (!data.success) return setError(data.error || "خطا در ارسال کد");
+      await loadSentCode({ email });
       setMsg("کد تأیید به ایمیل شما ارسال شد.");
       setStep("code");
       startCooldown();
@@ -320,7 +335,7 @@ export default function LoginPage() {
             {msg && <p className="rounded-xl bg-emerald-50 px-4 py-3 text-sm text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300">{msg}</p>}
             {devCode && (
               <div className="rounded-2xl border-2 border-dashed border-pink-300 bg-pink-50 p-4 text-center dark:border-pink-700 dark:bg-pink-950/30">
-                <div className="text-xs font-semibold text-pink-600 dark:text-pink-400">کد تأیید (توسعه)</div>
+                <div className="text-xs font-semibold text-pink-600 dark:text-pink-400">کد تأیید ارسالی (حالت تست)</div>
                 <div className="mt-1 text-3xl font-black tracking-[0.4em] text-pink-700 dark:text-pink-300" dir="ltr">
                   {devCode}
                 </div>
@@ -330,6 +345,8 @@ export default function LoginPage() {
 
           <p className="mt-6 text-center text-xs text-neutral-400">
             <Link href="/" className="text-pink-600 hover:underline">بازگشت به خانه</Link>
+            <span className="mx-2 text-neutral-300 dark:text-neutral-600">|</span>
+            <Link href="/admin/login" className="font-bold text-neutral-500 hover:text-pink-600">ورود سوپرادمین</Link>
           </p>
         </div>
       </div>

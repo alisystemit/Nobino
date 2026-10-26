@@ -56,6 +56,9 @@ async function main() {
       address: "تهران، سعادت‌آباد، بلوار دریا",
       description: "سالن زیبایی تخصصی با کادری مجرب در زمینه مو، پوست و ناخن.",
       coverColor: "#ec4899",
+      // تصویرهای نمونه داخل ریپو (public/seed) هستند، پس روی سرور تازه هم لود می‌شوند.
+      logoUrl: "/seed/mah-logo.svg",
+      bannerUrl: "/seed/mah-banner.svg",
       ownerId: owner.id,
       isApproved: true,
       isActive: true,
@@ -132,6 +135,7 @@ async function main() {
   // ─── تنظیمات پیش‌فرض سیستم (پویا) ─────────────────────────────────────
   const defaultSettings = [
     { key: "sms.active_provider", value: "kavenegar", group: "sms", type: "select", options: JSON.stringify(["kavenegar", "smsdotir", "farazsms", "ghasedak", "melipayamak", "iransms", "payamresan", "nakalaya", "mobilesms", "arpano"]), description: "سرویس پیامک فعال" },
+    { key: "sms.show_sent_codes", value: "false", group: "sms", type: "select", options: JSON.stringify(["true", "false"]), description: "نمایش کد پیامک/ایمیل ارسال‌شده در صفحه ورود (فقط برای تست؛ در محیط واقعی خاموش باشد)" },
     { key: "payments.default_gateway", value: "sandbox", group: "payments", type: "select", options: JSON.stringify(["sandbox", "zarinpal", "mellat", "saman", "parsian", "pasargad", "asanpardakht", "irankish", "sadad", "maban", "cetab", "pardakhtnet", "psp", "nextpay", "vanak", "behpardakht", "payir", "zibal", "idpay", "amanat"]), description: "درگاه پرداخت پیش‌فرض" },
     { key: "voice.provider", value: "mock", group: "voice", type: "select", options: JSON.stringify(["mock", "openai"]), description: "موتور تبدیل گفتار به متن" },
     { key: "general.announcement", value: "", group: "general", type: "string", description: "اعلان سراسری (در صفحه اصلی نمایش داده می‌شود)" },

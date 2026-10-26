@@ -1,22 +1,35 @@
 import { prisma } from "@/lib/prisma";
 import { json } from "@/lib/utils";
+import { canShowSentCodes } from "@/lib/auth/code-display";
 
 /**
- * نمایش کد OTP در محیط توسعه (فقط وقتی NODE_ENV !== 'production').
- * برای راحتی تست محلی؛ در پروداکشن این مسیر ناموجود است.
+ * آخرین کد تأیید ارسال‌شده برای یک شماره/ایمیل.
+ *
+ * در محیط توسعه همیشه در دسترس است؛ در پروداکشن تنها وقتی سوپرادمین سوئیچ
+ * «نمایش کدهای ارسالی» (کلید `sms.show_sent_codes`) را روشن کرده باشد.
+ * با خاموش بودن سوئیچ، مسیر مثل قبل ۴۰۴ می‌دهد و کدی فاش نمی‌شود.
  */
 export async function GET(req: Request) {
-  if (process.env.NODE_ENV === "production") {
+  if (!(await canShowSentCodes())) {
     return json({ success: false, error: "not available" }, { status: 404 });
   }
-  const phone = new URL(req.url).searchParams.get("phone") ?? "";
-  if (!phone) return json({ success: false, error: "phone required" }, { status: 400 });
 
-  const record = await prisma.otp.findFirst({
-    where: { phone, purpose: "LOGIN", usedAt: null },
-    orderBy: { createdAt: "desc" },
-    select: { code: true, expiresAt: true },
-  });
+  const sp = new URL(req.url).searchParams;
+  const phone = sp.get("phone") ?? "";
+  const email = sp.get("email") ?? "";
+  if (!phone && !email) return json({ success: false, error: "phone or email required" }, { status: 400 });
+
+  const record = email
+    ? await prisma.otp.findFirst({
+        where: { phone: email, purpose: "EMAIL_LOGIN", usedAt: null },
+        orderBy: { createdAt: "desc" },
+        select: { code: true, expiresAt: true },
+      })
+    : await prisma.otp.findFirst({
+        where: { phone, purpose: "LOGIN", usedAt: null },
+        orderBy: { createdAt: "desc" },
+        select: { code: true, expiresAt: true },
+      });
 
   if (!record) return json({ success: false, code: null });
   return json({ success: true, code: record.code, expiresAt: record.expiresAt });

@@ -157,15 +157,14 @@ export default async function SalonPage({ params }: { params: Promise<{ slug: st
               : { background: `linear-gradient(135deg, ${salon.coverColor}, #7c3aed)` }
           }
         />
-        {salon.bannerUrl && (
-          <SafeImage
-            src={salon.bannerUrl}
-            alt={`بنر ${salon.name}`}
-            className="absolute inset-0 h-full w-full object-cover"
-            fallback=""
-            fallbackClassName="absolute inset-0 !bg-gradient-to-br !from-pink-500 !to-purple-700"
-          />
-        )}
+        {/* بنر سالن؛ اگر سالن بنری آپلود نکرده، تصویر نمونهٔ برداری نمایش داده می‌شود */}
+        <SafeImage
+          src={salon.bannerUrl ?? "/seed/hero.svg"}
+          alt={`بنر ${salon.name}`}
+          className="absolute inset-0 h-full w-full object-cover"
+          fallback=""
+          fallbackClassName="absolute inset-0 !bg-gradient-to-br !from-pink-500 !to-purple-700"
+        />
         <div className="absolute inset-0 bg-hero-pattern" />
         <div className="absolute inset-0 bg-black/40" />
         <div className="absolute bottom-0 left-0 right-0 mx-auto max-w-6xl px-6 pb-8">

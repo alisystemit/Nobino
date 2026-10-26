@@ -328,7 +328,7 @@ export default async function HomePage() {
               return (
                 <Link key={s.id} href={`/s/${s.slug}`} className="group overflow-hidden rounded-3xl border border-neutral-200 bg-white shadow-sm transition hover:-translate-y-1 hover:shadow-xl dark:border-neutral-800 dark:bg-neutral-900">
                   <div className="relative h-36 overflow-hidden" style={{ background: `linear-gradient(135deg, ${s.coverColor}, #7c3aed)` }}>
-                    <SafeImage src={s.bannerUrl} alt={s.name} className="h-full w-full object-cover transition duration-500 group-hover:scale-105" fallback="" fallbackClassName="absolute inset-0 !bg-transparent" />
+                    <SafeImage src={s.bannerUrl ?? "/seed/hero.svg"} alt={s.name} className="h-full w-full object-cover transition duration-500 group-hover:scale-105" fallback={<SalonIcon className="h-10 w-10 opacity-60" />} fallbackClassName="absolute inset-0 !bg-transparent" />
                     <span className="absolute right-3 top-3 inline-flex items-center gap-1 rounded-full bg-white/90 px-2.5 py-1 text-[10px] font-bold text-neutral-700 backdrop-blur">📍 {s.city ?? "سالن زیبایی"}</span>
                   </div>
                   <div className="p-5">
