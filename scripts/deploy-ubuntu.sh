@@ -266,6 +266,30 @@ link_for_app() { # link_for_app <name> — expose an executable root sees to the
   return 1
 }
 
+is_domain_name() { # is_domain_name <host> — a real dotted name, not an IP or localhost
+  local h="${1:-}"
+  if [ -z "$h" ] || [ "$h" = "localhost" ]; then
+    return 1
+  fi
+  if [[ "$h" =~ ^[0-9.]+$ ]]; then
+    return 1
+  fi
+  [[ "$h" =~ ^[a-z0-9]([a-z0-9-]*[a-z0-9])?(\.[a-z0-9]([a-z0-9-]*[a-z0-9])?)+$ ]]
+}
+root_domain_of() { # root_domain_of <host> — the domain the salon subdomains hang under
+  local h="${1:-}"
+  if ! is_domain_name "$h"; then
+    printf 'localhost'
+  elif [[ "$h" == *.*.* ]]; then
+    printf '%s' "${h#*.}"          # bots.example.com -> example.com
+  else
+    printf '%s' "$h"               # already a bare domain: example.com -> example.com
+  fi
+}
+url_host_of() { # url_host_of <url> — the host part of http(s)://host:port/path
+  printf '%s' "${1:-}" | sed -e 's|^[A-Za-z][A-Za-z0-9+.-]*://||' -e 's|[/?#].*$||' -e 's|:[0-9]*$||'
+}
+
 as_app() { # as_app <command...> — run as the service user with its own home/PM2
   if [ "$(id -un)" = "$APP_USER" ]; then
     "$@"
@@ -731,8 +755,15 @@ if [ ! -f .env ]; then
   if [ -z "${APP_URL:-}" ]; then
     APP_URL="$(ask "Public app URL" "$PUBLIC_BASE")"
   fi
+  # Root domain for the salon subdomains: the domain the app URL host sits on,
+  # so typing http://bots.example.com gets example.com, not "localhost".
   if [ -z "${ROOT_DOMAIN:-}" ]; then
-    ROOT_DOMAIN="$(ask "Root domain (for subdomains)" "${DOMAIN:-localhost}")"
+    URL_HOST="$(url_host_of "$APP_URL")"
+    ROOT_DEFAULT="$(root_domain_of "${DOMAIN:-$URL_HOST}")"
+    if [ "$ROOT_DEFAULT" = "localhost" ]; then
+      info "No domain behind this address (IP or localhost): subdomain per salon is unavailable."
+    fi
+    ROOT_DOMAIN="$(ask "Root domain (for subdomains)" "$ROOT_DEFAULT")"
   fi
 
   # Generate secrets
@@ -833,6 +864,58 @@ pm2 startup systemd -u "$APP_USER" --hp "$APP_HOME" >/dev/null 2>&1 || \
 #  edited, and Nobino keeps its own domain (or its own port).
 # ══════════════════════════════════════════════════════════════════
 WEB_OK=0
+
+# ─── Which names this site file answers for ────────────────────────
+# Its own domain plus the salon subdomains under the root domain. A wildcard
+# another site already owns is never added: each app keeps its own domains.
+SITE_HOST="${DOMAIN:-}"
+if [ -z "$SITE_HOST" ]; then
+  SITE_HOST="$(url_host_of "$(grep -m1 '^NEXT_PUBLIC_APP_URL=' "$APP_DIR/.env" 2>/dev/null | cut -d= -f2- | tr -d '"' || true)")"
+fi
+if ! is_domain_name "$SITE_HOST"; then
+  SITE_HOST=""
+fi
+SUB_ROOT="${ROOT_DOMAIN:-}"
+if [ -z "$SUB_ROOT" ]; then
+  SUB_ROOT="$(grep -m1 '^NEXT_PUBLIC_ROOT_DOMAIN=' "$APP_DIR/.env" 2>/dev/null | cut -d= -f2- | tr -d '"' || true)"
+fi
+if [ -z "$SUB_ROOT" ] || [ "$SUB_ROOT" = "localhost" ]; then
+  SUB_ROOT="$(root_domain_of "${SITE_HOST:-}")"
+  if [ "$SUB_ROOT" = "localhost" ]; then
+    SUB_ROOT=""
+  fi
+fi
+if [ -n "$SUB_ROOT" ] && ! is_domain_name "$SUB_ROOT"; then
+  warn "Ignoring an unusable root domain for subdomains: ${SUB_ROOT}"
+  SUB_ROOT=""
+fi
+if [ -n "$SITE_HOST" ] && [ -z "${DOMAIN:-}" ]; then
+  info "The site file will answer for ${SITE_HOST}, published on port ${PUBLIC_PORT}."
+fi
+
+wildcard_claimed() { # wildcard_claimed <root> — does another site already serve *.<root>?
+  local root="${1:-}" name="*.${1:-}"
+  [ -n "$root" ] || return 1
+  if [ "$WEB_KIND" = "apache" ]; then
+    grep -RFI "ServerAlias ${name}" /etc/apache2/sites-enabled/ /etc/apache2/conf-enabled/ 2>/dev/null \
+      | grep -v "${APP_NAME}" | grep -q . && return 0
+  else
+    grep -RFI "$name" /etc/nginx/sites-enabled/ /etc/nginx/conf.d/ 2>/dev/null \
+      | grep -v "${APP_NAME}" | grep -q . && return 0
+  fi
+  return 1
+}
+
+WILDCARD_ROOT=""
+if [ -n "$SITE_HOST" ] && [ -n "$SUB_ROOT" ]; then
+  if wildcard_claimed "$SUB_ROOT"; then
+    warn "Another site already serves *.${SUB_ROOT}; Nobino keeps only ${SITE_HOST} on this server."
+    SUB_ROOT=""
+  else
+    WILDCARD_ROOT="$SUB_ROOT"
+  fi
+fi
+
 if [ "$WEB_KIND" = "apache" ]; then
   # ── Apache: new vhost + optional extra port, existing sites untouched ──
   APACHE_CTL="apache2ctl"
@@ -875,7 +958,13 @@ EOF
   esac
 
   SERVER_NAME_LINE=""
-  [ -n "$DOMAIN" ] && SERVER_NAME_LINE="    ServerName ${DOMAIN}"
+  if [ -n "$SITE_HOST" ]; then
+    SERVER_NAME_LINE="    ServerName ${SITE_HOST}"
+    if [ -n "$WILDCARD_ROOT" ]; then
+      SERVER_NAME_LINE="${SERVER_NAME_LINE}
+    ServerAlias *.${WILDCARD_ROOT}"
+    fi
+  fi
   cat > "$APACHE_SITE" <<EOF
 # Managed by Nobino — do not edit other vhosts; each app keeps its own domain.
 <VirtualHost *:${PUBLIC_PORT}>
@@ -923,7 +1012,10 @@ else
     info "Installing Nginx..."
     apt-get install -y nginx || fail "Nginx could not be installed."
   fi
-  NGINX_SERVER_NAME="${DOMAIN:-_}"
+  NGINX_SERVER_NAME="${SITE_HOST:-_}"
+  if [ -n "$WILDCARD_ROOT" ]; then
+    NGINX_SERVER_NAME="${NGINX_SERVER_NAME} *.${WILDCARD_ROOT}"
+  fi
   cat > "$NGINX_CONF" <<EOF
 # Managed by Nobino — each app keeps its own site file and domain.
 server {
