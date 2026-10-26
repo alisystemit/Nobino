@@ -276,12 +276,26 @@ fi
 
 # ─── Phase 4: database schema ─────────────────────────────────────
 echo
-info "Prisma: generate + migrate (fallback db push)..."
+info "Prisma: generate + apply the schema..."
 app_sh "npx prisma generate" || fail "prisma generate failed; see the output above."
-if ! app_sh "npx prisma migrate deploy"; then
-  info "migrate deploy failed; trying db push..."
-  app_sh "npx prisma db push" || fail "Prisma could not apply the schema. Check DATABASE_URL in $APP_DIR/.env; the backups are in ${BACKUP_DIR}."
+# `migrate deploy` prints "No pending migrations to apply." and succeeds even
+# when the database is completely empty, which would leave every page failing
+# with "table does not exist". The repo has no prisma/migrations at all, so the
+# schema is applied with db push in that case.
+if [ -d "$APP_DIR/prisma/migrations" ] && [ -n "$(ls -A "$APP_DIR/prisma/migrations" 2>/dev/null)" ]; then
+  if app_sh "npx prisma migrate deploy"; then
+    info "Migrations applied."
+  else
+    warn "migrate deploy failed; falling back to db push..."
+    app_sh "npx prisma db push" || fail "Prisma could not apply the schema. Backups are in ${BACKUP_DIR}."
+  fi
+else
+  info "No prisma/migrations in the repository; applying the schema with db push..."
+  app_sh "npx prisma db push" || fail "Prisma could not create the schema. Check DATABASE_URL in $APP_DIR/.env and run 'npx prisma db push' yourself to see the prompt (backups are in ${BACKUP_DIR})."
 fi
+# The seed is idempotent (findUnique/upsert), so it is safe on every update.
+info "Seeding (only adds what is missing)..."
+app_sh "node prisma/seed.mjs" || warn "seed reported errors (data may already exist)."
 
 # ─── Phase 5: build ───────────────────────────────────────────────
 echo
@@ -317,11 +331,22 @@ app_sh "pm2 save" || warn "pm2 save failed; the app will not survive a reboot."
 
 # ─── Phase 7: health check ────────────────────────────────────────
 echo
-CODE="$(curl -s -o /dev/null -w '%{http_code}' --max-time 20 "http://127.0.0.1:${PORT}/" || echo 000)"
-if [ "$CODE" = "200" ] || [ "$CODE" = "301" ] || [ "$CODE" = "302" ] || [ "$CODE" = "307" ]; then
-  info "Health check: HTTP $CODE from the app itself — the update looks good."
-else
-  warn "Health check: HTTP $CODE from 127.0.0.1:${PORT}. Last log lines:"
+wait_for_app() { # the app has just restarted: give Next.js a few seconds
+  local i code=""
+  for i in 1 2 3 4 5 6 7 8 9 10; do
+    code="$(curl -s -o /dev/null -w '%{http_code}' --max-time 5 "http://127.0.0.1:${PORT}/" 2>/dev/null || true)"
+    case "$code" in
+      200|301|302|307) info "Health check: HTTP ${code} — the app is serving."; return 0 ;;
+      000|"") sleep 2 ;;
+      *) warn "Health check: HTTP ${code} — the app answers but reports an error."; return 2 ;;
+    esac
+  done
+  warn "Health check: 127.0.0.1:${PORT} did not answer."
+  return 1
+}
+HEALTH=0
+wait_for_app || HEALTH=$?
+if [ "$HEALTH" -ne 0 ]; then
   app_sh "pm2 logs ${APP_NAME} --lines 30 --nostream" || true
   warn "Roll the code back with: git -C $APP_DIR checkout ${OLD_SHA:-<previous sha>} && sudo bash $APP_DIR/scripts/update-ubuntu.sh --skip-deps"
 fi

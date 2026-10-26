@@ -806,9 +806,21 @@ chown "$APP_USER":"$APP_GROUP" .env 2>/dev/null || true
 # ══════════════════════════════════════════════════════════════════
 info "Generating Prisma Client and applying the schema..."
 app_sh "npx prisma generate" || fail "prisma generate failed; the npm output above has the reason."
-app_sh "npx prisma migrate deploy" \
-  || { info "migrate deploy failed; trying db push..."; app_sh "npx prisma db push" \
-       || fail "Prisma could not create the schema. Check DATABASE_URL in ${APP_DIR}/.env (a fresh PostgreSQL role needs the password the script generated for it)."; }
+# `migrate deploy` happily says "No pending migrations to apply." on an empty
+# database, so the schema has to be pushed when the repo carries no migrations.
+if [ -d prisma/migrations ] && [ -n "$(ls -A prisma/migrations 2>/dev/null)" ]; then
+  if app_sh "npx prisma migrate deploy"; then
+    info "Migrations applied."
+  else
+    info "migrate deploy failed; trying db push..."
+    app_sh "npx prisma db push" \
+      || fail "Prisma could not create the schema. Check DATABASE_URL in ${APP_DIR}/.env (a fresh PostgreSQL role needs the password the script generated for it)."
+  fi
+else
+  info "No prisma/migrations in the repository; creating the schema with db push..."
+  app_sh "npx prisma db push" \
+    || fail "Prisma could not create the schema. Check DATABASE_URL in ${APP_DIR}/.env and run 'npx prisma db push' by hand to read any prompt."
+fi
 info "Seeding initial data..."
 app_sh "node prisma/seed.mjs" || warn "seed reported errors (data may already exist)."
 
@@ -856,6 +868,30 @@ app_sh "pm2 save" || warn "pm2 save failed; the process will not survive a reboo
 # Autostart on boot for this user only (a separate PM2 instance per user).
 pm2 startup systemd -u "$APP_USER" --hp "$APP_HOME" >/dev/null 2>&1 || \
   warn "pm2 startup failed; run: pm2 startup systemd -u ${APP_USER} --hp ${APP_HOME}"
+
+# ─── Did it actually come up? ───────────────────────────────────────
+# Next.js needs a few seconds after PM2 says "online", and a database whose
+# tables were never created answers with an error page instead of the app. So:
+# retry, then show the log tail rather than declaring a silent success.
+wait_for_app() {
+  local i code=""
+  for i in 1 2 3 4 5 6 7 8 9 10; do
+    code="$(curl -s -o /dev/null -w '%{http_code}' --max-time 5 "http://127.0.0.1:${PORT}/" 2>/dev/null || true)"
+    case "$code" in
+      200|301|302|307) info "Health check: HTTP ${code} — the app is serving."; return 0 ;;
+      000|"") sleep 2 ;;
+      *) warn "Health check: HTTP ${code} — the app answers but reports an error."; return 2 ;;
+    esac
+  done
+  warn "Health check: 127.0.0.1:${PORT} did not answer."
+  return 1
+}
+HEALTH=0
+wait_for_app || HEALTH=$?
+if [ "$HEALTH" -ne 0 ]; then
+  app_sh "pm2 logs ${APP_NAME} --lines 30 --nostream" || true
+  warn "If the log says 'The table public.X does not exist', the schema was never created. Fix it with: sudo -u ${APP_USER} -H bash -lc 'cd ${APP_DIR} && npx prisma db push && node prisma/seed.mjs' && sudo -u ${APP_USER} -H pm2 restart ${APP_NAME} --update-env"
+fi
 
 # ══════════════════════════════════════════════════════════════════
 #  Phase 9 — write the site/vhost decided in Phase 0b
