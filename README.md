@@ -105,22 +105,30 @@ npm run dev
 curl -fsSL https://raw.githubusercontent.com/alisystemit/Nobino/main/scripts/install-from-github.sh | sudo bash
 ```
 
-### هم‌زیستی با سرور فعلی (Apache + PHP 8 + MySQL/MariaDB)
+### سرور خام یا سرور دارای Apache/Nginx؟
 
-این اسکریپت برای سروری نوشته شده که **از قبل** یک LAMP کامل دارد (ربات تلگرام،
-phpMyAdmin، سایت‌های PHP با SSL):
+اسکریپت اول سرور را بررسی می‌کند و بعد یکی از دو مسیر را می‌رود:
 
-- **MySQL/MariaDB، PHP و Apache** نه نصب می‌شوند، نه ارتقا، نه ری‌استارت و نه
-  دوباره تنظیم؛ فایل `/etc/apache2`، پوشه‌های سایت‌ها، دامنه‌ها و گواهی‌های SSL
-  آن‌ها دست‌نخورده می‌مانند (هیچ تغییری در `/var/www` هم داده نمی‌شود).
-- اپ با یک **کاربر اختصاصی و کم‌دسترس** (`nobino`) اجرا می‌شود، نه root؛
-  پوشه نصب `/opt/nobino` و خانه کاربر `/var/lib/nobino` است.
-- اگر پورت 80 در اختیار Apache باشد، Nginx روی اولین پورت آزاد **8080 تا 8099**
-  بالا می‌آید و فقط فایل اختصاصی خودش (`nobino.conf`) را اضافه می‌کند.
-- در همین حالت certbot و UFW **دست نمی‌خورند** و فقط یک قطعه آماده برای
-  reverse-proxy در vhost آپاچی چاپ می‌شود (که خودتان در صورت نیاز اضافه کنید).
-- چیزهایی که تازه نصب می‌شوند: Node.js، PM2، PostgreSQL و Nginx. هر کدام از قبل
-  باشد، دوباره نصب نمی‌شود.
+- **سرور خام (هیچ وب‌سروری ندارد):** همه‌چیز کامل نصب می‌شود — Node.js،
+  PostgreSQL، PHP (CLI + FPM)، Nginx، PM2، بیلد پروژه و در صورت داشتن دامنه
+  گواهی SSL و فایروال UFW.
+- **Apache یا Nginx از قبل نصب است:** همان وب‌سرور **استفاده** می‌شود و پروژه در
+  `/var/www/nobino` کنار سایت‌های دیگر قرار می‌گیرد. فقط یک فایل اختصاصی اضافه
+  می‌شود (`/etc/apache2/sites-available/nobino.conf` یا
+  `/etc/nginx/sites-available/nobino.conf`) و وب‌سرور reload می‌شود. سایت‌ها،
+  دامنه‌ها، پوشه‌ها و گواهی‌های SSL بقیهٔ برنامه‌ها **تغییر نمی‌کنند**.
+- **دامنهٔ تکراری:** اگر دامنهٔ واردشده قبلاً برای سایت دیگری تنظیم شده باشد، به
+  آن سایت دست نمی‌زنیم؛ Nobino روی اولین پورت آزاد **8080 تا 8099** منتشر می‌شود
+  و همان دامنه با پورت قابل استفاده است.
+- **PHP:** اگر روی سرور نصب باشد، همان استفاده و دست‌نخورده می‌ماند؛ اگر نباشد،
+  `php-cli` و `php-fpm` با افزونه‌های رایج نصب می‌شوند. `mod_php` هرگز نصب
+  نمی‌شود تا کانفیگ Apache تغییر نکند.
+- **دیتابیس:** PostgreSQL موجود استفاده می‌شود. یوزر/رمز قبلی **هرگز تغییر
+  نمی‌کند**: اگر role هم‌نام وجود داشته باشد ولی رمزش معلوم نباشد، یا دیتابیس
+  هم‌نام متعلق به نقش دیگری باشد، یک role و دیتابیس جداگانه با پسوند ساخته
+  می‌شود. MySQL/MariaDB نه نصب، نه ری‌استارت و نه بازتنظیم می‌شود.
+- اپ با یک **کاربر اختصاصی و کم‌دسترس** (`nobino`) اجرا می‌شود، نه root؛ خانهٔ
+  کاربر `/var/lib/nobino` است و خود اپ فقط روی `127.0.0.1:3000` گوش می‌دهد.
 
 > سؤال‌ها از ترمینال (`/dev/tty`) خوانده می‌شوند، پس اجرای pipe تعامل را از بین
 > نمی‌برد. اگر کد از قبل روی سرور است: `sudo bash scripts/deploy-ubuntu.sh`.
@@ -132,13 +140,14 @@ phpMyAdmin، سایت‌های PHP با SSL):
 | `REPO_URL` | `https://github.com/alisystemit/Nobino.git` | ریپوی منبع (برای ریپوی خصوصی با توکن هم کار می‌کند) |
 | `GIT_REF` | `main` | برنچ، تگ یا کامیت برای استقرار |
 | `APP_USER` | `nobino` | کاربر سرویس (بدون دسترسی root) |
-| `APP_DIR` | `/opt/nobino` | پوشه نصب (بیرون از web root آپاچی) |
+| `APP_DIR` | `/var/www/nobino` | پوشه نصب، کنار سایت‌های وب‌سرور |
 | `PORT` | `3000` | پورت داخلی Next (فقط روی 127.0.0.1) |
-| `NGINX_PORT` | `80` یا پورت آزاد 8080+ | پورت عمومی Nginx |
-| `COEXIST` | `auto` | `auto/1/0` نگه‌داشتن دست‌نخوردهٔ Apache/MySQL/PHP (auto = روشن وقتی Apache دیده شود) |
-| `MANAGE_UFW` | `auto` | `auto/1/0` تنظیم فایروال (در حالت هم‌زیستی خاموش) |
-| `ENABLE_SSL` | `auto` | `auto/1/0` گرفتن گواهی با certbot (در حالت هم‌زیستی خاموش) |
-| `DOMAIN` | _(خالی)_ | دامنه؛ خالی = نصب فقط با IP و پورت |
+| `WEB_SERVER` | `auto` | `auto/apache/nginx` — auto یعنی وب‌سرور موجود استفاده شود و روی سرور خام Nginx نصب شود |
+| `WEB_PORT` | `80` با دامنهٔ آزاد، وگرنه پورت آزاد 8080+ | پورت عمومی؛ مقدار صریح همیشه رعایت می‌شود (پورت 80 فقط با دامنهٔ آزاد) |
+| `INSTALL_PHP` | `auto` | `auto` = استفاده از PHP موجود یا نصب CLI+FPM؛ `0` = کاری با PHP نداشته باش |
+| `MANAGE_UFW` | `auto` | `auto/1/0` تنظیم فایروال (auto فقط روی سرور خام روشن است) |
+| `ENABLE_SSL` | `auto` | `auto/1/0` گرفتن گواهی با certbot (auto وقتی دامنه و پورت 80 آزاد باشد) |
+| `DOMAIN` | _(خالی)_ | دامنهٔ اختصاصی همین نصب؛ خالی = نصب فقط با IP و پورت |
 | `SSL_EMAIL` | `admin@DOMAIN` | ایمیل تماس certbot |
 | `APP_URL` / `ROOT_DOMAIN` | از `DOMAIN` | آدرس عمومی و دامنه ریشه ساب‌دامین‌ها |
 | `NONINTERACTIVE` | `0` | با `1` هیچ سؤالی پرسیده نمی‌شود |
@@ -150,41 +159,41 @@ curl -fsSL https://raw.githubusercontent.com/alisystemit/Nobino/main/scripts/ins
   | sudo DOMAIN=nobino.ir SSL_EMAIL=admin@nobino.ir NONINTERACTIVE=1 bash
 ```
 
-برای انتشار روی **دامنهٔ HTTPS موجود در آپاچی** (بدون دست‌زدن به SSL آن)، بعد از
-نصب این را داخل vhost همان دامنه بگذارید (`a2enmod proxy proxy_http` و سپس
-`systemctl reload apache2`):
+نصب روی سروری که Apache دارد و دامنهٔ جدا برای Nobino:
 
-```apache
-ProxyPreserveHost On
-ProxyPass        / http://127.0.0.1:8080/ retry=0
-ProxyPassReverse / http://127.0.0.1:8080/
+```bash
+curl -fsSL https://raw.githubusercontent.com/alisystemit/Nobino/main/scripts/install-from-github.sh \
+  | sudo DOMAIN=app.example.com NONINTERACTIVE=1 bash
 ```
 
-(پورت `8080` همان چیزی است که اسکریپت در پایان نصب چاپ می‌کند.)
+اگر دامنهٔ جدید ندارید، `DOMAIN` را خالی بگذارید؛ اسکریپت یک پورت آزاد 8080–8099
+انتخاب می‌کند و آدرس نهایی را در پایان چاپ می‌کند.
 
 **به‌روزرسانی بعدی** (کد را می‌کشد و سرویس را با همان کاربر ری‌استارت می‌کند):
 
 ```bash
-sudo bash /opt/nobino/scripts/deploy-ubuntu.sh
+sudo bash /var/www/nobino/scripts/deploy-ubuntu.sh
 # یا یک تگ مشخص:
-sudo GIT_REF=v1.0.0 bash /opt/nobino/scripts/deploy-ubuntu.sh
+sudo GIT_REF=v1.0.0 bash /var/www/nobino/scripts/deploy-ubuntu.sh
 ```
 
 اگر پوشهٔ نصب تغییرات دست‌ی (commit‌نشده) داشته باشد، اسکریپت آن را **پاک نمی‌کند**
 و فقط هشدار می‌دهد.
 
-**حذف کامل:** هر بخش (PM2، Nginx، SSL، دیتابیس، فایروال، Node، پوشه، کاربر سرویس)
-جداگانه پرسیده می‌شود و فقط چیزی که تأیید کنید حذف می‌شود؛ قبل از حذف دیتابیس هم
-پشتیبان `pg_dump` گرفته می‌شود. Apache/PHP/MySQL هیچ‌وقت لمس نمی‌شوند:
+**حذف کامل:** هر بخش (PM2، وب‌سرور، SSL، دیتابیس، فایروال، Node، پوشه، کاربر
+سرویس) جداگانه پرسیده می‌شود و فقط چیزی که تأیید کنید حذف می‌شود؛ قبل از حذف
+دیتابیس هم پشتیبان `pg_dump` گرفته می‌شود. فقط vhost/فایل اختصاصی Nobino حذف
+می‌شود؛ سایت‌های دیگر، PHP و MySQL/MariaDB دست‌نخورده می‌مانند و بستهٔ Apache
+هیچ‌وقت حذف نمی‌شود:
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/alisystemit/Nobino/main/scripts/uninstall-ubuntu.sh \
   | sudo bash -s -- --dry-run      # پیش‌نمایش، بدون هیچ تغییری
-sudo bash /opt/nobino/scripts/uninstall-ubuntu.sh
+sudo bash /var/www/nobino/scripts/uninstall-ubuntu.sh
 ```
 
 پس از نصب، ادمین پیش‌فرض سید با شماره `09120000000` وارد شوید و رمز را عوض کنید
-(`sudo -u nobino -H env HOME=/var/lib/nobino bash -lc 'cd /opt/nobino && node scripts/reset-admin-password.mjs رمز-جدید'`).
+(`sudo -u nobino -H env HOME=/var/lib/nobino bash -lc 'cd /var/www/nobino && node scripts/reset-admin-password.mjs رمز-جدید'`).
 
 ---
 

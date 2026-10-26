@@ -6,32 +6,46 @@
 #  One-line install from GitHub:
 #    curl -fsSL https://raw.githubusercontent.com/alisystemit/Nobino/main/scripts/install-from-github.sh | sudo bash
 #
-#  Behavior: existing components are reused (not reinstalled);
-#            only missing ones are installed and configured.
+#  Behavior: a clean server gets everything installed; on a server that already
+#            has Apache or Nginx, that server is reused and only a new site file
+#            is added. Existing components are never reinstalled or rewritten.
 #
-#  Safe next to an existing stack (Apache/LAMP + MySQL/MariaDB + Telegram bot):
-#    * MySQL/MariaDB is never installed, restarted or reconfigured.
-#    * Apache and its sites, folders and SSL certificates are never touched.
-#    * The app runs as its own unprivileged user, never as root.
-#    * When Apache owns port 80, Nginx is put on a free port instead.
-#    * certbot and UFW are skipped in that mode (nothing of the existing
-#      server changes); a ready Apache reverse-proxy snippet is printed.
+#  * Bare server      : Node.js, PostgreSQL, PHP CLI+FPM and Nginx are installed
+#                       and configured from scratch.
+#  * Existing Apache  : the project goes to /var/www/nobino and gets its own
+#    or Nginx          vhost/site file with its own domain; only Apache/Nginx
+#                       is reloaded. Other sites, their folders, domains and
+#                       certificates are not edited.
+#  * Domain conflict  : the other site keeps its domain; Nobino is published on
+#                       its own free port (8080-8099) instead.
+#  * PHP              : an installed PHP is reused as-is; when none exists,
+#                       PHP CLI + FPM are installed (mod_php is never used, so
+#                       Apache's configuration stays untouched).
+#  * Database         : PostgreSQL is reused when present. An existing role is
+#                       never altered: if its password is unknown, a separate
+#                       role + database (suffix) is created. MySQL/MariaDB is
+#                       never installed, started or reconfigured.
+#  * The app runs as its own unprivileged user (never as root); the web server
+#    only proxies to 127.0.0.1:PORT.
 #
 #  Environment overrides (all optional):
 #    REPO_URL        git repository to clone      (default: public Nobino repo)
 #    GIT_REF         branch/tag/commit to deploy  (default: main)
 #    APP_USER        unprivileged service user    (default: nobino)
 #    APP_HOME        home of that user            (default: /var/lib/nobino)
-#    APP_DIR         install directory            (default: /opt/nobino)
+#    APP_DIR         install directory            (default: /var/www/nobino)
 #    PORT            internal Next.js port        (default: 3000)
-#    NGINX_PORT      public Nginx port            (default: 80, or a free port
-#                                                  when Apache occupies 80)
-#    COEXIST         auto|1|0  keep an existing Apache/MySQL stack untouched
-#                              (auto = on when Apache is detected)
-#    MANAGE_UFW      auto|1|0  configure the firewall (auto = off in coexistence)
-#    ENABLE_SSL      auto|1|0  run certbot for DOMAIN (auto = off in coexistence)
-#    DOMAIN          domain name for SSL; empty   = IP-only install
+#    WEB_SERVER      auto|apache|nginx            (auto = reuse what exists,
+#                                                  Nginx on a clean server)
+#    WEB_PORT        public port                  (default: 80 with a free
+#                                                  domain, else a free 8080-
+#                                                  8099; an explicit value is
+#                                                  honored, 80 needs a domain)
+#    INSTALL_PHP     auto|0                       (auto = reuse or install PHP)
+#    DOMAIN          own domain for this install  (empty = IP + port)
 #    SSL_EMAIL       certbot contact email
+#    MANAGE_UFW      auto|1|0  firewall (auto = only on a clean server)
+#    ENABLE_SSL      auto|1|0  certbot for DOMAIN (auto = when port 80 + domain)
 #    APP_URL         public app URL (https://...)
 #    ROOT_DOMAIN     root domain used for subdomains
 #    NONINTERACTIVE  set to 1 to never prompt; every question uses its
@@ -96,31 +110,42 @@ fi
 export DEBIAN_FRONTEND=noninteractive
 
 APP_NAME="nobino"
-# The app never runs as root and lives outside the Apache web root, so an
-# existing LAMP/PHP site keeps its folders exactly as they are.
 APP_USER="${APP_USER:-nobino}"
 APP_HOME="${APP_HOME:-/var/lib/${APP_USER}}"
-APP_DIR="${APP_DIR:-/opt/nobino}"
+# Filled in after detection: /var/www/nobino next to the web server's sites.
+APP_DIR="${APP_DIR:-}"
 PORT="${PORT:-3000}"
 NODE_REQUIRED="18"
 # The public repository is the default source, so a bare Enter accepts it.
 REPO_URL="${REPO_URL:-https://github.com/alisystemit/Nobino.git}"
 GIT_REF="${GIT_REF:-main}"
-# Pre-set DOMAIN/APP_URL/NGINX_PORT/SSL_EMAIL to run unattended.
+# Pre-set DOMAIN/WEB_PORT/SSL_EMAIL to run unattended.
 DOMAIN="${DOMAIN:-}"
-COEXIST="${COEXIST:-auto}"
 MANAGE_UFW="${MANAGE_UFW:-auto}"
 ENABLE_SSL="${ENABLE_SSL:-auto}"
+INSTALL_PHP="${INSTALL_PHP:-auto}"
+# auto | apache | nginx  — which web server serves Nobino (auto = reuse one
+# that is already on the server, or install Nginx on a clean server).
+WEB_SERVER="${WEB_SERVER:-auto}"
+PUBLIC_PORT_OVERRIDE="${WEB_PORT:-${NGINX_PORT:-}}"
+
+APACHE_SITE="/etc/apache2/sites-available/${APP_NAME}.conf"
+APACHE_SITE_LINK="/etc/apache2/sites-enabled/${APP_NAME}.conf"
+APACHE_PORT_CONF="/etc/apache2/conf-available/${APP_NAME}-port.conf"
+APACHE_DENY_CONF="/etc/apache2/conf-available/${APP_NAME}-deny.conf"
 NGINX_CONF="/etc/nginx/sites-available/${APP_NAME}.conf"
+NGINX_CONF_LINK="/etc/nginx/sites-enabled/${APP_NAME}.conf"
 
 # ══════════════════════════════════════════════════════════════════
-#  Phase 0a — detect the existing stack (read-only) and pick safe defaults
+#  Phase 0a — inspect the server (read-only) and choose the integration
 # ══════════════════════════════════════════════════════════════════
 APACHE_PRESENT=0
 if command -v apache2ctl >/dev/null 2>&1 || command -v apachectl >/dev/null 2>&1 ||
    [ -d /etc/apache2 ] || pgrep -x apache2 >/dev/null 2>&1; then
   APACHE_PRESENT=1
 fi
+NGINX_PRESENT=0
+if command -v nginx >/dev/null 2>&1 || [ -d /etc/nginx ]; then NGINX_PRESENT=1; fi
 MYSQL_PRESENT=0
 if [ -d /etc/mysql ] || command -v mysqld >/dev/null 2>&1 || command -v mariadbd >/dev/null 2>&1 ||
    systemctl list-unit-files 2>/dev/null | grep -qE '^(mysql|mariadb)\.service'; then
@@ -128,18 +153,47 @@ if [ -d /etc/mysql ] || command -v mysqld >/dev/null 2>&1 || command -v mariadbd
 fi
 PHP_PRESENT=0
 if command -v php >/dev/null 2>&1 || ls /etc/php >/dev/null 2>&1; then PHP_PRESENT=1; fi
+POSTGRES_PRESENT=0
+if command -v psql >/dev/null 2>&1; then POSTGRES_PRESENT=1; fi
 
-[ "$APACHE_PRESENT" -eq 1 ] && info "Apache detected — coexistence mode keeps it untouched."
-[ "$MYSQL_PRESENT" -eq 1 ] && info "MySQL/MariaDB detected — it will not be installed, restarted or reconfigured."
-[ "$PHP_PRESENT" -eq 1 ] && info "PHP detected (existing sites) — no PHP packages are changed."
-
-case "${COEXIST,,}" in
-  auto) if [ "$APACHE_PRESENT" -eq 1 ]; then COEXIST=1; else COEXIST=0; fi ;;
-  1|yes|true) COEXIST=1 ;;
-  0|no|false) COEXIST=0 ;;
-  *) warn "Unknown COEXIST='${COEXIST}'; falling back to auto."; COEXIST=$([ "$APACHE_PRESENT" -eq 1 ] && echo 1 || echo 0) ;;
+# Which web server will own the public port? An existing one is always reused
+# (never replaced); only a server without any web server gets Nginx.
+WEB_INSTALLED=0
+case "${WEB_SERVER,,}" in
+  apache)
+    APACHE_PRESENT=1; WEB_KIND=apache ;;
+  nginx)
+    WEB_KIND=nginx ;;
+  auto|'')
+    if [ "$APACHE_PRESENT" -eq 1 ] && systemctl is-active --quiet apache2 2>/dev/null; then
+      WEB_KIND=apache
+    elif [ "$NGINX_PRESENT" -eq 1 ] && systemctl is-active --quiet nginx 2>/dev/null; then
+      WEB_KIND=nginx
+    elif [ "$APACHE_PRESENT" -eq 1 ]; then
+      WEB_KIND=apache
+    elif [ "$NGINX_PRESENT" -eq 1 ]; then
+      WEB_KIND=nginx
+    else
+      WEB_KIND=nginx; WEB_INSTALLED=1
+    fi ;;
+  *)
+    warn "Unknown WEB_SERVER='${WEB_SERVER}'; using auto."
+    if [ "$APACHE_PRESENT" -eq 1 ]; then WEB_KIND=apache
+    elif [ "$NGINX_PRESENT" -eq 1 ]; then WEB_KIND=nginx
+    else WEB_KIND=nginx; WEB_INSTALLED=1; fi ;;
 esac
-[ "$COEXIST" -eq 1 ] && info "Coexistence mode: Nginx gets its own port; certbot and UFW are not touched."
+if [ "$WEB_KIND" = "apache" ] && [ "$APACHE_PRESENT" -eq 0 ]; then
+  fail "WEB_SERVER=apache was requested, but Apache is not installed."
+fi
+if [ "$WEB_KIND" = "nginx" ] && [ "$NGINX_PRESENT" -eq 0 ]; then
+  WEB_INSTALLED=1
+fi
+
+[ "$WEB_INSTALLED" -eq 1 ] && info "Clean server: Nginx will be installed as the web server."
+[ "$WEB_INSTALLED" -eq 0 ] && info "Existing ${WEB_KIND} detected — it will be reused, not replaced."
+[ "$MYSQL_PRESENT" -eq 1 ] && info "MySQL/MariaDB detected — it will not be installed, restarted or reconfigured."
+[ "$PHP_PRESENT" -eq 1 ] && info "PHP detected — the installed version is reused and left untouched."
+[ "$POSTGRES_PRESENT" -eq 1 ] && info "PostgreSQL detected — the existing server is reused."
 
 # ─── Port helpers (read-only) ─────────────────────────────────────
 port_in_use() { # port_in_use <port>
@@ -161,31 +215,25 @@ free_port() { # free_port <start> [end] — first unused port in the range
   done
   return 1
 }
-# A re-run must keep the port that this install already uses: when Nginx is the
-# one listening, the port is taken by ourselves, not by a foreign service.
-nginx_owns_port() { # nginx_owns_port <port>
-  [ -f "$NGINX_CONF" ] || return 1
-  grep -qE "^[[:space:]]*listen[[:space:]]+$1([[:space:];]|$)" "$NGINX_CONF" 2>/dev/null
+# A re-run must keep the port that this install already uses (the site file it
+# wrote earlier listens there, so a busy port can be our own).
+our_site_uses_port() { # our_site_uses_port <port>
+  { [ -f "$NGINX_CONF" ] && grep -qE "^[[:space:]]*listen[[:space:]]+$1([[:space:];]|$)" "$NGINX_CONF" 2>/dev/null; } && return 0
+  { [ -f "$APACHE_SITE" ] && grep -qE "<VirtualHost[[:space:]]+\*:$1>" "$APACHE_SITE" 2>/dev/null; } && return 0
+  return 1
 }
 
-# Default public port: 80 on a dedicated server, but never fight Apache for it.
-DEFAULT_NGINX_PORT=80
-if port_in_use 80 && ! nginx_owns_port 80; then
-  if [ "$COEXIST" -eq 1 ]; then
-    if FREE_NGINX_PORT="$(free_port 8080 8099)"; then
-      DEFAULT_NGINX_PORT="$FREE_NGINX_PORT"
-      warn "Port 80 is already taken (Apache); Nginx will listen on ${DEFAULT_NGINX_PORT} instead."
-    else
-      fail "Ports 8080-8099 are all busy; set NGINX_PORT manually."
-    fi
+# ─── The project lives next to the existing sites, not in /opt ────
+if [ -z "$APP_DIR" ]; then
+  if [ -d "/var/www/$APP_NAME" ]; then
+    APP_DIR="/var/www/$APP_NAME"
+  elif [ -d "/opt/$APP_NAME" ]; then
+    APP_DIR="/opt/$APP_NAME"          # layout of older installs
   else
-    warn "Port 80 is already taken by another service."
-    if FREE_NGINX_PORT="$(free_port 8080 8099)"; then
-      DEFAULT_NGINX_PORT="$FREE_NGINX_PORT"
-      warn "Nginx will listen on ${DEFAULT_NGINX_PORT} instead (override with NGINX_PORT)."
-    fi
+    APP_DIR="/var/www/$APP_NAME"      # web root used by Apache and Nginx (Debian/Ubuntu)
   fi
 fi
+APP_DIR="${APP_DIR%/}"
 
 # ─── Dedicated unprivileged user: the app never runs as root ──────
 if id -u "$APP_USER" >/dev/null 2>&1; then
@@ -210,20 +258,55 @@ app_sh() { # app_sh '<shell snippet>' — executed inside APP_DIR as the service
   as_app bash -lc "cd '$APP_DIR' && $1"
 }
 
+# ─── Own domain: every install gets its own vhost/site file ───────
+if [ -z "$DOMAIN" ]; then
+  DOMAIN="$(ask "Your own domain for Nobino (empty = serve on IP and a port)" "")"
+fi
+DOMAIN="${DOMAIN#http://}"; DOMAIN="${DOMAIN#https://}"; DOMAIN="${DOMAIN%/}"; DOMAIN="${DOMAIN,,}"
+if [ -n "$DOMAIN" ] && ! [[ "$DOMAIN" =~ ^[a-z0-9]([a-z0-9.-]*[a-z0-9])?$ ]]; then
+  warn "'${DOMAIN}' is not a valid domain name; continuing without one."
+  DOMAIN=""
+fi
+[ -n "$DOMAIN" ] && info "Nobino will be published on its own domain: ${DOMAIN}"
+
 # ══════════════════════════════════════════════════════════════════
 #  Phase 0 — system prerequisites (missing only)
 # ══════════════════════════════════════════════════════════════════
 info "Checking and installing base prerequisites (apt)..."
 apt-get update -y
-# Only the packages Nobino needs are named here: apache2, php*, mysql-server
-# and mariadb-server are deliberately absent, so apt never upgrades or
-# reconfigures the existing LAMP stack that other sites/robots rely on.
+# apache2, php*, mysql-server and mariadb-server are deliberately absent:
+# an existing stack is reused as-is and never upgraded or reconfigured.
+# PostgreSQL is installed in Phase 1, only when it is really missing.
 apt-get install -y \
   curl wget git ca-certificates gnupg lsb-release \
   openssl build-essential python3 make g++ \
-  postgresql postgresql-contrib \
-  nginx \
   || warn "Some packages failed to install; continuing."
+if [ "$WEB_INSTALLED" -eq 1 ]; then
+  info "Installing Nginx (this server has no web server yet)..."
+  apt-get install -y nginx || fail "Nginx could not be installed."
+fi
+
+# ─── PHP: reuse what exists, install only when it is missing ──────
+# Nobino itself runs on Node.js; PHP is managed here because this installer
+# targets full-stack servers. Set INSTALL_PHP=0 to skip it entirely.
+case "${INSTALL_PHP,,}" in
+  0|no|false) info "PHP handling skipped (INSTALL_PHP=${INSTALL_PHP})." ;;
+  *)
+    if [ "$PHP_PRESENT" -eq 1 ]; then
+      info "PHP is present ($(php -v 2>/dev/null | head -1 | cut -d' ' -f1-2)); leaving it exactly as it is."
+    else
+      info "PHP is not installed; installing PHP CLI + FPM + common extensions (mod_php is not used, so Apache stays untouched)..."
+      apt-get install -y \
+        php-cli php-fpm php-common php-curl php-gd php-mbstring \
+        php-xml php-zip php-intl php-bcmath php-mysql php-sqlite3 \
+        || warn "PHP installation reported errors; continuing."
+      # Start whatever phpX.Y-fpm unit the distribution created.
+      for unit in $(systemctl list-unit-files --type=service --no-legend 2>/dev/null | awk '{print $1}' | grep -E '^php[0-9.]+-fpm\.service$'); do
+        systemctl enable --now "$unit" || warn "Could not start ${unit}."
+      done
+      command -v php >/dev/null 2>&1 && info "PHP installed: $(php -v | head -1 | cut -d' ' -f1-2)."
+    fi ;;
+esac
 
 # ══════════════════════════════════════════════════════════════════
 #  Phase 1 — PostgreSQL (use the existing server if present)
@@ -243,6 +326,7 @@ DB_USER="nobino"
 DB_NAME="nobino"
 DB_PASS=""
 DB_HOST="localhost"
+DB_CONFLICT=0
 # Reuse the previous database if an .env file already exists.
 if [ -f "$APP_DIR/.env" ] && grep -q '^DATABASE_URL=' "$APP_DIR/.env"; then
   EXISTING_URL="$(grep '^DATABASE_URL=' "$APP_DIR/.env" | head -1 | cut -d= -f2- | tr -d '"')"
@@ -285,6 +369,10 @@ as_postgres() {
   else su postgres -c "$*"; fi
 }
 run_psql() { as_postgres psql -v ON_ERROR_STOP=1 -tAc "$1"; }
+pg_can_login() { # pg_can_login <user> <password> — do these credentials work?
+  [ -n "$2" ] || return 1
+  PGPASSWORD="$2" psql -h 127.0.0.1 -p "${DB_PORT:-5432}" -U "$1" -d postgres -tAc 'SELECT 1' >/dev/null 2>&1
+}
 
 if [ "$LOCAL_DB" -eq 0 ]; then
   warn "DATABASE_URL points at ${DB_HOST} (not local); skipping role/database creation."
@@ -294,6 +382,44 @@ else
   if ! [[ "$DB_NAME" =~ ^[A-Za-z0-9_]+$ ]] || ! [[ "$DB_USER" =~ ^[A-Za-z0-9_]+$ ]]; then
     fail "Database user/name may only contain letters, digits and underscores."
   fi
+
+  # An existing role is never altered (its password belongs to someone else),
+  # and an existing database is never taken over. On any doubt, a separate
+  # role + database are created so the previous install keeps working.
+  DB_CONFLICT=0
+  CONFLICT_REASON=""
+  if [ -z "$EXISTING_URL" ]; then
+    ROLE_EXISTS="$(run_psql "SELECT 1 FROM pg_roles WHERE rolname='${DB_USER}'")"
+    DB_EXISTS="$(run_psql "SELECT 1 FROM pg_database WHERE datname='${DB_NAME}'")"
+    if [ "$ROLE_EXISTS" = "1" ] && ! pg_can_login "$DB_USER" "$DB_PASS"; then
+      DB_CONFLICT=1
+      CONFLICT_REASON="role '${DB_USER}' already exists with a password this installer does not know"
+    elif [ "$DB_EXISTS" = "1" ]; then
+      DB_OWNER="$(run_psql "SELECT pg_get_userbyid(datdba) FROM pg_database WHERE datname='${DB_NAME}'")"
+      if [ "$DB_OWNER" != "$DB_USER" ]; then
+        DB_CONFLICT=1
+        CONFLICT_REASON="database '${DB_NAME}' already exists and belongs to '${DB_OWNER:-another role}'"
+      fi
+    fi
+  fi
+
+  if [ "$DB_CONFLICT" -eq 1 ]; then
+    BASE_USER="$DB_USER"; BASE_NAME="$DB_NAME"
+    SUFFIX="$(date +%s)"; SUFFIX="${SUFFIX: -4}"
+    DB_USER="${BASE_USER}_${SUFFIX}"
+    DB_NAME="${BASE_NAME}_${SUFFIX}"
+    # Extremely unlikely, but never collide with another role/database.
+    i=1
+    while [ "$(run_psql "SELECT 1 FROM pg_roles WHERE rolname='${DB_USER}'")" = "1" ] ||
+          [ "$(run_psql "SELECT 1 FROM pg_database WHERE datname='${DB_NAME}'")" = "1" ]; do
+      DB_USER="${BASE_USER}_${SUFFIX}${i}"; DB_NAME="${BASE_NAME}_${SUFFIX}${i}"; i=$((i+1))
+    done
+    DB_PASS="$(openssl rand -hex 16)"
+    DATABASE_URL="postgresql://${DB_USER}:${DB_PASS}@localhost:${DB_PORT:-5432}/${DB_NAME}?schema=public"
+    warn "${CONFLICT_REASON}."
+    warn "Creating a separate role/database (${DB_USER} / ${DB_NAME}) so the old one is not touched."
+  fi
+
   if [ "$(run_psql "SELECT 1 FROM pg_roles WHERE rolname='${DB_USER}'")" != "1" ]; then
     if [ -z "$DB_PASS" ]; then
       fail "No password available for role '${DB_USER}'. Set DATABASE_URL (or a new password) and rerun."
@@ -301,16 +427,13 @@ else
     as_postgres psql -c "CREATE ROLE \"${DB_USER}\" LOGIN PASSWORD '${DB_PASS}';" >/dev/null
     info "Database user created."
   else
-    if [ -z "$EXISTING_URL" ] && [ -n "$DB_PASS" ]; then
-      as_postgres psql -c "ALTER ROLE \"${DB_USER}\" WITH PASSWORD '${DB_PASS}';" >/dev/null
-    fi
-    info "Database user already existed."
+    info "Database user already exists; its password is left unchanged."
   fi
   if [ "$(run_psql "SELECT 1 FROM pg_database WHERE datname='${DB_NAME}'")" != "1" ]; then
     as_postgres createdb -O "$DB_USER" "$DB_NAME"
     info "Database created."
   else
-    info "Database already existed."
+    info "Database already existed; its data is kept."
   fi
 fi
 
@@ -543,165 +666,276 @@ pm2 startup systemd -u "$APP_USER" --hp "$APP_HOME" >/dev/null 2>&1 || \
   warn "pm2 startup failed; run: pm2 startup systemd -u ${APP_USER} --hp ${APP_HOME}"
 
 # ══════════════════════════════════════════════════════════════════
-#  Phase 9 — Nginx reverse proxy (config created if missing)
-#  Nginx listens on a user-chosen port to avoid conflicts with
-#  other services on the server.
+#  Phase 9 — publish the app on its OWN site/vhost
+#  An existing Apache/Nginx is reused; only a new site file is added and the
+#  server is reloaded. Sites, domains and certificates of other apps are never
+#  edited. Without a free domain, Nobino gets its own port instead.
 # ══════════════════════════════════════════════════════════════════
-NGINX_PORT="${NGINX_PORT:-$(ask "Port Nginx should listen on" "$DEFAULT_NGINX_PORT")}"
-# Validate that the port is numeric and actually free (a port this very site
-# already listens on is not a conflict, so re-runs keep it).
-case "$NGINX_PORT" in ''|*[!0-9]*) NGINX_PORT="$DEFAULT_NGINX_PORT";; esac
-if port_in_use "$NGINX_PORT" && ! nginx_owns_port "$NGINX_PORT"; then
-  if ALT_PORT="$(free_port 8080 8099)"; then
-    warn "Port ${NGINX_PORT} is already in use; using ${ALT_PORT} instead."
-    NGINX_PORT="$ALT_PORT"
+domain_taken() { # domain_taken <domain> — is it served by another site already?
+  local d="${1:-}" esc
+  [ -n "$d" ] || return 1
+  esc="${d//./\\.}"
+  if [ "$WEB_KIND" = "apache" ]; then
+    grep -RIsE "Server(Name|Alias)[^#]*[[:space:]]${esc}([[:space:]]|$)" \
+      /etc/apache2/sites-enabled/ /etc/apache2/apache2.conf 2>/dev/null \
+      | grep -v "${APP_NAME}" | grep -q . && return 0
   else
-    fail "Port ${NGINX_PORT} is in use and no free fallback was found; set NGINX_PORT."
+    grep -RIsE "server_name[^;]*[[:space:]]${esc}([[:space:];]|$)" \
+      /etc/nginx/sites-enabled/ 2>/dev/null \
+      | grep -v "${APP_NAME}" | grep -q . && return 0
   fi
-fi
-if ! command -v nginx >/dev/null 2>&1; then
-  info "Installing Nginx..."
-  apt-get install -y nginx
-fi
-
-# DOMAIN may already come from the environment (unattended install); only ask
-# when it was not supplied.
-if [ -n "$DOMAIN" ]; then
-  info "Using the domain supplied from the environment: ${DOMAIN}"
-else
-  USE_DOMAIN="$(ask "Do you have a domain? (yes/no)" "no")"
-  if [[ "${USE_DOMAIN,,}" == "y" || "${USE_DOMAIN,,}" == "yes" ]]; then
-    DOMAIN="$(ask "Domain name (e.g., nobino.ir)" "")"
-    [ -n "$DOMAIN" ] || DOMAIN=""
+  return 1
+}
+prior_public_port() { # the port this install used on an earlier run, if any
+  if [ -f "$NGINX_CONF" ]; then
+    sed -nE 's/^[[:space:]]*listen[[:space:]]+([0-9]+).*/\1/p' "$NGINX_CONF" | head -1
+  elif [ -f "$APACHE_SITE" ]; then
+    sed -nE 's/.*<VirtualHost[[:space:]]+\*:([0-9]+)>.*/\1/p' "$APACHE_SITE" | head -1
   fi
-fi
+}
 
-# Shared proxy body (Nginx variables stay literal)
-PROXY_BLOCK='    location / {
-        proxy_pass http://127.0.0.1:'"$PORT"';
-        proxy_http_version 1.1;
-        proxy_set_header Upgrade $http_upgrade;
-        proxy_set_header Connection "upgrade";
-        proxy_set_header Host $host;
-        proxy_set_header X-Real-IP $remote_addr;
-        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-        proxy_set_header X-Forwarded-Proto $scheme;
-        proxy_read_timeout 60s;
-    }'
-
+DOMAIN_TAKEN=0
+DEDICATED_PORT=0
 if [ -z "$DOMAIN" ]; then
-  # No domain: listen on the chosen port only
-  info "No domain configured; the site will be available on port ${NGINX_PORT}."
-  cat > "$NGINX_CONF" <<EOF
-server {
-    listen ${NGINX_PORT};
-    server_name _;
-
-    client_max_body_size 20M;
-
-${PROXY_BLOCK}
-}
-EOF
-elif [ "$COEXIST" -eq 1 ]; then
-  # Coexistence: Apache keeps 80/443. Nginx is a private proxy for one port
-  # only, so nothing about the existing sites changes.
-  info "Coexistence mode: Nginx answers on port ${NGINX_PORT} only (Apache keeps 80/443)."
-  cat > "$NGINX_CONF" <<EOF
-server {
-    listen ${NGINX_PORT};
-    server_name ${DOMAIN};
-
-    client_max_body_size 20M;
-
-${PROXY_BLOCK}
-}
-EOF
-else
-  # Standalone server with a domain: port 80 (for SSL) plus the chosen port
-  info "Creating Nginx config for ${DOMAIN} on port ${NGINX_PORT}..."
-  if [ "$NGINX_PORT" = "80" ]; then
-    LISTEN_LINE="listen 80;"
-  else
-    LISTEN_LINE="listen 80;
-    listen ${NGINX_PORT};"
-  fi
-  cat > "$NGINX_CONF" <<EOF
-server {
-    ${LISTEN_LINE}
-    server_name ${DOMAIN} www.${DOMAIN} *.${DOMAIN};
-
-    client_max_body_size 20M;
-
-${PROXY_BLOCK}
-}
-EOF
+  DEDICATED_PORT=1
+elif domain_taken "$DOMAIN"; then
+  DOMAIN_TAKEN=1
+  warn "The domain '${DOMAIN}' is already used by another site on this server."
+  warn "It will not be touched; Nobino is published on its own port instead."
+  DEDICATED_PORT=1
 fi
 
-ln -sf "$NGINX_CONF" /etc/nginx/sites-enabled/"${APP_NAME}.conf"
+PUBLIC_PORT=80
+# An explicit WEB_PORT is honored even when the domain itself is free.
+if [ -n "$PUBLIC_PORT_OVERRIDE" ] && [[ "$PUBLIC_PORT_OVERRIDE" =~ ^[0-9]+$ ]]; then
+  PUBLIC_PORT="$PUBLIC_PORT_OVERRIDE"
+fi
 
-# The stock Nginx default site binds port 80. When Apache already owns 80,
-# nginx refuses to start until that file is out of the way. Only the stock
-# file is touched: any custom site is reported and left alone.
-if [ -f /etc/nginx/sites-enabled/default ] && port_in_use 80; then
-  if grep -q "Default server configuration" /etc/nginx/sites-enabled/default 2>/dev/null; then
-    info "Disabling the stock Nginx default site (port 80 belongs to another service)."
+# Port 80 is only shared through name-based vhosts, which needs a free domain;
+# otherwise Nobino gets a port of its own and no other site can be shadowed.
+if [ "$PUBLIC_PORT" != "80" ]; then
+  DEDICATED_PORT=1
+elif [ -z "$DOMAIN" ] || [ "$DOMAIN_TAKEN" -eq 1 ]; then
+  DEDICATED_PORT=1
+  if [ -n "$PUBLIC_PORT_OVERRIDE" ]; then
+    warn "WEB_PORT=80 cannot be used without a free domain; choosing a dedicated port."
+  fi
+fi
+
+if [ "$DEDICATED_PORT" -eq 1 ]; then
+  # No explicit port: keep the one from an earlier run, else pick a free one.
+  if [ "$PUBLIC_PORT" = "80" ]; then
+    PRIOR_PORT="$(prior_public_port)"
+    if [ -n "$PRIOR_PORT" ] && [ "$PRIOR_PORT" != "80" ]; then
+      PUBLIC_PORT="$PRIOR_PORT"
+    elif FREE_WEB_PORT="$(free_port 8080 8099)"; then
+      PUBLIC_PORT="$FREE_WEB_PORT"
+    else
+      fail "No free port found in 8080-8099; set WEB_PORT to a free port."
+    fi
+  fi
+  if port_in_use "$PUBLIC_PORT" && ! our_site_uses_port "$PUBLIC_PORT"; then
+    if ALT_PORT="$(free_port 8080 8099)"; then
+      warn "Port ${PUBLIC_PORT} is already in use; using ${ALT_PORT} instead."
+      PUBLIC_PORT="$ALT_PORT"
+    else
+      fail "Port ${PUBLIC_PORT} is in use and no free fallback was found; set WEB_PORT."
+    fi
+  fi
+  info "Nobino will answer directly on port ${PUBLIC_PORT} (no other site is touched)."
+else
+  info "Nobino will answer on port 80 for its own domain: ${DOMAIN}"
+fi
+
+WEB_OK=0
+if [ "$WEB_KIND" = "apache" ]; then
+  # ── Apache: new vhost + optional extra port, existing sites untouched ──
+  APACHE_CTL="apache2ctl"
+  command -v apache2ctl >/dev/null 2>&1 || APACHE_CTL="apachectl"
+  if command -v a2enmod >/dev/null 2>&1; then
+    a2enmod proxy proxy_http headers >/dev/null 2>&1 || \
+      warn "Could not enable proxy modules; check 'a2enmod proxy proxy_http headers'."
+  fi
+
+  if [ "$DEDICATED_PORT" -eq 1 ]; then
+    if [ -d /etc/apache2/conf-available ]; then
+      printf '%s\n' "# Managed by Nobino: one additional port for its own vhost." \
+        "Listen ${PUBLIC_PORT}" > "$APACHE_PORT_CONF"
+      a2enconf "${APP_NAME}-port" >/dev/null 2>&1 || \
+        ln -sf "$APACHE_PORT_CONF" "/etc/apache2/conf-enabled/${APP_NAME}-port.conf"
+    else
+      warn "Apache has no conf-available directory; add 'Listen ${PUBLIC_PORT}' to ports.conf manually."
+    fi
+  elif [ -f "$APACHE_PORT_CONF" ]; then
+    # A previous run published Nobino on a dedicated port; this run uses 80.
+    command -v a2disconf >/dev/null 2>&1 && a2disconf "${APP_NAME}-port" >/dev/null 2>&1
+    rm -f "$APACHE_PORT_CONF" "/etc/apache2/conf-enabled/${APP_NAME}-port.conf"
+  fi
+
+  # The project folder is inside /var/www; never let it be served as plain files
+  # (the .env lives there). This block only applies to filesystem requests.
+  case "$APP_DIR" in
+    /var/www/*)
+      if [ -d /etc/apache2/conf-available ]; then
+        cat > "$APACHE_DENY_CONF" <<EOF
+# Managed by Nobino: block direct file access to the project sources.
+<Directory "${APP_DIR}">
+    Options -Indexes
+    Require all denied
+</Directory>
+EOF
+        a2enconf "${APP_NAME}-deny" >/dev/null 2>&1 || \
+          ln -sf "$APACHE_DENY_CONF" "/etc/apache2/conf-enabled/${APP_NAME}-deny.conf"
+      fi ;;
+  esac
+
+  SERVER_NAME_LINE=""
+  [ -n "$DOMAIN" ] && SERVER_NAME_LINE="    ServerName ${DOMAIN}"
+  cat > "$APACHE_SITE" <<EOF
+# Managed by Nobino — do not edit other vhosts; each app keeps its own domain.
+<VirtualHost *:${PUBLIC_PORT}>
+${SERVER_NAME_LINE}
+    ProxyPreserveHost On
+    ProxyRequests Off
+    AllowEncodedSlashes NoDecode
+    ProxyPass        / http://127.0.0.1:${PORT}/ retry=0 connectiontimeout=5 timeout=60
+    ProxyPassReverse / http://127.0.0.1:${PORT}/
+    RequestHeader set X-Forwarded-Proto "http"
+    RequestHeader set X-Forwarded-Proto "https" env=HTTPS
+    ErrorLog \${APACHE_LOG_DIR}/${APP_NAME}-error.log
+    CustomLog \${APACHE_LOG_DIR}/${APP_NAME}-access.log combined
+</VirtualHost>
+EOF
+  if command -v a2ensite >/dev/null 2>&1; then
+    a2ensite "$APP_NAME" >/dev/null 2>&1 || ln -sf "$APACHE_SITE" "$APACHE_SITE_LINK"
+  else
+    ln -sf "$APACHE_SITE" "$APACHE_SITE_LINK"
+  fi
+
+  if "$APACHE_CTL" configtest >/dev/null 2>&1; then
+    if systemctl is-active --quiet apache2 2>/dev/null; then
+      systemctl reload apache2 >/dev/null 2>&1 || systemctl restart apache2 >/dev/null 2>&1 || true
+    else
+      systemctl enable --now apache2 >/dev/null 2>&1 || true
+    fi
+    if systemctl is-active --quiet apache2 2>/dev/null; then
+      WEB_OK=1
+      info "Apache vhost created: ${APACHE_SITE}"
+    else
+      warn "Apache did not start; check '${APACHE_CTL} configtest'."
+    fi
+  else
+    warn "Apache config test failed; rolling back the Nobino vhost."
+    command -v a2dissite >/dev/null 2>&1 && a2dissite "$APP_NAME" >/dev/null 2>&1
+    rm -f "$APACHE_SITE_LINK"
+    [ -f "$APACHE_PORT_CONF" ] && { command -v a2disconf >/dev/null 2>&1 && a2disconf "${APP_NAME}-port" >/dev/null 2>&1; rm -f "/etc/apache2/conf-enabled/${APP_NAME}-port.conf"; }
+    "$APACHE_CTL" configtest >/dev/null 2>&1 && systemctl reload apache2 >/dev/null 2>&1 || true
+  fi
+
+else
+  # ── Nginx: one site file; existing sites and their domains stay as they are ──
+  if ! command -v nginx >/dev/null 2>&1; then
+    info "Installing Nginx..."
+    apt-get install -y nginx || fail "Nginx could not be installed."
+  fi
+  NGINX_SERVER_NAME="${DOMAIN:-_}"
+  cat > "$NGINX_CONF" <<EOF
+# Managed by Nobino — each app keeps its own site file and domain.
+server {
+    listen ${PUBLIC_PORT};
+    server_name ${NGINX_SERVER_NAME};
+
+    client_max_body_size 20M;
+
+    location / {
+        proxy_pass http://127.0.0.1:${PORT};
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade \$http_upgrade;
+        proxy_set_header Connection "upgrade";
+        proxy_set_header Host \$host;
+        proxy_set_header X-Real-IP \$remote_addr;
+        proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto \$scheme;
+        proxy_read_timeout 60s;
+    }
+}
+EOF
+  ln -sf "$NGINX_CONF" "$NGINX_CONF_LINK"
+
+  # On a clean server the stock site owns port 80 as default_server; it is
+  # only disabled there (it is the stock file, kept in sites-available).
+  if [ "$WEB_INSTALLED" -eq 1 ] && [ "$PUBLIC_PORT" = "80" ] &&
+     [ -f /etc/nginx/sites-enabled/default ] &&
+     grep -q "Default server configuration" /etc/nginx/sites-enabled/default 2>/dev/null; then
+    info "Disabling the stock Nginx default site so Nobino answers on port 80."
     rm -f /etc/nginx/sites-enabled/default
+  fi
+
+  if nginx -t; then
+    if systemctl is-active --quiet nginx 2>/dev/null; then
+      systemctl reload nginx >/dev/null 2>&1 || true
+    else
+      systemctl enable --now nginx >/dev/null 2>&1 || true
+    fi
+    if systemctl is-active --quiet nginx 2>/dev/null; then
+      WEB_OK=1
+      info "Nginx site created: ${NGINX_CONF}"
+    else
+      warn "Nginx did not start; check 'nginx -t' and 'systemctl status nginx'."
+    fi
   else
-    warn "/etc/nginx/sites-enabled/default is not the stock file; leaving it untouched."
-    warn "If nginx fails below, disable that site manually or pick another NGINX_PORT."
+    warn "nginx -t failed; disabling the new site so the existing server keeps working."
+    rm -f "$NGINX_CONF_LINK"
+    nginx -t >/dev/null 2>&1 && systemctl reload nginx >/dev/null 2>&1 || true
   fi
 fi
 
-if nginx -t; then
-  if systemctl is-active --quiet nginx; then
-    systemctl reload nginx || warn "nginx reload failed."
-  else
-    systemctl enable --now nginx || warn "nginx could not be started."
-  fi
-else
-  warn "nginx -t failed; fix the config and run: nginx -t && systemctl restart nginx"
-fi
 
 # ══════════════════════════════════════════════════════════════════
-#  Phase 10 — SSL (standalone servers only; Apache keeps its own certs)
+#  Phase 10 — SSL for Nobino's own domain (never for other sites)
 # ══════════════════════════════════════════════════════════════════
+SSL_OK=0
 case "${ENABLE_SSL,,}" in
-  auto) if [ -n "$DOMAIN" ] && [ "$COEXIST" -eq 0 ]; then ENABLE_SSL=1; else ENABLE_SSL=0; fi ;;
+  auto)
+    if [ -n "$DOMAIN" ] && [ "$PUBLIC_PORT" = "80" ] && [ "$WEB_OK" -eq 1 ] && ! domain_taken "$DOMAIN"; then
+      ENABLE_SSL=1
+    else
+      ENABLE_SSL=0
+    fi ;;
   1|yes|true) ENABLE_SSL=1 ;;
   0|no|false) ENABLE_SSL=0 ;;
   *) warn "Unknown ENABLE_SSL='${ENABLE_SSL}'; skipping SSL."; ENABLE_SSL=0 ;;
 esac
 
-if [ "$ENABLE_SSL" -eq 1 ] && [ -n "$DOMAIN" ]; then
+if [ "$ENABLE_SSL" -eq 1 ] && [ -n "$DOMAIN" ] && [ "$PUBLIC_PORT" = "80" ]; then
   SYSTEMD_EDITOR=true
   if ! command -v certbot >/dev/null 2>&1; then
     info "Installing Certbot..."
-    apt-get install -y certbot python3-certbot-nginx
+    apt-get install -y certbot || warn "Certbot installation reported errors."
   fi
-  certbot --nginx -d "$DOMAIN" -d "www.${DOMAIN}" --non-interactive --agree-tos \
-    -m "${SSL_EMAIL:-$(ask "Email for the SSL certificate (optional)" "admin@${DOMAIN}")}" \
-    --redirect || warn "certbot reported errors; rerun after fixing DNS: certbot --nginx -d ${DOMAIN}"
-elif [ -n "$DOMAIN" ]; then
-  info "SSL is left to Apache: Nginx serves plain HTTP on 127.0.0.1:${NGINX_PORT}."
-  info "To publish Nobino on your existing HTTPS domain, add this to the Apache"
-  info "vhost of ${DOMAIN} (a2enmod proxy proxy_http, then reload Apache):"
-  cat <<SNIPPET
-
-    ProxyPreserveHost On
-    ProxyPass        / http://127.0.0.1:${NGINX_PORT}/ retry=0
-    ProxyPassReverse / http://127.0.0.1:${NGINX_PORT}/
-
-SNIPPET
-  info "Nothing in /etc/apache2 was modified."
+  CERTBOT_PLUGIN="python3-certbot-${WEB_KIND}"
+  dpkg -s "$CERTBOT_PLUGIN" >/dev/null 2>&1 || apt-get install -y "$CERTBOT_PLUGIN" >/dev/null 2>&1 || true
+  info "Requesting a certificate for ${DOMAIN} (only this domain is affected)..."
+  if certbot "--${WEB_KIND}" -d "$DOMAIN" --non-interactive --agree-tos \
+       -m "${SSL_EMAIL:-$(ask "Email for the SSL certificate (optional)" "admin@${DOMAIN}")}" \
+       --redirect; then
+    SSL_OK=1
+    info "HTTPS is enabled for ${DOMAIN}."
+  else
+    warn "certbot reported errors; HTTP still works. Rerun after DNS: certbot --${WEB_KIND} -d ${DOMAIN}"
+  fi
+elif [ -n "$DOMAIN" ] && [ "$DEDICATED_PORT" -eq 1 ]; then
+  info "SSL skipped: '${DOMAIN}' is served by another site or Nobino is on port ${PUBLIC_PORT}."
+  info "Point a free domain here (DOMAIN=app.example.com) to get a certificate on port 80."
 else
-  info "No domain supplied; skipping SSL (the site is reachable on port ${NGINX_PORT})."
+  info "No domain supplied; the site is reachable on http://IP:${PUBLIC_PORT}."
 fi
 
 # ══════════════════════════════════════════════════════════════════
 #  Phase 11 — firewall (never surprises a running server)
 # ══════════════════════════════════════════════════════════════════
 case "${MANAGE_UFW,,}" in
-  auto) if [ "$COEXIST" -eq 1 ]; then MANAGE_UFW=0; else MANAGE_UFW=1; fi ;;
+  auto) if [ "$WEB_INSTALLED" -eq 1 ]; then MANAGE_UFW=1; else MANAGE_UFW=0; fi ;;
   1|yes|true) MANAGE_UFW=1 ;;
   0|no|false) MANAGE_UFW=0 ;;
   *) warn "Unknown MANAGE_UFW='${MANAGE_UFW}'; leaving the firewall alone."; MANAGE_UFW=0 ;;
@@ -711,16 +945,23 @@ if [ "$MANAGE_UFW" -eq 1 ]; then
   command -v ufw >/dev/null 2>&1 || apt-get install -y ufw
   info "Configuring the UFW firewall..."
   ufw allow 22/tcp >/dev/null || true
-  ufw allow "${NGINX_PORT}/tcp" >/dev/null || true
-  [ "$ENABLE_SSL" -eq 1 ] && ufw allow 443/tcp >/dev/null || true
-  # The Next.js port stays private: Nginx proxies to 127.0.0.1:${PORT}.
+  if [ "$PUBLIC_PORT" = "80" ]; then
+    ufw allow 80/tcp >/dev/null || true
+  else
+    ufw allow "${PUBLIC_PORT}/tcp" >/dev/null || true
+  fi
+  [ "$SSL_OK" -eq 1 ] && ufw allow 443/tcp >/dev/null || true
+  # The Next.js port stays private: the web server proxies to 127.0.0.1:${PORT}.
   info "Keeping the internal app port (${PORT}) closed to the public."
   ufw --force enable || true
 else
-  info "Firewall left untouched (coexistence mode keeps the server exactly as it was)."
+  info "Firewall left untouched (an existing server keeps its own rules)."
   if command -v ufw >/dev/null 2>&1 && ufw status 2>/dev/null | grep -q "Status: active"; then
-    warn "UFW is active: allow ${NGINX_PORT}/tcp yourself if you want the app reachable"
-    warn "from outside, e.g.  ufw allow ${NGINX_PORT}/tcp"
+    if [ "$SSL_OK" -eq 1 ]; then
+      warn "UFW is active: allow 80, 443 and ${PUBLIC_PORT}/tcp if the app must be reachable."
+    else
+      warn "UFW is active: allow ${PUBLIC_PORT}/tcp (and 443 for HTTPS) if the app must be reachable."
+    fi
   fi
 fi
 
@@ -734,14 +975,26 @@ echo "${C_GREEN}+------------------------------------------------------+${C_RESE
 echo "  App directory : $APP_DIR  (owned by ${APP_USER})"
 echo "  Service user  : ${APP_USER}  (the app never runs as root)"
 echo "  Internal port : ${PORT}  (127.0.0.1 only)"
-echo "  Nginx port    : ${NGINX_PORT}"
-if [ -n "$DOMAIN" ] && [ "$ENABLE_SSL" -eq 1 ]; then
-  echo "  Site URL      : https://${DOMAIN}"
-elif [ "$COEXIST" -eq 1 ] && [ -n "$DOMAIN" ]; then
-  echo "  Site URL      : https://${DOMAIN}  (via your Apache proxy)"
-  echo "  Direct URL    : http://$(curl -4 -s ifconfig.me || echo 'IP_SERVER'):${NGINX_PORT}"
+if [ "$WEB_KIND" = "apache" ]; then
+  echo "  Web server    : Apache ($( [ "$WEB_INSTALLED" -eq 1 ] && echo 'installed now' || echo 'existing, reused'))"
+  echo "  Site config   : ${APACHE_SITE}"
 else
-  echo "  Site URL      : http://$(curl -4 -s ifconfig.me || echo 'IP_SERVER'):${NGINX_PORT}"
+  echo "  Web server    : Nginx ($( [ "$WEB_INSTALLED" -eq 1 ] && echo 'installed now' || echo 'existing, reused'))"
+  echo "  Site config   : ${NGINX_CONF}"
+fi
+echo "  Public port   : ${PUBLIC_PORT}"
+SERVER_IP="$(curl -4 -s --max-time 5 ifconfig.me 2>/dev/null || true)"
+SERVER_IP="${SERVER_IP:-IP_SERVER}"
+if [ "$SSL_OK" -eq 1 ] && [ -n "$DOMAIN" ]; then
+  echo "  Site URL      : https://${DOMAIN}"
+elif [ -n "$DOMAIN" ] && [ "$DEDICATED_PORT" -eq 0 ]; then
+  echo "  Site URL      : http://${DOMAIN}"
+elif [ -n "$DOMAIN" ] && [ "$DOMAIN_TAKEN" -eq 1 ]; then
+  echo "  Site URL      : http://${DOMAIN}:${PUBLIC_PORT}  (domain kept by another site on 80)"
+elif [ -n "$DOMAIN" ]; then
+  echo "  Site URL      : http://${DOMAIN}:${PUBLIC_PORT}  (custom WEB_PORT)"
+else
+  echo "  Site URL      : http://${SERVER_IP}:${PUBLIC_PORT}"
 fi
 echo "  PM2 status    : sudo -u ${APP_USER} -H env PM2_HOME=${APP_HOME}/.pm2 pm2 status"
 echo "  Logs          : sudo -u ${APP_USER} -H env PM2_HOME=${APP_HOME}/.pm2 pm2 logs ${APP_NAME}"
@@ -750,10 +1003,17 @@ echo ""
 echo "  Update later   : sudo bash ${APP_DIR}/scripts/deploy-ubuntu.sh"
 echo "  (or pull a tag) : GIT_REF=v1.2.0 sudo bash ${APP_DIR}/scripts/deploy-ubuntu.sh"
 echo ""
-if [ "$COEXIST" -eq 1 ]; then
-  info "Untouched on purpose: Apache + its sites/SSL, MySQL/MariaDB, PHP, and /var/www."
-  [ "$MYSQL_PRESENT" -eq 1 ] && info "MySQL/MariaDB was not installed, restarted or reconfigured."
-  info "Nginx only adds its own file: /etc/nginx/sites-available/${APP_NAME}.conf"
+if [ "$WEB_INSTALLED" -eq 0 ]; then
+  info "Your existing ${WEB_KIND} was reused: other sites, domains and certificates were not modified."
+  info "Nobino only added its own site file and reloaded the server."
+else
+  info "Nginx was installed for this app and only one site file is served."
 fi
+[ "$MYSQL_PRESENT" -eq 1 ] && info "MySQL/MariaDB was not installed, restarted or reconfigured."
+case "${INSTALL_PHP,,}" in
+  0|no|false) : ;;
+  *) if [ "$PHP_PRESENT" -eq 1 ]; then info "The installed PHP was reused untouched."; else info "PHP CLI + FPM were installed for future use (Apache was not modified)."; fi ;;
+esac
+[ "$DB_CONFLICT" -eq 1 ] && info "The previous PostgreSQL role/database were kept; Nobino uses its own pair."
 warn "Default seeded admin: phone 09120000000 (default password in prisma/seed.mjs)."
 warn "Change the password after the first login."

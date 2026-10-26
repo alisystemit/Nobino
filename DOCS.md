@@ -335,32 +335,39 @@ Nobino/
 ## ب) VPS اوبونتو با یک فرمان از GitHub
 
 روی سرور، کد از ریپوی عمومی گرفته و همه‌چیز خودکار پیکربندی می‌شود
-(PostgreSQL، Node.js، build، PM2، Nginx):
+(PostgreSQL، Node.js، PHP در صورت نبود، build، PM2 و Apache/Nginx):
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/alisystemit/Nobino/main/scripts/install-from-github.sh | sudo bash
 ```
 
-**هم‌زیستی با LAMP (Apache + PHP 8 + MySQL/MariaDB):**
+**سرور خام یا سرور دارای Apache/Nginx؟**
 
-- MySQL/MariaDB، PHP و Apache نه نصب، نه ارتقا و نه ری‌استارت می‌شوند؛
-  `/etc/apache2`، پوشه‌های سایت‌ها، دامنه‌ها، SSL و `/var/www` دست‌نخورده می‌مانند.
-- اپ با کاربر اختصاصی `nobino` (خانه: `/var/lib/nobino`) و در `/opt/nobino` اجرا
-  می‌شود؛ هیچ‌چیز با root اجرا نمی‌شود.
-- اگر پورت 80 برای Apache باشد، Nginx روی اولین پورت آزاد 8080–8099 می‌آید و
-  فقط فایل `nobino.conf` را اضافه می‌کند؛ certbot و UFW دست نمی‌خورند و یک
-  قطعه `ProxyPass` برای vhost آپاچی چاپ می‌شود.
-- چیزهایی که نصب می‌شوند: Node.js، PM2، PostgreSQL، Nginx (هر کدام از قبل باشد،
-  دوباره نصب نمی‌شود).
+- **سرور خام:** Node.js، PostgreSQL، PHP (CLI + FPM)، Nginx، PM2، بیلد، SSL
+  (با دامنه) و UFW کامل نصب و تنظیم می‌شوند.
+- **Apache یا Nginx موجود:** همان وب‌سرور استفاده می‌شود؛ پروژه در
+  `/var/www/nobino` قرار می‌گیرد و فقط یک فایل اختصاصی به آن اضافه می‌شود
+  (`sites-available/nobino.conf`). سایت‌ها، دامنه‌ها، پوشه‌ها و SSL بقیهٔ
+  برنامه‌ها تغییر نمی‌کنند و بستهٔ وب‌سرور دوباره نصب یا حذف نمی‌شود.
+- **دامنهٔ تکراری:** سایت قبلی دامنهٔ خودش را نگه می‌دارد؛ Nobino روی اولین
+  پورت آزاد 8080–8099 منتشر می‌شود.
+- **PHP:** اگر موجود باشد همان استفاده می‌شود؛ اگر نباشد `php-cli` و `php-fpm`
+  با افزونه‌های رایج نصب می‌شوند. `mod_php` نصب نمی‌شود تا Apache دست‌نخورده بماند.
+- **دیتابیس:** PostgreSQL موجود استفاده می‌شود. یوزر/رمز قبلی هرگز تغییر نمی‌کند؛
+  در صورت هم‌نامی مشکوک (role با رمز نامعلوم یا دیتابیس متعلق به نقش دیگر) یک
+  role و دیتابیس جداگانه با پسوند ساخته می‌شود. MySQL/MariaDB دست نمی‌خورد.
+- اپ با کاربر اختصاصی `nobino` (خانه: `/var/lib/nobino`) اجرا می‌شود و فقط روی
+  `127.0.0.1:3000` گوش می‌دهد؛ هیچ‌چیز با root اجرا نمی‌شود.
 
 - نصب بی‌سؤال: متغیرها را قبل از `bash` بگذارید (`DOMAIN=nobino.ir
   NONINTERACTIVE=1`). گزینه‌های دیگر: `REPO_URL`، `GIT_REF`، `APP_USER`،
-  `APP_DIR`، `PORT`، `NGINX_PORT`، `COEXIST`، `MANAGE_UFW`، `ENABLE_SSL`،
-  `SSL_EMAIL`، `APP_URL`، `ROOT_DOMAIN`.
-- به‌روزرسانی بعدی: `sudo bash /opt/nobino/scripts/deploy-ubuntu.sh`
+  `APP_DIR`، `PORT`، `WEB_SERVER`، `WEB_PORT`، `INSTALL_PHP`، `MANAGE_UFW`،
+  `ENABLE_SSL`، `SSL_EMAIL`، `APP_URL`، `ROOT_DOMAIN`.
+- به‌روزرسانی بعدی: `sudo bash /var/www/nobino/scripts/deploy-ubuntu.sh`
   (با `GIT_REF=v1.0.0` می‌توان تگ مشخصی را استقرار داد).
-- حذف کامل و مرحله‌ای: `sudo bash /opt/nobino/scripts/uninstall-ubuntu.sh`
-  (پیش‌نمایش: `--dry-run`)؛ Apache/PHP/MySQL هیچ‌وقت لمس نمی‌شوند.
+- حذف کامل و مرحله‌ای: `sudo bash /var/www/nobino/scripts/uninstall-ubuntu.sh`
+  (پیش‌نمایش: `--dry-run`)؛ فقط vhost/فایل اختصاصی Nobino حذف می‌شود و
+  سایت‌های دیگر، PHP و MySQL/MariaDB دست‌نخورده می‌مانند.
 - توضیح کامل در [README](./README.md#-نصب-خودکار-روی-vps-اوبونتو--فقط-با-لینک-github).
 
 ---

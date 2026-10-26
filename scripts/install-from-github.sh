@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # ══════════════════════════════════════════════════════════════════
-#  Nobino — one-line installer for a clean Ubuntu VPS
+#  Nobino — one-line installer for Ubuntu
+#            (clean server, or a server that already runs Apache/Nginx)
 #
 #  The code is fetched from the public GitHub repository, so nothing has to
 #  be uploaded to the server by hand.
@@ -20,23 +21,29 @@
 #    GIT_REF         branch/tag/commit         (default: main)
 #    APP_USER        service user for the app  (default: nobino)
 #    APP_HOME        home of that user         (default: /var/lib/nobino)
-#    APP_DIR         install directory         (default: /opt/nobino)
+#    APP_DIR         install directory         (default: /var/www/nobino)
 #    PORT            internal Next.js port     (default: 3000)
-#    NGINX_PORT      public Nginx port         (default: 80, or a free port
-#                                               when Apache owns 80)
-#    COEXIST         auto|1|0 keep an existing Apache/MySQL/PHP stack intact
+#    WEB_SERVER      auto|apache|nginx         (auto = reuse what exists,
+#                                               Nginx on a clean server)
+#    WEB_PORT        public port               (default: 80 with a domain,
+#                                               otherwise a free 8080-8099)
+#    INSTALL_PHP     auto|0                    (auto = reuse or install PHP)
 #    MANAGE_UFW      auto|1|0 firewall handling
 #    ENABLE_SSL      auto|1|0 certbot for DOMAIN
-#    DOMAIN          domain for SSL (empty = IP/port only)
+#    DOMAIN          own domain (empty = IP/port only)
 #    SSL_EMAIL       certbot contact email
 #    APP_URL         public app URL
 #    ROOT_DOMAIN     root domain for subdomains
 #    NONINTERACTIVE  1 = never prompt, use defaults/env values
 #
-#  Safe on a server that already runs Apache + PHP 8 + MySQL (a Telegram bot,
-#  phpMyAdmin, etc.): nothing of that stack is installed, upgraded, restarted
-#  or reconfigured. Nobino gets its own user, its own folder, its own Node
-#  process and its own Nginx file on a free port.
+#  Clean server: Node.js, PostgreSQL, PHP CLI+FPM and Nginx are installed and
+#  configured from scratch.
+#
+#  Existing Apache/Nginx (a Telegram bot, phpMyAdmin, another PHP site...):
+#  that server is reused and only one new vhost/site file is added. The project
+#  is installed in /var/www/nobino, gets its own domain (or its own free port
+#  when the domain is already used), and nothing of the existing sites,
+#  certificates, PHP or MySQL/MariaDB is changed.
 #
 #  Re-running it is safe: the repository is updated and the deployment
 #  phases that are already satisfied are skipped.
@@ -62,8 +69,8 @@ ask() { # ask <prompt> <default> — reads the terminal, never stdin (it holds t
 
 REPO_URL="${REPO_URL:-https://github.com/alisystemit/Nobino.git}"
 GIT_REF="${GIT_REF:-main}"
-# Outside /var/www on purpose: an existing Apache/PHP site keeps its folders.
-APP_DIR="${APP_DIR:-/opt/nobino}"
+# Next to the existing document roots; each site keeps its own vhost/domain.
+APP_DIR="${APP_DIR:-/var/www/nobino}"
 
 # ─── Sanity checks ────────────────────────────────────────────────
 [ "$(uname -s)" = "Linux" ] || fail "This installer only runs on Linux/Ubuntu."
@@ -88,10 +95,13 @@ export REPO_URL GIT_REF APP_DIR
 export APP_USER="${APP_USER:-nobino}"
 [ -n "${APP_HOME:-}" ] && export APP_HOME || true
 export PORT="${PORT:-3000}"
-# NGINX_PORT is only exported when asked for: deploy-ubuntu.sh then chooses 80
-# on a dedicated server, or a free port (8080+) when Apache already owns 80.
-[ -n "${NGINX_PORT:-}" ] && export NGINX_PORT || true
-export COEXIST="${COEXIST:-auto}" MANAGE_UFW="${MANAGE_UFW:-auto}" ENABLE_SSL="${ENABLE_SSL:-auto}"
+# WEB_PORT is only exported when asked for: deploy-ubuntu.sh then keeps the
+# default (80 with a domain) or picks a free 8080+ port when needed.
+[ -n "${WEB_PORT:-}" ] && export WEB_PORT || true
+# Backwards compatibility with the old installer flag.
+[ -n "${NGINX_PORT:-}" ] && export WEB_PORT="${WEB_PORT:-$NGINX_PORT}" || true
+export WEB_SERVER="${WEB_SERVER:-auto}" INSTALL_PHP="${INSTALL_PHP:-auto}"
+export MANAGE_UFW="${MANAGE_UFW:-auto}" ENABLE_SSL="${ENABLE_SSL:-auto}"
 export NONINTERACTIVE="${NONINTERACTIVE:-0}"
 export DEBIAN_FRONTEND=noninteractive
 

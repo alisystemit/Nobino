@@ -8,14 +8,17 @@
 #  from the terminal, not from the pipe):
 #        curl -fsSL https://raw.githubusercontent.com/alisystemit/Nobino/main/scripts/uninstall-ubuntu.sh \
 #          | sudo bash -s -- --dry-run
-#  Behavior: each section (PM2, Nginx, SSL, database, firewall, Node, app folder,
-#            service user) is prompted separately; only confirmed items are removed.
+#  Behavior: each section (PM2, web server, SSL, database, firewall, Node, app
+#            folder, service user) is prompted separately; only confirmed items
+#            are removed.
 #
-#  Coexistence-safe: Apache, its sites/certificates, PHP and MySQL/MariaDB are
-#  never touched. Nobino is removed as the unprivileged service user it runs as.
+#  Coexistence-safe: the web server (Apache or Nginx) is not uninstalled when
+#  it pre-existed, and the sites, domains, certificates, PHP and MySQL/MariaDB
+#  of other applications are never touched. Only Nobino's own vhost/site file
+#  and, when confirmed, its own package are removed.
 #
 #  Overridable env vars: APP_NAME, APP_USER, APP_HOME, APP_DIR, PORT, DOMAIN,
-#                        NGINX_PORT, NGINX_CONF, BACKUP_DIR
+#                        WEB_PORT, BACKUP_DIR
 # ══════════════════════════════════════════════════════════════════
 set -uo pipefail
 
@@ -39,7 +42,7 @@ Usage:
 
 Optional environment variables:
   APP_NAME=nobino  APP_USER=nobino  APP_HOME=/var/lib/nobino
-  APP_DIR=/opt/nobino  PORT=3000  DOMAIN=example.com
+  APP_DIR=/var/www/nobino  PORT=3000  DOMAIN=example.com  WEB_PORT=8080
   BACKUP_DIR=/root/nobino-backups
 EOF
 }
@@ -140,10 +143,10 @@ APP_NAME="${APP_NAME:-nobino}"
 APP_USER="${APP_USER:-nobino}"
 APP_HOME="${APP_HOME:-/var/lib/${APP_USER}}"
 if [ -z "${APP_DIR:-}" ]; then
-  if [ -d "/opt/$APP_NAME" ]; then
-    APP_DIR="/opt/$APP_NAME"                       # default since the coexistence layout
-  elif [ -d "/var/www/$APP_NAME" ]; then
-    APP_DIR="/var/www/$APP_NAME"                   # older layout
+  if [ -d "/var/www/$APP_NAME" ]; then
+    APP_DIR="/var/www/$APP_NAME"                   # default install location
+  elif [ -d "/opt/$APP_NAME" ]; then
+    APP_DIR="/opt/$APP_NAME"                       # layout of older installs
   else
     APP_DIR="$PROJECT_ROOT"
   fi
@@ -151,6 +154,14 @@ fi
 APP_DIR="${APP_DIR%/}"
 NGINX_CONF="${NGINX_CONF:-/etc/nginx/sites-available/${APP_NAME}.conf}"
 NGINX_LINK="${NGINX_LINK:-/etc/nginx/sites-enabled/${APP_NAME}.conf}"
+APACHE_SITE="${APACHE_SITE:-/etc/apache2/sites-available/${APP_NAME}.conf}"
+APACHE_SITE_LINK="${APACHE_SITE_LINK:-/etc/apache2/sites-enabled/${APP_NAME}.conf}"
+APACHE_SSL_SITE="${APACHE_SSL_SITE:-/etc/apache2/sites-available/${APP_NAME}-le-ssl.conf}"
+APACHE_SSL_LINK="${APACHE_SSL_LINK:-/etc/apache2/sites-enabled/${APP_NAME}-le-ssl.conf}"
+APACHE_PORT_CONF="${APACHE_PORT_CONF:-/etc/apache2/conf-available/${APP_NAME}-port.conf}"
+APACHE_PORT_LINK="${APACHE_PORT_LINK:-/etc/apache2/conf-enabled/${APP_NAME}-port.conf}"
+APACHE_DENY_CONF="${APACHE_DENY_CONF:-/etc/apache2/conf-available/${APP_NAME}-deny.conf}"
+APACHE_DENY_LINK="${APACHE_DENY_LINK:-/etc/apache2/conf-enabled/${APP_NAME}-deny.conf}"
 BACKUP_DIR="${BACKUP_DIR:-/root/nobino-backups}"
 
 env_get() {
@@ -159,7 +170,7 @@ env_get() {
   grep -E "^${key}=" "$APP_DIR/.env" | head -1 | cut -d= -f2- | sed -e 's/^"//' -e 's/"$//'
 }
 
-# Internal port: env -> ecosystem -> nginx -> 3000
+# Internal port: env -> ecosystem -> Nginx/Apache proxy -> 3000
 detect_port() {
   local p=""
   [ -n "${PORT:-}" ] && { printf '%s' "$PORT"; return; }
@@ -169,23 +180,41 @@ detect_port() {
   if [ -z "$p" ] && [ -f "$NGINX_CONF" ]; then
     p="$(sed -nE 's/.*proxy_pass[[:space:]]+http:\/\/127\.0\.0\.1:([0-9]+).*/\1/p' "$NGINX_CONF" | head -1)"
   fi
+  if [ -z "$p" ] && [ -f "$APACHE_SITE" ]; then
+    p="$(sed -nE 's/.*ProxyPass[[:space:]]+\/[[:space:]]+http:\/\/127\.0\.0\.1:([0-9]+).*/\1/p' "$APACHE_SITE" | head -1)"
+  fi
   printf '%s' "${p:-3000}"
 }
 PORT="$(detect_port)"
 
-# Public ports Nginx listens on for this site (a coexistence install uses a
-# single port such as 8080; a standalone one may listen on 80 and 443).
-detect_nginx_ports() {
-  local p="${NGINX_PORT:-}"
+# Public ports this install listens on (Nginx `listen` or Apache VirtualHost).
+detect_public_ports() {
+  local p="${WEB_PORT:-${NGINX_PORT:-}}" f
   if [ -n "$p" ]; then printf '%s' "$p"; return; fi
-  if [ -f "$NGINX_CONF" ]; then
-    sed -nE 's/^[[:space:]]*listen[[:space:]]+([0-9]+).*/\1/p' "$NGINX_CONF" | sort -un | tr '\n' ' '
-  fi
+  {
+    for f in "$NGINX_CONF" "$APACHE_SITE" "$APACHE_SSL_SITE"; do
+      [ -f "$f" ] || continue
+      sed -nE 's/^[[:space:]]*listen[[:space:]]+([0-9]+).*/\1/p' "$f"
+      sed -nE 's/.*<VirtualHost[[:space:]]+\*:([0-9]+)>.*/\1/p' "$f"
+    done
+  } | sort -un | tr '\n' ' '
 }
-NGINX_PORTS="$(detect_nginx_ports)"
-NGINX_PORTS="${NGINX_PORTS% }"
+PUBLIC_PORTS="$(detect_public_ports)"
+PUBLIC_PORTS="${PUBLIC_PORTS% }"
 
-# Domain: env -> Nginx server_name -> NEXT_PUBLIC_APP_URL
+# Was the web server installed together with Nobino? A firewall rule for 80/443
+# must not be removed when Apache/Nginx was already serving other sites.
+APACHE_PRESENT=0
+if command -v apache2ctl >/dev/null 2>&1 || command -v apachectl >/dev/null 2>&1 ||
+   [ -d /etc/apache2 ]; then
+  APACHE_PRESENT=1
+fi
+NGINX_PRESENT=0
+if command -v nginx >/dev/null 2>&1 || [ -d /etc/nginx ]; then NGINX_PRESENT=1; fi
+WEB_PREEXISTED=1
+[ "$APACHE_PRESENT" -eq 0 ] && [ "$NGINX_PRESENT" -eq 1 ] && WEB_PREEXISTED=0
+
+# Domain: env -> site files -> NEXT_PUBLIC_APP_URL
 detect_domain() {
   local d="${DOMAIN:-}" raw tok host
   if [ -z "$d" ] && [ -f "$NGINX_CONF" ]; then
@@ -195,6 +224,10 @@ detect_domain() {
       d="$tok"; break
     done
   fi
+  if [ -z "$d" ] && [ -f "$APACHE_SITE" ]; then
+    raw="$(sed -nE 's/^[[:space:]]*ServerName[[:space:]]+([^[:space:]]+).*/\1/p' "$APACHE_SITE" | head -1)"
+    d="$raw"
+  fi
   if [ -z "$d" ] && [ -f "$APP_DIR/.env" ]; then
     host="$(env_get NEXT_PUBLIC_APP_URL | sed -E 's#^[a-z]+://##; s#/.*$##; s#:[0-9]+$##')"
     case "$host" in ''|localhost|127.*) ;; *) d="$host" ;; esac
@@ -202,6 +235,18 @@ detect_domain() {
   printf '%s' "$d"
 }
 DOMAIN="$(detect_domain)"
+
+# Certificate of Nobino only (read now: the site files are removed in section 2).
+OWN_CERT_PATH=""
+for _f in "$NGINX_CONF" "$APACHE_SITE" "$APACHE_SSL_SITE"; do
+  [ -f "$_f" ] || continue
+  if [ -z "$OWN_CERT_PATH" ]; then
+    _p="$(sed -nE 's/^[[:space:]]*ssl_certificate[[:space:]]+([^;]+);.*/\1/p' "$_f" | head -1)"
+    [ -n "$_p" ] || _p="$(sed -nE 's/^[[:space:]]*SSLCertificateFile[[:space:]]+([^[:space:];]+).*/\1/p' "$_f" | head -1)"
+    OWN_CERT_PATH="$_p"
+  fi
+done
+unset _f _p
 
 # Database from DATABASE_URL in .env
 DB_URL="$(env_get DATABASE_URL)"
@@ -231,7 +276,7 @@ echo "  App           : $APP_NAME"
 echo "  App directory : $APP_DIR"
 echo "  Service user  : ${APP_USER} (home: ${APP_HOME})"
 echo "  Internal port : $PORT"
-echo "  Public port(s): ${NGINX_PORTS:-—}"
+echo "  Public port(s): ${PUBLIC_PORTS:-—}"
 echo "  Domain        : ${DOMAIN:-—}"
 echo "  Database      : ${DB_NAME} / role ${DB_USER} @ ${DB_HOST}:${DB_PORT}$( [ "$DB_LOCAL" -eq 0 ] && echo ' (external)')"
 echo "  Backups       : $BACKUP_DIR"
@@ -381,10 +426,29 @@ reload_nginx() {
   fi
 }
 
-section_nginx() {
-  header "2) Nginx"
-  local removed_site=0
-  if [ -e "$NGINX_CONF" ] || [ -e "$NGINX_LINK" ] || [ -L "$NGINX_LINK" ]; then
+reload_apache() {
+  local ctl="apache2ctl"
+  command -v apache2ctl >/dev/null 2>&1 || ctl="apachectl"
+  if [ "$DRY_RUN" -eq 1 ]; then
+    run "$ctl" configtest
+    run systemctl reload apache2
+    return
+  fi
+  if command -v "$ctl" >/dev/null 2>&1; then
+    if "$ctl" configtest >/dev/null 2>&1; then
+      systemctl reload apache2 >/dev/null 2>&1 || true
+    else
+      warn "Apache config test failed; reload skipped."
+    fi
+  fi
+}
+
+section_web() {
+  header "2) Web server (Nginx / Apache)"
+  local removed_site=0 f found
+
+  # ── Nginx: only this site's file ──
+  if [ -e "$NGINX_CONF" ] || [ -L "$NGINX_LINK" ]; then
     if ask_yes "Remove the Nginx site config for '$APP_NAME'?" no; then
       run rm -f "$NGINX_LINK" "$NGINX_CONF"
       removed_site=1
@@ -395,7 +459,7 @@ section_nginx() {
       mark_kept "Nginx: site $APP_NAME"
     fi
   else
-    info "No Nginx config found for '$APP_NAME'."
+    info "No Nginx site config found for '$APP_NAME'."
   fi
 
   if [ "$removed_site" -eq 1 ] && command -v nginx >/dev/null 2>&1 \
@@ -407,6 +471,41 @@ section_nginx() {
     fi
   fi
 
+  # ── Apache: the Nobino vhost plus its port/deny helper confs ──
+  found=0
+  for f in "$APACHE_SITE_LINK" "$APACHE_SITE" "$APACHE_SSL_LINK" "$APACHE_SSL_SITE" \
+           "$APACHE_PORT_LINK" "$APACHE_PORT_CONF" "$APACHE_DENY_LINK" "$APACHE_DENY_CONF"; do
+    if [ -e "$f" ] || [ -L "$f" ]; then found=1; fi
+  done
+  if [ "$found" -eq 1 ]; then
+    if ask_yes "Remove the Apache vhost and helper configs of '$APP_NAME' (only these files)?" no; then
+      if [ "$DRY_RUN" -eq 0 ]; then
+        command -v a2dissite >/dev/null 2>&1 && a2dissite "$APP_NAME" >/dev/null 2>&1 || true
+        command -v a2dissite >/dev/null 2>&1 && a2dissite "${APP_NAME}-le-ssl" >/dev/null 2>&1 || true
+        command -v a2disconf >/dev/null 2>&1 && a2disconf "${APP_NAME}-port" >/dev/null 2>&1 || true
+        command -v a2disconf >/dev/null 2>&1 && a2disconf "${APP_NAME}-deny" >/dev/null 2>&1 || true
+      else
+        run a2dissite "$APP_NAME"
+        run a2dissite "${APP_NAME}-le-ssl"
+        run a2disconf "${APP_NAME}-port"
+        run a2disconf "${APP_NAME}-deny"
+      fi
+      run rm -f "$APACHE_SITE_LINK" "$APACHE_SITE" "$APACHE_SSL_LINK" "$APACHE_SSL_SITE" \
+        "$APACHE_PORT_LINK" "$APACHE_PORT_CONF" "$APACHE_DENY_LINK" "$APACHE_DENY_CONF"
+      ok "Apache vhost and helper configs removed."
+      mark_removed "Apache: vhost $APP_NAME"
+      reload_apache
+    else
+      mark_kept "Apache: vhost $APP_NAME"
+    fi
+  else
+    info "No Apache vhost found for '$APP_NAME'."
+  fi
+  if [ -d /etc/apache2 ]; then
+    info "The Apache package itself is never removed here: other sites may depend on it."
+  fi
+
+  # ── Nginx package: only offered when no other site uses it ──
   if command -v nginx >/dev/null 2>&1; then
     local others
     others="$(find /etc/nginx/sites-enabled -mindepth 1 -maxdepth 1 ! -name default ! -name "${APP_NAME}.conf" 2>/dev/null | wc -l | tr -d ' ')"
@@ -428,15 +527,11 @@ section_nginx() {
 # ══════════════════════════════════════════════════════════════════
 section_ssl() {
   header "3) SSL certificate"
-  # Only a certificate that Nobino's own Nginx file points at belongs to it.
-  # In coexistence mode Nobino has no certificate at all: Apache (and any other
-  # site) keeps using its own, so nothing is listed or deleted here.
-  local cert_path="" cert_name=""
-  if [ -f "$NGINX_CONF" ]; then
-    cert_path="$(sed -nE 's/^[[:space:]]*ssl_certificate[[:space:]]+([^;]+);.*/\1/p' "$NGINX_CONF" | head -1)"
-  fi
+  # Only a certificate that Nobino's own site/vhost points at belongs to it;
+  # certificates of the other sites are never listed or deleted.
+  local cert_path="${OWN_CERT_PATH:-}" cert_name=""
   if [ -z "$cert_path" ]; then
-    info "Nobino has no certificate of its own; Apache/other sites keep theirs. Skipping."
+    info "Nobino has no certificate of its own; other sites keep theirs. Skipping."
     mark_kept "SSL: none managed by Nobino"
     return
   fi
@@ -554,7 +649,7 @@ section_db() {
 }
 
 # ══════════════════════════════════════════════════════════════════
-#  5) Firewall — only the app's internal port (80/443 untouched)
+#  5) Firewall — only ports opened for Nobino (80/443 stay when shared)
 # ══════════════════════════════════════════════════════════════════
 section_firewall() {
   header "5) UFW firewall"
@@ -567,13 +662,18 @@ section_firewall() {
     return
   fi
 
-  # Only the ports this install opened: the public Nginx port(s) and the
-  # internal app port. Apache's 80/443 rules are never listed or removed.
+  # 80/443 may serve other sites of a pre-existing Apache/Nginx; they are left
+  # alone. Only Nobino's dedicated public port is offered for removal.
   local p seen=" "
-  for p in ${NGINX_PORTS:-} ${PORT}; do
+  for p in ${PUBLIC_PORTS:-}; do
     [ -n "$p" ] || continue
     case "$seen" in *" $p "*) continue ;; esac
     seen="${seen}${p} "
+    if { [ "$p" = "80" ] || [ "$p" = "443" ]; } && [ "$WEB_PREEXISTED" -eq 1 ]; then
+      info "Keeping the firewall rule for port ${p}: the existing web server may need it."
+      mark_kept "UFW: port $p (shared)"
+      continue
+    fi
     if ufw status 2>/dev/null | grep -qE "(^|[[:space:]])${p}/tcp"; then
       if ask_yes "Remove the firewall rule that allows port ${p}?" no; then
         run ufw delete allow "${p}/tcp" >/dev/null 2>&1 || true
@@ -586,6 +686,7 @@ section_firewall() {
       info "No UFW rule found for port ${p}."
     fi
   done
+  info "The internal app port (${PORT}) was never open to the public; nothing to remove."
 }
 
 # ══════════════════════════════════════════════════════════════════
@@ -736,7 +837,7 @@ section_user() {
 
 # ─── Run ──────────────────────────────────────────────────────────
 section_pm2
-section_nginx
+section_web
 section_ssl
 section_db
 section_firewall
@@ -766,7 +867,7 @@ else
   info "Uninstall finished."
 fi
 echo "  Reminder: disable DNS/Cloudflare records and external services (SMS, payments) separately."
-echo "  Apache, PHP and MySQL/MariaDB were never touched (their sites and data stay online)."
+echo "  Other sites of the web server, PHP and MySQL/MariaDB were never touched."
 if [ -d "$BACKUP_DIR" ]; then
   echo "  Backups: $BACKUP_DIR"
 fi
