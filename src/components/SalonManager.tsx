@@ -127,13 +127,13 @@ const CHANNEL_LABEL: Record<string, string> = {
 const DAY_NAMES = ["شنبه", "یکشنبه", "دوشنبه", "سه‌شنبه", "چهارشنبه", "پنجشنبه", "جمعه"];
 
 const inputCls =
-  "w-full rounded-xl border border-neutral-300 px-3 py-2.5 text-sm outline-none transition focus:border-pink-500 dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-100";
+  "h-11 w-full rounded-xl border border-neutral-300 px-3 text-sm outline-none transition focus:border-pink-500 dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-100";
 
 const cardCls = "rounded-2xl border border-neutral-200 bg-white p-4 shadow-sm dark:border-neutral-800 dark:bg-neutral-900";
 
 const primaryBtn =
-  "rounded-xl bg-gradient-to-l from-pink-600 to-purple-600 px-5 py-2.5 text-sm font-bold text-white shadow-md shadow-pink-500/20 transition hover:opacity-95";
-const darkBtn = "rounded-xl bg-neutral-900 px-5 py-2.5 text-sm font-bold text-white transition hover:bg-neutral-700 dark:bg-neutral-100 dark:text-neutral-900 dark:hover:bg-neutral-300";
+  "flex h-11 items-center justify-center rounded-xl bg-gradient-to-l from-pink-600 to-purple-600 px-5 text-sm font-bold text-white shadow-md shadow-pink-500/20 transition hover:opacity-95";
+const darkBtn = "flex h-11 items-center justify-center rounded-xl bg-neutral-900 px-5 text-sm font-bold text-white transition hover:bg-neutral-700 dark:bg-neutral-100 dark:text-neutral-900 dark:hover:bg-neutral-300";
 
 /* ─── فرم خدمت ───────────────────────────────────────────────────────── */
 
@@ -337,16 +337,16 @@ function ReportView({ ctx }: { ctx: Ctx }) {
       {/* گزارش مالی بازه‌ای */}
       <div className={cardCls}>
         <h4 className="text-sm font-extrabold text-neutral-800 dark:text-neutral-100">گزارش مالی بازه‌ای</h4>
-        <div className="mt-2 flex flex-wrap items-end gap-2">
-          <div>
+        <div className="mt-2 grid gap-2 sm:flex sm:flex-wrap sm:items-end">
+          <div className="w-full sm:w-auto">
             <label className="text-[11px] font-medium text-neutral-500 dark:text-neutral-400">از تاریخ (شمسی)</label>
-            <JalaliDatePicker className="mt-1 w-44" value={finFrom} onChange={setFinFrom} timeZone={ctx.timezone} />
+            <JalaliDatePicker className="mt-1 sm:w-44" value={finFrom} onChange={setFinFrom} timeZone={ctx.timezone} />
           </div>
-          <div>
+          <div className="w-full sm:w-auto">
             <label className="text-[11px] font-medium text-neutral-500 dark:text-neutral-400">تا تاریخ (شمسی)</label>
-            <JalaliDatePicker className="mt-1 w-44" value={finTo} onChange={setFinTo} timeZone={ctx.timezone} />
+            <JalaliDatePicker className="mt-1 sm:w-44" value={finTo} onChange={setFinTo} timeZone={ctx.timezone} />
           </div>
-          <button onClick={loadFinancial} className={darkBtn}>نمایش</button>
+          <button onClick={loadFinancial} className={`${darkBtn} w-full sm:w-auto`}>نمایش</button>
         </div>
         {financial && (
           <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-4">
@@ -371,12 +371,12 @@ function ReportView({ ctx }: { ctx: Ctx }) {
         </div>
       )}
 
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
         {cards.map((c) => (
           <div key={c.label} className={cardCls}>
-            <div className="text-2xl">{c.icon}</div>
-            <div className="mt-2 text-xl font-black text-neutral-900 dark:text-neutral-100">{c.value}</div>
-            <div className="mt-1 text-xs text-neutral-500 dark:text-neutral-400">{c.label}</div>
+            <div className="text-xl sm:text-2xl">{c.icon}</div>
+            <div className="mt-1.5 text-lg font-black text-neutral-900 sm:mt-2 sm:text-xl dark:text-neutral-100">{c.value}</div>
+            <div className="mt-1 text-[11px] text-neutral-500 sm:text-xs dark:text-neutral-400">{c.label}</div>
           </div>
         ))}
       </div>
@@ -477,7 +477,7 @@ function WaitlistView({ ctx }: { ctx: Ctx }) {
                         setEntries((prev) => prev.map((x) => (x.id === e.id ? { ...x, status: "NOTIFIED" } : x)));
                       })
                   }
-                  className="rounded-lg bg-sky-500 px-3 py-1.5 text-xs font-bold text-white hover:bg-sky-600"
+                  className="h-10 rounded-lg bg-sky-500 px-3 text-xs font-bold text-white hover:bg-sky-600"
                 >
                   اطلاع‌رسانی شد
                 </button>
@@ -594,16 +594,16 @@ function CalendarView({ ctx }: { ctx: Ctx }) {
   return (
     <div>
       <div className="mb-3 flex flex-wrap items-center gap-2">
-        <button onClick={() => shift(-1)} className="rounded-lg bg-neutral-100 px-3 py-1.5 text-sm font-bold text-neutral-700 transition hover:bg-neutral-200 dark:bg-neutral-800 dark:text-neutral-200 dark:hover:bg-neutral-700">قبلی</button>
-        <button onClick={gotoToday} className="rounded-lg bg-neutral-900 px-3 py-1.5 text-sm font-bold text-white dark:bg-neutral-100 dark:text-neutral-900">امروز</button>
-        <button onClick={() => shift(1)} className="rounded-lg bg-neutral-100 px-3 py-1.5 text-sm font-bold text-neutral-700 transition hover:bg-neutral-200 dark:bg-neutral-800 dark:text-neutral-200 dark:hover:bg-neutral-700">بعدی</button>
-        <span className="text-sm font-bold text-neutral-700 dark:text-neutral-200">{title}</span>
+        <button onClick={() => shift(-1)} className="h-10 rounded-lg bg-neutral-100 px-3 text-sm font-bold text-neutral-700 transition hover:bg-neutral-200 dark:bg-neutral-800 dark:text-neutral-200 dark:hover:bg-neutral-700">قبلی</button>
+        <button onClick={gotoToday} className="h-10 rounded-lg bg-neutral-900 px-3 text-sm font-bold text-white dark:bg-neutral-100 dark:text-neutral-900">امروز</button>
+        <button onClick={() => shift(1)} className="h-10 rounded-lg bg-neutral-100 px-3 text-sm font-bold text-neutral-700 transition hover:bg-neutral-200 dark:bg-neutral-800 dark:text-neutral-200 dark:hover:bg-neutral-700">بعدی</button>
+        <span className="w-full text-sm font-bold text-neutral-700 sm:w-auto dark:text-neutral-200">{title}</span>
         <div className="ms-auto flex gap-1">
           {(["day", "week", "month"] as const).map((m) => (
             <button
               key={m}
               onClick={() => changeMode(m)}
-              className={`rounded-lg px-3 py-1.5 text-xs font-bold transition ${mode === m ? "bg-pink-600 text-white" : "bg-neutral-100 text-neutral-600 dark:bg-neutral-800 dark:text-neutral-300"}`}
+              className={`h-10 rounded-lg px-3 text-xs font-bold transition ${mode === m ? "bg-pink-600 text-white" : "bg-neutral-100 text-neutral-600 dark:bg-neutral-800 dark:text-neutral-300"}`}
             >
               {m === "day" ? "روز" : m === "week" ? "هفته" : "ماه"}
             </button>
@@ -635,23 +635,23 @@ function CalendarView({ ctx }: { ctx: Ctx }) {
             .filter((a) => dayKey(new Date(a.startAt)) === key)
             .sort((a, b) => a.startAt.localeCompare(b.startAt));
           return (
-            <div key={key} className={`rounded-2xl border border-neutral-200 bg-white p-2.5 shadow-sm dark:border-neutral-800 dark:bg-neutral-900 ${mode === "month" ? "min-h-[110px]" : ""}`}>
+            <div key={key} className={`rounded-2xl border border-neutral-200 bg-white p-1.5 shadow-sm sm:p-2.5 dark:border-neutral-800 dark:bg-neutral-900 ${mode === "month" ? "min-h-[86px] sm:min-h-[110px]" : ""}`}>
               <div className="mb-1.5 flex items-center justify-between gap-1">
-                <span className="text-xs font-extrabold text-neutral-800 dark:text-neutral-100">{DAY_NAMES[(day.getDay() + 1) % 7]}</span>
-                <span className="text-[10px] text-neutral-400" dir="ltr">{dayKey(day).slice(5)}</span>
+                <span className="truncate text-[10px] font-extrabold text-neutral-800 sm:text-xs dark:text-neutral-100">{mode === "month" ? DAY_NAMES[(day.getDay() + 1) % 7].slice(0, 1) : DAY_NAMES[(day.getDay() + 1) % 7]}</span>
+                <span className="shrink-0 text-[9px] text-neutral-400 sm:text-[10px]" dir="ltr">{dayKey(day).slice(5)}</span>
               </div>
               <div className="space-y-1">
                 {dayAppts.length === 0 && mode !== "month" && <p className="text-xs text-neutral-400">نوبتی نیست</p>}
                 {dayAppts.slice(0, mode === "month" ? 3 : 50).map((a) => {
                   const st = APPT_STATUS[a.status] ?? { label: a.status, cls: "bg-neutral-100 text-neutral-500" };
                   return (
-                    <div key={a.id} className="rounded-lg bg-neutral-50 px-2 py-1 text-[11px] dark:bg-neutral-800">
+                    <div key={a.id} className="truncate rounded-lg bg-neutral-50 px-1.5 py-1 text-[10px] sm:px-2 sm:text-[11px] dark:bg-neutral-800">
                       <span className="font-bold text-neutral-700 dark:text-neutral-200" dir="ltr">
                         {new Date(a.startAt).toLocaleTimeString("fa-IR", { hour: "2-digit", minute: "2-digit" })}
                       </span>{" "}
                       <span className="text-neutral-600 dark:text-neutral-300">{a.customerName}</span>
                       {a.employee ? <span className="text-neutral-400"> — {a.employee}</span> : null}
-                      <div className="flex items-center gap-1 text-neutral-400">
+                      <div className="hidden items-center gap-1 text-neutral-400 sm:flex">
                         <span>{a.service ?? ""}</span>
                         <span className={`rounded-full px-1.5 py-0.5 text-[9px] font-bold ${st.cls}`}>{st.label}</span>
                       </div>
@@ -753,11 +753,11 @@ function BlockForm({ ctx }: { ctx: Ctx }) {
   }
   return (
     <div className={`${cardCls} grid gap-3 sm:grid-cols-2`}>
-      <div className="grid grid-cols-2 gap-2">
+      <div className="grid grid-cols-1 gap-2 sm:grid-cols-[1fr_7.5rem]">
         <JalaliDatePicker label="از تاریخ (شمسی)" value={startDate} onChange={setStartDate} timeZone={ctx.timezone} placeholder="تاریخ شروع" />
         <TimeField label="از ساعت" value={startTime} onChange={setStartTime} />
       </div>
-      <div className="grid grid-cols-2 gap-2">
+      <div className="grid grid-cols-1 gap-2 sm:grid-cols-[1fr_7.5rem]">
         <JalaliDatePicker label="تا تاریخ (شمسی)" value={endDate} onChange={setEndDate} timeZone={ctx.timezone} placeholder="تاریخ پایان" />
         <TimeField label="تا ساعت" value={endTime} onChange={setEndTime} />
       </div>
@@ -818,7 +818,7 @@ function BookingForm({ ctx }: { ctx: Ctx }) {
         <option value="">آرایشگر (اختیاری)</option>
         {ctx.staff.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
       </select>
-      <div className="grid grid-cols-2 gap-2">
+      <div className="grid grid-cols-1 gap-2 sm:col-span-2 sm:grid-cols-2">
         <JalaliDatePicker value={date} onChange={setDate} timeZone={ctx.timezone} placeholder="تاریخ (شمسی)" />
         <TimeField value={time} onChange={setTime} />
       </div>
@@ -904,7 +904,7 @@ function HolidaysView({ ctx }: { ctx: Ctx }) {
           {ctx.branches.map((b) => <option key={b.id} value={b.id}>{b.name}</option>)}
         </select>
         <label className="flex items-center gap-2 rounded-xl border border-neutral-200 px-3 text-sm text-neutral-600 dark:border-neutral-700 dark:text-neutral-300">
-          <input type="checkbox" checked={isClosed} onChange={(e) => setIsClosed(e.target.checked)} />
+          <input type="checkbox" className="h-5 w-5 shrink-0 accent-pink-600" checked={isClosed} onChange={(e) => setIsClosed(e.target.checked)} />
           تعطیل کامل
         </label>
         {!isClosed && (
@@ -930,7 +930,7 @@ function HolidaysView({ ctx }: { ctx: Ctx }) {
                 {h.reason ? ` (${h.reason})` : ""}
               </div>
             </div>
-            <button onClick={() => remove(h.id)} className="rounded-lg bg-red-50 px-3 py-1.5 text-xs font-bold text-red-600 transition hover:bg-red-100 dark:bg-red-900/30 dark:text-red-300">
+            <button onClick={() => remove(h.id)} className="h-10 shrink-0 rounded-lg bg-red-50 px-3 text-xs font-bold text-red-600 transition hover:bg-red-100 dark:bg-red-900/30 dark:text-red-300">
               حذف
             </button>
           </div>
@@ -1006,7 +1006,7 @@ function CustomersView({ ctx }: { ctx: Ctx }) {
                   setNote(c.note ?? "");
                   setEditName(c.name ?? "");
                 }}
-                className="rounded-lg bg-neutral-100 px-3 py-1.5 text-xs font-bold text-neutral-700 transition hover:bg-neutral-200 dark:bg-neutral-800 dark:text-neutral-200 dark:hover:bg-neutral-700"
+                className="h-10 shrink-0 rounded-lg bg-neutral-100 px-3 text-xs font-bold text-neutral-700 transition hover:bg-neutral-200 dark:bg-neutral-800 dark:text-neutral-200 dark:hover:bg-neutral-700"
               >
                 {editing === c.phone ? "بستن" : "یادداشت / نام"}
               </button>
@@ -1122,7 +1122,7 @@ function BillingView({ ctx }: { ctx: Ctx }) {
         </div>
         <button
           onClick={() => setShowForm((v) => !v)}
-          className="rounded-xl bg-gradient-to-l from-pink-600 to-purple-600 px-4 py-2.5 text-sm font-bold text-white shadow-lg shadow-pink-500/25 transition hover:opacity-95"
+          className="h-11 w-full rounded-xl bg-gradient-to-l from-pink-600 to-purple-600 px-4 text-sm font-bold text-white shadow-lg shadow-pink-500/25 transition hover:opacity-95 sm:w-auto"
         >
           {showForm ? "بستن فرم" : "🧾 صدور فاکتور جدید"}
         </button>
@@ -1145,7 +1145,7 @@ function BillingView({ ctx }: { ctx: Ctx }) {
                 onChange={(e) => setForm((f) => ({ ...f, customerName: e.target.value }))}
                 placeholder="مثلاً: سارا احمدی"
                 required
-                className="w-full rounded-xl border border-neutral-200 bg-white px-3 py-2 text-sm outline-none focus:border-pink-400 dark:border-neutral-700 dark:bg-neutral-900"
+                className="h-11 w-full rounded-xl border border-neutral-200 bg-white px-3 text-sm outline-none focus:border-pink-400 dark:border-neutral-700 dark:bg-neutral-900"
               />
             </div>
             <div>
@@ -1157,7 +1157,7 @@ function BillingView({ ctx }: { ctx: Ctx }) {
                 dir="ltr"
                 inputMode="tel"
                 required
-                className="w-full rounded-xl border border-neutral-200 bg-white px-3 py-2 text-right text-sm outline-none focus:border-pink-400 dark:border-neutral-700 dark:bg-neutral-900"
+                className="h-11 w-full rounded-xl border border-neutral-200 bg-white px-3 text-right text-sm outline-none focus:border-pink-400 dark:border-neutral-700 dark:bg-neutral-900"
               />
             </div>
             <div>
@@ -1166,7 +1166,7 @@ function BillingView({ ctx }: { ctx: Ctx }) {
                 value={form.description}
                 onChange={(e) => setForm((f) => ({ ...f, description: e.target.value }))}
                 placeholder="مثلاً: کوتاهی و رنگ مو + کراتینه"
-                className="w-full rounded-xl border border-neutral-200 bg-white px-3 py-2 text-sm outline-none focus:border-pink-400 dark:border-neutral-700 dark:bg-neutral-900"
+                className="h-11 w-full rounded-xl border border-neutral-200 bg-white px-3 text-sm outline-none focus:border-pink-400 dark:border-neutral-700 dark:bg-neutral-900"
               />
             </div>
             <div>
@@ -1178,7 +1178,7 @@ function BillingView({ ctx }: { ctx: Ctx }) {
                 dir="ltr"
                 inputMode="numeric"
                 required
-                className="w-full rounded-xl border border-neutral-200 bg-white px-3 py-2 text-right text-sm outline-none focus:border-pink-400 dark:border-neutral-700 dark:bg-neutral-900"
+                className="h-11 w-full rounded-xl border border-neutral-200 bg-white px-3 text-right text-sm outline-none focus:border-pink-400 dark:border-neutral-700 dark:bg-neutral-900"
               />
             </div>
           </div>
@@ -1187,7 +1187,7 @@ function BillingView({ ctx }: { ctx: Ctx }) {
             <button
               type="submit"
               disabled={saving}
-              className="rounded-xl bg-neutral-900 px-5 py-2.5 text-sm font-bold text-white transition hover:bg-neutral-800 disabled:opacity-60"
+              className="h-11 w-full rounded-xl bg-neutral-900 px-5 text-sm font-bold text-white transition hover:bg-neutral-800 disabled:opacity-60 sm:w-auto dark:bg-neutral-100 dark:text-neutral-900"
             >
               {saving ? "در حال صدور..." : "صدور فاکتور و ارسال پیامک"}
             </button>
@@ -1222,14 +1222,14 @@ function BillingView({ ctx }: { ctx: Ctx }) {
                 <div className="flex items-center gap-2">
                   <button
                     onClick={() => copyLink(i)}
-                    className="rounded-lg bg-neutral-100 px-3 py-1.5 text-xs font-bold text-neutral-700 transition hover:bg-neutral-200 dark:bg-neutral-800 dark:text-neutral-200"
+                    className="h-10 rounded-lg bg-neutral-100 px-3 text-xs font-bold text-neutral-700 transition hover:bg-neutral-200 dark:bg-neutral-800 dark:text-neutral-200"
                   >
                     {copied === i.id ? "کپی شد ✓" : "🔗 کپی لینک پرداخت"}
                   </button>
                   <button
                     onClick={() => resend(i)}
                     disabled={resending === i.id}
-                    className="rounded-lg bg-purple-50 px-3 py-1.5 text-xs font-bold text-purple-600 transition hover:bg-purple-100 disabled:opacity-60 dark:bg-purple-900/30 dark:text-purple-300"
+                    className="h-10 rounded-lg bg-purple-50 px-3 text-xs font-bold text-purple-600 transition hover:bg-purple-100 disabled:opacity-60 dark:bg-purple-900/30 dark:text-purple-300"
                   >
                     {resending === i.id ? "در حال ارسال..." : "📱 ارسال مجدد پیامک"}
                   </button>
@@ -1402,7 +1402,7 @@ function DomainView({ ctx }: { ctx: Ctx }) {
       <div className={`${cardCls} grid gap-3 sm:grid-cols-[1fr_auto_auto]`}>
         <input className={inputCls} aria-label={t("domain.placeholder")} dir="ltr" placeholder={t("domain.placeholder")} value={domain} onChange={(e) => setDomain(e.target.value)} />
         <button onClick={init} className={darkBtn}>{t("domain.submit")}</button>
-        <button onClick={verify} className="rounded-xl bg-green-600 px-4 py-2.5 text-sm font-bold text-white transition hover:bg-green-700">{t("domain.verify")}</button>
+        <button onClick={verify} className="h-11 rounded-xl bg-green-600 px-4 text-sm font-bold text-white transition hover:bg-green-700">{t("domain.verify")}</button>
       </div>
       {result && (
         <div className={`${cardCls} text-sm`}>
@@ -1515,11 +1515,11 @@ function ServiceRow({ ctx, service }: { ctx: Ctx; service: Service }) {
             </div>
           </div>
           <div className="flex gap-2">
-            <button onClick={() => setEditing(true)} className="rounded-lg bg-neutral-100 px-3 py-1.5 text-xs font-bold text-neutral-700 transition hover:bg-neutral-200 dark:bg-neutral-800 dark:text-neutral-200 dark:hover:bg-neutral-700">ویرایش</button>
-            <button onClick={toggleActive} className="rounded-lg bg-amber-50 px-3 py-1.5 text-xs font-bold text-amber-700 transition hover:bg-amber-100 dark:bg-amber-900/30 dark:text-amber-300 dark:hover:bg-amber-900/50">
+            <button onClick={() => setEditing(true)} className="h-10 rounded-lg bg-neutral-100 px-3 text-xs font-bold text-neutral-700 transition hover:bg-neutral-200 dark:bg-neutral-800 dark:text-neutral-200 dark:hover:bg-neutral-700">ویرایش</button>
+            <button onClick={toggleActive} className="h-10 rounded-lg bg-amber-50 px-3 text-xs font-bold text-amber-700 transition hover:bg-amber-100 dark:bg-amber-900/30 dark:text-amber-300 dark:hover:bg-amber-900/50">
               {service.isActive ? "غیرفعال" : "فعال‌سازی"}
             </button>
-            <button onClick={() => ctx.api(`${ctx.base}/services/${service.id}`, "DELETE", undefined, "حذف شد ✅").then(ctx.refreshServices)} className="rounded-lg bg-red-50 px-3 py-1.5 text-xs font-bold text-red-600 transition hover:bg-red-100 dark:bg-red-900/30 dark:text-red-300">
+            <button onClick={() => ctx.api(`${ctx.base}/services/${service.id}`, "DELETE", undefined, "حذف شد ✅").then(ctx.refreshServices)} className="h-10 rounded-lg bg-red-50 px-3 text-xs font-bold text-red-600 transition hover:bg-red-100 dark:bg-red-900/30 dark:text-red-300">
               حذف
             </button>
           </div>
@@ -1620,13 +1620,13 @@ function StaffRow({ ctx, item }: { ctx: Ctx; item: StaffItem }) {
           </div>
         </div>
         <div className="flex gap-2">
-          <button onClick={() => setOpen((o) => !o)} className="rounded-lg bg-neutral-100 px-3 py-1.5 text-xs font-bold text-neutral-700 transition hover:bg-neutral-200 dark:bg-neutral-800 dark:text-neutral-200 dark:hover:bg-neutral-700">
+          <button onClick={() => setOpen((o) => !o)} className="h-10 rounded-lg bg-neutral-100 px-3 text-xs font-bold text-neutral-700 transition hover:bg-neutral-200 dark:bg-neutral-800 dark:text-neutral-200 dark:hover:bg-neutral-700">
             {open ? "بستن" : "برنامه و خدمات"}
           </button>
-          <button onClick={toggleActive} className="rounded-lg bg-amber-50 px-3 py-1.5 text-xs font-bold text-amber-700 transition hover:bg-amber-100 dark:bg-amber-900/30 dark:text-amber-300 dark:hover:bg-amber-900/50">
+          <button onClick={toggleActive} className="h-10 rounded-lg bg-amber-50 px-3 text-xs font-bold text-amber-700 transition hover:bg-amber-100 dark:bg-amber-900/30 dark:text-amber-300 dark:hover:bg-amber-900/50">
             {active ? "غیرفعال" : "فعال‌سازی"}
           </button>
-          <button onClick={() => ctx.api(`${ctx.base}/staff/${item.id}`, "DELETE", undefined, "حذف شد ✅").then(ctx.refreshStaff)} className="rounded-lg bg-red-50 px-3 py-1.5 text-xs font-bold text-red-600 transition hover:bg-red-100 dark:bg-red-900/30 dark:text-red-300">
+          <button onClick={() => ctx.api(`${ctx.base}/staff/${item.id}`, "DELETE", undefined, "حذف شد ✅").then(ctx.refreshStaff)} className="h-10 rounded-lg bg-red-50 px-3 text-xs font-bold text-red-600 transition hover:bg-red-100 dark:bg-red-900/30 dark:text-red-300">
             حذف
           </button>
         </div>
@@ -1638,18 +1638,26 @@ function StaffRow({ ctx, item }: { ctx: Ctx; item: StaffItem }) {
             <h4 className="mb-2 text-xs font-extrabold text-neutral-700 dark:text-neutral-200">برنامه کاری هفتگی</h4>
             <div className="space-y-1.5">
               {days.map((d, i) => (
-                <div key={d.day} className="grid grid-cols-[70px_1fr_1fr_58px] items-center gap-1.5">
-                  <span className="text-[11px] text-neutral-500 dark:text-neutral-400">{DAY_NAMES[i]}</span>
-                  <TimeField value={d.open} disabled={d.isClosed} onChange={(v) => setDays((prev) => prev.map((x) => (x.day === d.day ? { ...x, open: v } : x)))} />
-                  <TimeField value={d.close} disabled={d.isClosed} onChange={(v) => setDays((prev) => prev.map((x) => (x.day === d.day ? { ...x, close: v } : x)))} />
-                  <label className="flex items-center gap-1 text-[10px] text-neutral-500 dark:text-neutral-400">
-                    <input type="checkbox" checked={d.isClosed} onChange={(e) => setDays((prev) => prev.map((x) => (x.day === d.day ? { ...x, isClosed: e.target.checked } : x)))} />
+                <div key={d.day} className="rounded-xl border border-neutral-100 bg-neutral-50/60 p-2.5 sm:grid sm:grid-cols-[70px_1fr_1fr_58px] sm:items-center sm:gap-1.5 sm:border-0 sm:bg-transparent sm:p-0 dark:border-neutral-800 dark:bg-neutral-800/40 sm:dark:bg-transparent">
+                  <div className="flex items-center justify-between gap-2 sm:block">
+                    <span className="text-xs font-bold text-neutral-600 sm:text-[11px] sm:font-normal dark:text-neutral-300">{DAY_NAMES[i]}</span>
+                    <label className="flex items-center gap-1 text-[10px] text-neutral-500 sm:hidden dark:text-neutral-400">
+                      <input type="checkbox" className="h-5 w-5 shrink-0 accent-pink-600" checked={d.isClosed} onChange={(e) => setDays((prev) => prev.map((x) => (x.day === d.day ? { ...x, isClosed: e.target.checked } : x)))} />
+                      تعطیل
+                    </label>
+                  </div>
+                  <div className="mt-2 grid grid-cols-2 gap-2 sm:contents">
+                    <TimeField value={d.open} disabled={d.isClosed} onChange={(v) => setDays((prev) => prev.map((x) => (x.day === d.day ? { ...x, open: v } : x)))} />
+                    <TimeField value={d.close} disabled={d.isClosed} onChange={(v) => setDays((prev) => prev.map((x) => (x.day === d.day ? { ...x, close: v } : x)))} />
+                  </div>
+                  <label className="hidden items-center gap-1 text-[10px] text-neutral-500 sm:flex dark:text-neutral-400">
+                    <input type="checkbox" className="h-5 w-5 shrink-0 accent-pink-600" checked={d.isClosed} onChange={(e) => setDays((prev) => prev.map((x) => (x.day === d.day ? { ...x, isClosed: e.target.checked } : x)))} />
                     تعطیل
                   </label>
                 </div>
               ))}
             </div>
-            <button onClick={saveSchedule} className="mt-2 rounded-lg bg-neutral-900 px-4 py-2 text-xs font-bold text-white transition hover:bg-neutral-700 dark:bg-neutral-100 dark:text-neutral-900">
+            <button onClick={saveSchedule} className="mt-2 h-10 w-full rounded-lg bg-neutral-900 px-4 text-xs font-bold text-white transition hover:bg-neutral-700 sm:w-auto dark:bg-neutral-100 dark:text-neutral-900">
               ذخیره برنامه
             </button>
           </div>
@@ -1660,6 +1668,7 @@ function StaffRow({ ctx, item }: { ctx: Ctx; item: StaffItem }) {
                 <label key={s.id} className="flex items-center gap-2 text-xs text-neutral-600 dark:text-neutral-300">
                   <input
                     type="checkbox"
+                    className="h-5 w-5 shrink-0 accent-pink-600"
                     checked={serviceIds.includes(s.id)}
                     onChange={(e) => setServiceIds((prev) => (e.target.checked ? [...prev, s.id] : prev.filter((id) => id !== s.id)))}
                   />
@@ -1668,7 +1677,7 @@ function StaffRow({ ctx, item }: { ctx: Ctx; item: StaffItem }) {
               ))}
               {ctx.services.length === 0 && <p className="text-xs text-neutral-400">ابتدا خدمت بسازید.</p>}
             </div>
-            <button onClick={saveServices} className="mt-2 rounded-lg bg-neutral-900 px-4 py-2 text-xs font-bold text-white transition hover:bg-neutral-700 dark:bg-neutral-100 dark:text-neutral-900">
+            <button onClick={saveServices} className="mt-2 h-10 w-full rounded-lg bg-neutral-900 px-4 text-xs font-bold text-white transition hover:bg-neutral-700 sm:w-auto dark:bg-neutral-100 dark:text-neutral-900">
               ذخیره خدمات
             </button>
           </div>
@@ -1808,12 +1817,13 @@ export default function SalonManager({
         </p>
       )}
 
-      <div className="flex gap-2 overflow-x-auto pb-1.5">
+      <div className="-mx-1 flex gap-2 overflow-x-auto px-1 pb-1.5 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
         {tabs.map((tb) => (
           <button
             key={tb.id}
             onClick={() => setTab(tb.id)}
-            className={`flex shrink-0 items-center gap-1.5 rounded-xl px-3.5 py-2 text-sm font-bold transition ${
+            aria-current={tab === tb.id ? "page" : undefined}
+            className={`flex h-10 shrink-0 items-center gap-1.5 rounded-xl px-3.5 text-xs font-bold transition sm:text-sm ${
               tab === tb.id
                 ? "bg-gradient-to-l from-pink-600 to-purple-600 text-white shadow-md shadow-pink-500/25"
                 : "bg-neutral-100 text-neutral-600 hover:bg-neutral-200 dark:bg-neutral-800 dark:text-neutral-300 dark:hover:bg-neutral-700"
@@ -1863,7 +1873,7 @@ export default function SalonManager({
                     <div className="font-bold text-neutral-800 dark:text-neutral-100">{b.name}</div>
                     <div className="text-xs text-neutral-500 dark:text-neutral-400">{b.city ?? ""} {b.address ?? ""}</div>
                   </div>
-                  <button onClick={() => ctx.api(`${base}/branches/${b.id}`, "DELETE", undefined, "حذف شد ✅").then(refreshBranches)} className="rounded-lg bg-red-50 px-3 py-1.5 text-xs font-bold text-red-600 transition hover:bg-red-100 dark:bg-red-900/30 dark:text-red-300">
+                  <button onClick={() => ctx.api(`${base}/branches/${b.id}`, "DELETE", undefined, "حذف شد ✅").then(refreshBranches)} className="h-10 rounded-lg bg-red-50 px-3 text-xs font-bold text-red-600 transition hover:bg-red-100 dark:bg-red-900/30 dark:text-red-300">
                     حذف
                   </button>
                 </div>
@@ -1914,7 +1924,7 @@ export default function SalonManager({
                       {b.staff ? ` — ${b.staff.name}` : ""}
                     </div>
                   </div>
-                  <button onClick={() => ctx.api(`${base}/blocks/${b.id}`, "DELETE", undefined, "حذف شد ✅").then(refreshBlocks)} className="rounded-lg bg-red-50 px-3 py-1.5 text-xs font-bold text-red-600 transition hover:bg-red-100 dark:bg-red-900/30 dark:text-red-300">
+                  <button onClick={() => ctx.api(`${base}/blocks/${b.id}`, "DELETE", undefined, "حذف شد ✅").then(refreshBlocks)} className="h-10 rounded-lg bg-red-50 px-3 text-xs font-bold text-red-600 transition hover:bg-red-100 dark:bg-red-900/30 dark:text-red-300">
                     حذف
                   </button>
                 </div>

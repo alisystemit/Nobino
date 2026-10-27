@@ -58,7 +58,7 @@ export function ThemeToggle() {
   return (
     <button
       onClick={toggle}
-      className="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
+      className="flex h-10 w-10 items-center justify-center rounded-xl transition-colors hover:bg-gray-100 active:scale-95 dark:hover:bg-gray-800"
       aria-label="تغییر تم"
     >
       {theme === "dark" ? (

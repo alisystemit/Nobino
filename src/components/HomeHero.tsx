@@ -25,7 +25,7 @@ export default function HomeHero() {
         ))}
       </div>
 
-      <div className="relative mx-auto max-w-7xl px-6 py-20 text-center sm:py-28">
+      <div className="relative mx-auto max-w-7xl px-4 py-14 text-center sm:px-6 sm:py-28">
         <span className="inline-flex items-center gap-2 rounded-full border border-white/25 bg-white/10 px-4 py-1.5 text-sm font-semibold backdrop-blur">
           <span className="relative flex h-2.5 w-2.5">
             <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-75" />

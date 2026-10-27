@@ -185,10 +185,10 @@ export default function DailyBoard({ salonId }: { salonId: string }) {
   return (
     <div>
       <div className="mb-4 flex flex-wrap items-end gap-3">
-        <div>
+        <div className="w-full sm:w-56">
           <label className="text-[11px] font-bold text-neutral-500 dark:text-neutral-400">تاریخ (شمسی)</label>
           <JalaliDatePicker
-            className="mt-1 w-56"
+            className="mt-1 w-full"
             value={date}
             onChange={setDate}
             timeZone={timezone}
@@ -200,13 +200,13 @@ export default function DailyBoard({ salonId }: { salonId: string }) {
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             placeholder="نام، شماره، خدمت یا آرایشگر"
-            className="mt-1 w-full rounded-xl border border-neutral-300 px-3 py-2 text-sm outline-none focus:border-pink-500 dark:border-neutral-700 dark:bg-neutral-800"
+            className="mt-1 h-11 w-full rounded-xl border border-neutral-300 px-3 text-sm outline-none focus:border-pink-500 dark:border-neutral-700 dark:bg-neutral-800"
           />
         </div>
         <select
           value={statusFilter}
           onChange={(e) => setStatusFilter(e.target.value)}
-          className="rounded-xl border border-neutral-300 px-3 py-2 text-sm outline-none focus:border-pink-500 dark:border-neutral-700 dark:bg-neutral-800"
+          className="h-11 w-full rounded-xl border border-neutral-300 px-3 text-sm outline-none focus:border-pink-500 sm:w-auto dark:border-neutral-700 dark:bg-neutral-800"
           aria-label="فیلتر وضعیت"
         >
           <option value="">همه وضعیت‌ها</option>

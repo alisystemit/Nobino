@@ -374,20 +374,20 @@ export default function SalonBooking({
   const input = "w-full rounded-xl border border-neutral-300 px-4 py-3 text-sm outline-none focus:border-pink-500";
 
   return (
-    <div className="relative overflow-hidden rounded-[2rem] border border-neutral-200 bg-white shadow-xl shadow-pink-500/5">
-      <div className="bg-gradient-to-l from-pink-600 to-purple-600 px-6 py-4 text-white">
+    <div className="relative overflow-hidden rounded-3xl border border-neutral-200 bg-white shadow-xl shadow-pink-500/5 sm:rounded-[2rem]">
+      <div className="bg-gradient-to-l from-pink-600 to-purple-600 px-4 py-4 text-white sm:px-6">
         <h3 className="text-lg font-black">رزرو نوبت</h3>
         <p className="text-xs text-white/80">خدمت (چند مورد هم ممکن است)، تاریخ و ساعت واقعاً آزاد را انتخاب کنید</p>
       </div>
 
-      <div className="p-6">
+      <div className="p-4 sm:p-6">
         {/* Voice AI */}
         <div className="rounded-2xl bg-gradient-to-bl from-pink-50 to-purple-50 p-4">
-          <div className="flex items-center justify-between gap-2">
+          <div className="flex flex-wrap items-center justify-between gap-2">
             <p className="text-sm font-bold text-neutral-700">🎙️ نوبت‌دهی با صدا</p>
             <button
               onClick={() => setShowScript((v) => !v)}
-              className="rounded-lg bg-white/80 px-2.5 py-1.5 text-[11px] font-bold text-purple-700 shadow-sm transition hover:bg-white"
+              className="h-10 rounded-xl bg-white/80 px-3 text-[11px] font-bold text-purple-700 shadow-sm transition hover:bg-white active:scale-95"
             >
               {showScript ? "بستن متن نمونه" : "متن نمونه برای خواندن"}
             </button>
@@ -462,7 +462,7 @@ export default function SalonBooking({
                   <button
                     onClick={() => (recField === f ? stopRecording() : startRecording(f))}
                     disabled={sending || (recField !== "" && recField !== f)}
-                    className={`inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-[11px] font-black transition disabled:opacity-50 ${
+                    className={`inline-flex min-h-10 items-center gap-1.5 rounded-lg px-3 py-2 text-[11px] font-black transition disabled:opacity-50 ${
                       recField === f ? "bg-red-500 text-white" : "bg-amber-100 text-amber-800 hover:bg-amber-200"
                     }`}
                   >
@@ -518,7 +518,7 @@ export default function SalonBooking({
                       type="checkbox"
                       checked={checked}
                       onChange={() => toggleService(s.id)}
-                      className="h-4 w-4 accent-pink-600"
+                      className="h-5 w-5 shrink-0 accent-pink-600"
                     />
                     <span className="min-w-0 flex-1">
                       <span className="block font-semibold">{s.name}</span>
@@ -597,7 +597,7 @@ export default function SalonBooking({
 
             {!loadingSlots && date && serviceIds.length > 0 && slots.length > 0 && (
               <>
-                <div className="mt-2 grid max-h-56 grid-cols-3 gap-2 overflow-y-auto sm:grid-cols-4">
+                <div className="mt-3 grid max-h-[45dvh] grid-cols-3 gap-2 overflow-y-auto sm:max-h-56 sm:grid-cols-4">
                   {slots.map((s) => {
                     const active = slotISO === s.startAt;
                     return (
@@ -608,7 +608,7 @@ export default function SalonBooking({
                           voiceTimeRef.current = null;
                           setSlotISO(s.startAt);
                         }}
-                        className={`rounded-lg border px-2 py-2 text-xs font-bold transition ${
+                        className={`flex h-11 items-center justify-center rounded-xl border text-sm font-bold tabular-nums transition ${
                           active
                             ? "border-pink-600 bg-pink-600 text-white"
                             : "border-neutral-200 bg-white text-neutral-700 hover:border-pink-300 hover:bg-pink-50"
@@ -658,7 +658,7 @@ export default function SalonBooking({
                           : data.error || "خطا",
                       });
                     }}
-                    className="mt-2 rounded-lg bg-amber-600 px-4 py-2 text-xs font-bold text-white hover:bg-amber-700"
+                    className="mt-2 h-10 rounded-lg bg-amber-600 px-4 text-xs font-bold text-white hover:bg-amber-700"
                   >
                     ثبت در لیست انتظار
                   </button>
@@ -672,7 +672,7 @@ export default function SalonBooking({
           <button
             onClick={submit}
             disabled={sending || serviceIds.length === 0 || !slotISO}
-            className="w-full rounded-xl bg-gradient-to-l from-pink-600 to-purple-600 py-3.5 font-black text-white shadow-lg shadow-pink-500/25 transition hover:scale-[1.02] hover:shadow-pink-500/40 disabled:opacity-50"
+            className="h-12 w-full rounded-xl bg-gradient-to-l from-pink-600 to-purple-600 font-black text-white shadow-lg shadow-pink-500/25 transition hover:scale-[1.02] hover:shadow-pink-500/40 disabled:opacity-50"
           >
             {sending ? "در حال ثبت..." : "ثبت نوبت ✨"}
           </button>

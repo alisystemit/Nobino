@@ -8,7 +8,6 @@ import { limitSnapshot } from "@/lib/plans/limits";
 import SalonSettings from "@/components/SalonSettings";
 import CreateSalon from "@/components/CreateSalon";
 import SalonManager from "@/components/SalonManager";
-import DailyStats from "@/components/DailyStats";
 import DailyBoard from "@/components/DailyBoard";
 import DashboardShell from "@/components/DashboardShell";
 import { StatCard, PanelCard, Badge } from "@/components/ui/Stats";
@@ -86,11 +85,11 @@ export default async function SalonDashboardPage({ searchParams }: { searchParam
   return (
     <DashboardShell role={user.role} title="سالن من">
       {/* نوار وضعیت سالن */}
-      <div className="relative mb-6 overflow-hidden rounded-2xl bg-gradient-to-l from-[#1c2434] to-[#2a3450] p-5 text-white shadow-lg sm:p-6">
+      <div className="relative mb-6 overflow-hidden rounded-2xl bg-gradient-to-l from-[#1c2434] to-[#2a3450] p-4 text-white shadow-lg sm:p-6">
         <div className="pointer-events-none absolute -left-10 -top-10 h-44 w-44 rounded-full bg-pink-500/20 blur-3xl" />
         <div className="pointer-events-none absolute -bottom-12 -right-12 h-44 w-44 rounded-full bg-purple-500/20 blur-3xl" />
-        <div className="relative flex flex-wrap items-center justify-between gap-4">
-          <div>
+        <div className="relative flex flex-col gap-4 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between">
+          <div className="min-w-0">
             <div className="flex flex-wrap items-center gap-2">
               <h1 className="text-xl font-black sm:text-2xl">{salon.name}</h1>
               <Badge tone={plan.tone}>{plan.label}</Badge>
@@ -98,7 +97,7 @@ export default async function SalonDashboardPage({ searchParams }: { searchParam
               {!salon.isActive && <Badge tone="danger">غیرفعال</Badge>}
               {subActive && <Badge tone="success">اشتراک فعال</Badge>}
             </div>
-            <p className="mt-2 text-sm text-neutral-300">
+            <p className="mt-2 break-all text-xs text-neutral-300 sm:text-sm">
               صفحه: <span dir="ltr" className="font-mono">nobino.ir/s/{salon.slug}</span>
               <span className="mx-2 text-neutral-500">|</span>
               تلفن: {toPersianDigits(salon.phone)}
@@ -112,7 +111,7 @@ export default async function SalonDashboardPage({ searchParams }: { searchParam
           </div>
           <Link
             href={`/s/${salon.slug}`}
-            className="inline-flex items-center gap-2 rounded-xl bg-white px-5 py-2.5 text-sm font-black text-[#1c2434] shadow-xl transition hover:scale-[1.03]"
+            className="inline-flex h-11 w-full items-center justify-center gap-2 rounded-xl bg-white px-5 text-sm font-black text-[#1c2434] shadow-xl transition hover:scale-[1.03] sm:w-auto"
           >
             <Store className="h-4 w-4" />
             مشاهده صفحه عمومی
@@ -150,9 +149,7 @@ export default async function SalonDashboardPage({ searchParams }: { searchParam
         </div>
       )}
 
-      <DailyStats role={user.role} />
-
-      <div className="mt-4 grid grid-cols-2 gap-4 lg:grid-cols-4">
+      <div className="mt-4 grid grid-cols-2 gap-3 lg:grid-cols-4">
         <StatCard label="مجموع نوبت‌ها" value={toPersianDigits(salon._count.appointments)} icon={<CalendarDays className="h-5 w-5" />} sub="کل نوبت‌های ثبت‌شده" />
         <StatCard label="خدمات فعال" value={toPersianDigits(salon.services.length)} icon={<Scissors className="h-5 w-5" />} iconClass="bg-purple-100 text-purple-600 dark:bg-purple-900/40 dark:text-purple-300" sub="در صفحه عمومی سالن" />
         <StatCard label="آثار گالری" value={toPersianDigits(salon._count.galleryItems)} icon={<Images className="h-5 w-5" />} iconClass="bg-sky-100 text-sky-600 dark:bg-sky-900/40 dark:text-sky-300" sub="نمونه‌کارهای نمایشی" />
@@ -169,14 +166,14 @@ export default async function SalonDashboardPage({ searchParams }: { searchParam
             <div className="flex items-center gap-2">
               <Link
                 href="/dashboard/new-appointment"
-                className="inline-flex items-center gap-2 rounded-xl border border-neutral-200 bg-white px-3 py-2 text-xs font-bold text-neutral-700 transition hover:bg-neutral-50 dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-200"
+                className="inline-flex h-10 items-center gap-2 rounded-xl border border-neutral-200 bg-white px-3 text-xs font-bold text-neutral-700 transition hover:bg-neutral-50 dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-200"
               >
                 <PenLine className="h-4 w-4" />
                 رزرو دستی
               </Link>
               <Link
                 href="/dashboard/voice-booking"
-                className="inline-flex items-center gap-2 rounded-xl bg-[#1c2434] px-4 py-2 text-sm font-bold text-white transition hover:bg-[#2a3450]"
+                className="inline-flex h-10 items-center gap-2 rounded-xl bg-[#1c2434] px-4 text-sm font-bold text-white transition hover:bg-[#2a3450]"
               >
                 <Mic className="h-4 w-4" />
                 صفحه رزرو صوتی
@@ -188,25 +185,25 @@ export default async function SalonDashboardPage({ searchParams }: { searchParam
           <DailyBoard salonId={salon.id} />
 
           {/* دو مسیر مجزا برای ثبت نوبت: صوتی (هوش مصنوعی) و دستی (تایپ) */}
-          <div className="mt-5 flex flex-wrap items-center justify-between gap-4 rounded-2xl bg-gradient-to-l from-purple-600 to-pink-600 p-5 text-white shadow-lg shadow-pink-500/20">
-            <div className="flex items-center gap-4">
-              <span className="flex h-12 w-12 items-center justify-center rounded-full bg-white/20 text-2xl backdrop-blur">🎙️</span>
+          <div className="mt-5 flex flex-col items-start gap-3 rounded-2xl bg-gradient-to-l from-purple-600 to-pink-600 p-4 text-white shadow-lg shadow-pink-500/20 sm:flex-row sm:items-center sm:justify-between sm:gap-4 sm:p-5">
+            <div className="flex items-center gap-3 sm:gap-4">
+              <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-white/20 text-2xl backdrop-blur sm:h-12 sm:w-12">🎙️</span>
               <div>
-                <div className="text-base font-black">ثبت نوبت — دو مسیر جدا</div>
-                <div className="mt-0.5 text-xs text-white/80">صوتی: گفتار فارسی را هوش مصنوعی استخراج می‌کند · دستی: فرم را خودتان تایپ می‌کنید</div>
+                <div className="text-sm font-black sm:text-base">ثبت نوبت — دو مسیر جدا</div>
+                <div className="mt-0.5 text-[11px] leading-5 text-white/80 sm:text-xs">صوتی: گفتار فارسی را هوش مصنوعی استخراج می‌کند · دستی: فرم را خودتان تایپ می‌کنید</div>
               </div>
             </div>
-            <div className="flex flex-wrap gap-2">
+            <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row sm:flex-wrap">
               <Link
                 href="/dashboard/voice-booking"
-                className="inline-flex items-center gap-2 rounded-xl bg-white px-5 py-3 text-sm font-black text-rose-600 shadow-xl transition hover:scale-[1.03]"
+                className="inline-flex h-11 w-full items-center justify-center gap-2 rounded-xl bg-white px-5 text-sm font-black text-rose-600 shadow-xl transition hover:scale-[1.03] sm:w-auto"
               >
                 <Mic className="h-4 w-4" />
                 رزرو صوتی هوشمند
               </Link>
               <Link
                 href="/dashboard/new-appointment"
-                className="inline-flex items-center gap-2 rounded-xl border border-white/60 bg-white/10 px-5 py-3 text-sm font-black text-white backdrop-blur transition hover:bg-white/20"
+                className="inline-flex h-11 w-full items-center justify-center gap-2 rounded-xl border border-white/60 bg-white/10 px-5 text-sm font-black text-white backdrop-blur transition hover:bg-white/20 sm:w-auto"
               >
                 <PenLine className="h-4 w-4" />
                 رزرو دستی نوبت
@@ -291,7 +288,7 @@ export default async function SalonDashboardPage({ searchParams }: { searchParam
                 </span>
               ))}
             </div>
-            <Link href="/packages" className="mt-4 inline-block text-xs font-bold text-pink-600 hover:underline">
+            <Link href="/packages" className="mt-4 inline-flex h-10 items-center text-xs font-bold text-pink-600 hover:underline">
               ارتقا برای افزایش سقف‌ها ←
             </Link>
           </PanelCard>
@@ -301,7 +298,7 @@ export default async function SalonDashboardPage({ searchParams }: { searchParam
             <div className="mt-1 text-sm text-neutral-500">نظر ثبت‌شده</div>
             <Link
               href={`/s/${salon.slug}#reviews`}
-              className="mt-4 inline-block rounded-xl bg-neutral-100 px-4 py-2 text-sm font-bold text-neutral-700 transition hover:bg-neutral-200 dark:bg-neutral-800 dark:text-neutral-200 dark:hover:bg-neutral-700"
+              className="mt-4 inline-flex h-10 items-center rounded-xl bg-neutral-100 px-4 text-sm font-bold text-neutral-700 transition hover:bg-neutral-200 dark:bg-neutral-800 dark:text-neutral-200 dark:hover:bg-neutral-700"
             >
               مشاهده نظرات
             </Link>
@@ -312,7 +309,7 @@ export default async function SalonDashboardPage({ searchParams }: { searchParam
             {subEnd && <div className="mt-1 text-xs text-neutral-500">اشتراک تا {subEnd}</div>}
             <Link
               href="/packages"
-              className="mt-4 inline-flex items-center gap-2 rounded-xl bg-gradient-to-l from-pink-600 to-purple-600 px-4 py-2 text-sm font-bold text-white transition hover:scale-[1.02]"
+              className="mt-4 inline-flex h-10 items-center gap-2 rounded-xl bg-gradient-to-l from-pink-600 to-purple-600 px-4 text-sm font-bold text-white transition hover:scale-[1.02]"
             >
               <Rocket className="h-4 w-4" />
               ارتقای پلن

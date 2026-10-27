@@ -155,13 +155,13 @@ export default function LoginPage() {
   const stepLabel = step === "phone" ? "شماره موبایل" : step === "email" ? "ایمیل" : step === "password" ? "رمز عبور" : "کد تأیید";
 
   return (
-    <main className="relative flex min-h-[calc(100vh-4rem)] items-center justify-center overflow-hidden px-6 py-12">
+    <main className="relative flex min-h-[calc(100vh-4rem)] items-center justify-center overflow-hidden px-4 py-8 sm:px-6 sm:py-12">
       {/* پس‌زمینه */}
       <div className="absolute inset-0 -z-10 bg-gradient-to-br from-pink-100 via-white to-purple-100" />
       <div className="absolute -left-24 -top-24 -z-10 h-80 w-80 rounded-full bg-pink-300/30 blur-3xl" />
       <div className="absolute -bottom-24 -right-24 -z-10 h-80 w-80 rounded-full bg-purple-300/30 blur-3xl" />
 
-      <div className="grid w-full max-w-4xl overflow-hidden rounded-[2.5rem] border border-white/60 bg-white shadow-2xl shadow-pink-500/10 dark:border-neutral-800 dark:bg-neutral-900 lg:grid-cols-2">
+      <div className="grid w-full max-w-4xl overflow-hidden rounded-3xl border border-white/60 bg-white shadow-2xl shadow-pink-500/10 sm:rounded-[2.5rem] dark:border-neutral-800 dark:bg-neutral-900 lg:grid-cols-2">
         {/* برند */}
         <div className="relative hidden flex-col justify-between bg-gradient-to-bl from-pink-600 via-rose-600 to-purple-700 p-10 text-white lg:flex">
           <div className="absolute inset-0 bg-hero-pattern" />
@@ -181,7 +181,7 @@ export default function LoginPage() {
         </div>
 
         {/* فرم */}
-        <div className="p-8 sm:p-10">
+        <div className="p-5 sm:p-10">
           <h1 className="text-2xl font-black text-neutral-900 dark:text-neutral-100">ورود به نوبینو</h1>
           <p className="mt-1 text-sm text-neutral-500 dark:text-neutral-400">با {stepLabel} وارد شوید</p>
 
@@ -205,12 +205,12 @@ export default function LoginPage() {
                 <button onClick={requestOtp} disabled={loading || phone.length < 11} className="w-full rounded-2xl bg-gradient-to-l from-pink-600 to-purple-600 py-3.5 font-black text-white shadow-lg shadow-pink-500/25 transition hover:scale-[1.02] disabled:opacity-50">
                   {loading ? "در حال ارسال..." : "دریافت کد"}
                 </button>
-                <button onClick={() => setStep("email")} className="w-full text-sm font-semibold text-pink-600 hover:underline">
+                <button onClick={() => setStep("email")} className="w-full rounded-lg py-2.5 text-sm font-semibold text-pink-600 hover:underline">
                   ورود با ایمیل به‌جای شماره
                 </button>
                 <button
                   onClick={() => { setLoginId(phone); setPassword(""); setError(""); setMsg(""); setStep("password"); }}
-                  className="w-full text-sm font-semibold text-neutral-500 hover:text-neutral-700 dark:hover:text-neutral-300"
+                  className="w-full rounded-lg py-2.5 text-sm font-semibold text-neutral-500 hover:text-neutral-700 dark:hover:text-neutral-300"
                 >
                   ورود با رمز عبور
                 </button>
@@ -234,12 +234,12 @@ export default function LoginPage() {
                 <button onClick={requestEmailOtp} disabled={loading || !email.includes("@")} className="w-full rounded-2xl bg-gradient-to-l from-pink-600 to-purple-600 py-3.5 font-black text-white shadow-lg shadow-pink-500/25 transition hover:scale-[1.02] disabled:opacity-50">
                   {loading ? "در حال ارسال..." : "دریافت کد"}
                 </button>
-                <button onClick={() => setStep("phone")} className="w-full text-sm font-semibold text-pink-600 hover:underline">
+                <button onClick={() => setStep("phone")} className="w-full rounded-lg py-2.5 text-sm font-semibold text-pink-600 hover:underline">
                   ورود با شماره موبایل
                 </button>
                 <button
                   onClick={() => { setLoginId(email); setPassword(""); setError(""); setMsg(""); setStep("password"); }}
-                  className="w-full text-sm font-semibold text-neutral-500 hover:text-neutral-700 dark:hover:text-neutral-300"
+                  className="w-full rounded-lg py-2.5 text-sm font-semibold text-neutral-500 hover:text-neutral-700 dark:hover:text-neutral-300"
                 >
                   ورود با رمز عبور
                 </button>
@@ -266,13 +266,13 @@ export default function LoginPage() {
                   {loading ? "در حال بررسی..." : "تأیید و ورود"}
                 </button>
                 <div className="flex items-center justify-between gap-2 text-sm">
-                  <button onClick={() => setStep(usingEmail ? "email" : "phone")} className="font-semibold text-neutral-500 hover:text-neutral-700">
+                  <button onClick={() => setStep(usingEmail ? "email" : "phone")} className="rounded-lg px-1 py-2 font-semibold text-neutral-500 hover:text-neutral-700">
                     تغییر {usingEmail ? "ایمیل" : "شماره"}
                   </button>
                   <button
                     onClick={resend}
                     disabled={cooldown > 0 || loading}
-                    className="font-semibold text-pink-600 hover:underline disabled:text-neutral-400 disabled:no-underline"
+                    className="rounded-lg px-1 py-2 font-semibold text-pink-600 hover:underline disabled:text-neutral-400 disabled:no-underline"
                   >
                     {cooldown > 0 ? `ارسال دوباره کد تا ${cooldown.toLocaleString("fa-IR")} ثانیه` : "ارسال دوباره کد"}
                   </button>
@@ -321,10 +321,10 @@ export default function LoginPage() {
                   {loading ? "در حال بررسی..." : "ورود"}
                 </button>
                 <div className="flex items-center justify-between gap-2 text-sm">
-                  <button onClick={() => setStep("phone")} className="font-semibold text-neutral-500 hover:text-neutral-700">
+                  <button onClick={() => setStep("phone")} className="rounded-lg px-1 py-2 font-semibold text-neutral-500 hover:text-neutral-700">
                     ورود با شماره موبایل
                   </button>
-                  <button onClick={() => setStep("email")} className="font-semibold text-neutral-500 hover:text-neutral-700">
+                  <button onClick={() => setStep("email")} className="rounded-lg px-1 py-2 font-semibold text-neutral-500 hover:text-neutral-700">
                     ورود با ایمیل
                   </button>
                 </div>
@@ -344,9 +344,9 @@ export default function LoginPage() {
           </div>
 
           <p className="mt-6 text-center text-xs text-neutral-400">
-            <Link href="/" className="text-pink-600 hover:underline">بازگشت به خانه</Link>
+            <Link href="/" className="inline-block py-2 text-pink-600 hover:underline">بازگشت به خانه</Link>
             <span className="mx-2 text-neutral-300 dark:text-neutral-600">|</span>
-            <Link href="/admin/login" className="font-bold text-neutral-500 hover:text-pink-600">ورود سوپرادمین</Link>
+            <Link href="/admin/login" className="inline-block py-2 font-bold text-neutral-500 hover:text-pink-600">ورود سوپرادمین</Link>
           </p>
         </div>
       </div>

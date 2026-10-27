@@ -5,7 +5,6 @@ import { prisma } from "@/lib/prisma";
 import { requirePageRole } from "@/lib/auth/guards";
 import DashboardShell from "@/components/DashboardShell";
 import ManualBooking from "@/components/ManualBooking";
-import PwaInstallButton from "@/components/PwaInstallButton";
 
 export const instant = false;
 
@@ -25,7 +24,6 @@ export default async function ManualBookingPage() {
           <p className="text-sm text-neutral-500 dark:text-neutral-400">
             نوبت را تایپ کنید — مناسب مشتری تلفنی یا حضوری. <Link href="/dashboard/voice-booking" className="font-bold text-pink-600 hover:underline dark:text-pink-400">رزرو صوتی هوشمند اینجاست</Link>.
           </p>
-          <PwaInstallButton />
         </div>
         <ManualBooking salonId={salon.id} timezone={salon.timezone} />
         <p className="mt-4 flex items-center gap-1.5 text-[11px] text-neutral-400">

@@ -28,8 +28,8 @@ export function StatCard({
     <>
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
-          <div className="truncate text-xs font-semibold text-neutral-500 dark:text-neutral-400">{label}</div>
-          <div className="mt-1.5 truncate text-2xl font-black text-neutral-900 dark:text-white">{value}</div>
+          <div className="truncate text-[11px] font-semibold text-neutral-500 sm:text-xs dark:text-neutral-400">{label}</div>
+          <div className="mt-1.5 break-words text-lg font-black leading-tight text-neutral-900 sm:text-2xl dark:text-white">{value}</div>
           {sub && <div className="mt-1 truncate text-[11px] text-neutral-400">{sub}</div>}
           {trend && (
             <div className={`mt-2 inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-bold ${trendUp ? "bg-emerald-50 text-emerald-600 dark:bg-emerald-900/30 dark:text-emerald-400" : "bg-red-50 text-red-500 dark:bg-red-900/30 dark:text-red-400"}`}>
@@ -38,7 +38,7 @@ export function StatCard({
           )}
         </div>
         <span
-          className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-full ${
+          className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-full sm:h-11 sm:w-11 ${
             iconClass ?? "bg-pink-100 text-pink-600 dark:bg-pink-900/40 dark:text-pink-300"
           }`}
         >
@@ -48,7 +48,7 @@ export function StatCard({
     </>
   );
 
-  const cls = "block rounded-2xl border border-neutral-200 bg-white p-5 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md dark:border-neutral-800 dark:bg-neutral-900";
+  const cls = "block rounded-2xl border border-neutral-200 bg-white p-4 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md sm:p-5 dark:border-neutral-800 dark:bg-neutral-900";
   return href ? (
     <Link href={href} className={cls}>
       {body}
@@ -79,22 +79,22 @@ export function PanelCard({
   return (
     <div className={`rounded-2xl border border-neutral-200 bg-white shadow-sm dark:border-neutral-800 dark:bg-neutral-900 ${className ?? ""}`}>
       {(title || action) && (
-        <div className="flex flex-wrap items-center justify-between gap-3 border-b border-neutral-100 px-5 py-4 dark:border-neutral-800">
-          <div className="flex items-center gap-3">
+        <div className="flex flex-wrap items-center justify-between gap-3 border-b border-neutral-100 px-4 py-3.5 sm:px-5 sm:py-4 dark:border-neutral-800">
+          <div className="flex min-w-0 items-center gap-3">
             {icon && (
-              <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-neutral-100 text-neutral-600 dark:bg-neutral-800 dark:text-neutral-300">
+              <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-neutral-100 text-neutral-600 sm:h-10 sm:w-10 dark:bg-neutral-800 dark:text-neutral-300">
                 {icon}
               </span>
             )}
-            <div>
-              {title && <h2 className="text-base font-extrabold text-neutral-900 dark:text-neutral-100">{title}</h2>}
-              {subtitle && <p className="mt-0.5 text-xs text-neutral-400">{subtitle}</p>}
+            <div className="min-w-0">
+              {title && <h2 className="text-[15px] font-extrabold text-neutral-900 sm:text-base dark:text-neutral-100">{title}</h2>}
+              {subtitle && <p className="mt-0.5 text-[11px] leading-5 text-neutral-400 sm:text-xs">{subtitle}</p>}
             </div>
           </div>
           {action}
         </div>
       )}
-      <div className={bodyClassName ?? "p-5"}>{children}</div>
+      <div className={bodyClassName ?? "p-4 sm:p-5"}>{children}</div>
     </div>
   );
 }

@@ -132,15 +132,16 @@ export default function RescheduleModal({
   }
 
   return (
-    <div className="fixed inset-0 z-[60] flex items-center justify-center p-4" role="dialog" aria-modal="true" aria-label="تغییر زمان نوبت">
-      <div className="absolute inset-0 bg-black/50" onClick={onClose} />
-      <div className="relative max-h-[90vh] w-full max-w-lg overflow-y-auto rounded-3xl border border-neutral-200 bg-white p-5 shadow-2xl dark:border-neutral-800 dark:bg-neutral-900">
+    <div className="fixed inset-0 z-[60] flex items-end justify-center sm:items-center sm:p-4" role="dialog" aria-modal="true" aria-label="تغییر زمان نوبت">
+      <div className="absolute inset-0 bg-black/50 backdrop-blur-[2px]" onClick={onClose} />
+      <div className="relative max-h-[92dvh] w-full max-w-lg overflow-y-auto rounded-t-3xl border border-neutral-200 bg-white p-4 pb-[calc(1rem+env(safe-area-inset-bottom))] shadow-2xl sm:max-h-[90vh] sm:rounded-3xl sm:p-5 sm:pb-5 dark:border-neutral-800 dark:bg-neutral-900">
+        <div className="mx-auto mb-3 h-1.5 w-10 rounded-full bg-neutral-200 sm:hidden dark:bg-neutral-700" aria-hidden />
         <div className="flex items-start justify-between gap-3">
           <div>
             <h2 className="text-lg font-black text-neutral-900 dark:text-neutral-100">تغییر زمان نوبت</h2>
             <p className="mt-1 text-xs text-neutral-500">فقط زمان‌های واقعاً آزاد نمایش داده می‌شوند.</p>
           </div>
-          <button onClick={onClose} className="rounded-lg bg-neutral-100 px-3 py-1.5 text-xs font-bold text-neutral-600 hover:bg-neutral-200 dark:bg-neutral-800 dark:text-neutral-300" aria-label="بستن">
+          <button onClick={onClose} className="flex h-10 shrink-0 items-center rounded-xl bg-neutral-100 px-3 text-xs font-bold text-neutral-600 hover:bg-neutral-200 dark:bg-neutral-800 dark:text-neutral-300" aria-label="بستن">
             بستن ✕
           </button>
         </div>
@@ -170,13 +171,13 @@ export default function RescheduleModal({
                 در این روز زمان آزادی وجود ندارد. تاریخ دیگری را انتخاب کنید.
               </p>
             ) : (
-              <div className="mt-3 grid max-h-64 grid-cols-3 gap-2 overflow-y-auto sm:grid-cols-4">
+              <div className="mt-3 grid max-h-[45dvh] grid-cols-3 gap-2 overflow-y-auto sm:max-h-64 sm:grid-cols-4">
                 {slots.map((s) => (
                   <button
                     key={s.startAt}
                     onClick={() => choose(s.startAt)}
                     disabled={saving}
-                    className="rounded-lg border border-neutral-200 bg-white px-2 py-2 text-xs font-bold text-neutral-700 transition hover:border-pink-300 hover:bg-pink-50 disabled:opacity-50 dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-200"
+                    className="flex h-11 items-center justify-center rounded-xl border border-neutral-200 bg-white text-sm font-bold tabular-nums text-neutral-700 transition hover:border-pink-300 hover:bg-pink-50 disabled:opacity-50 dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-200"
                   >
                     {formatTime(s.startAt, tz)}
                   </button>

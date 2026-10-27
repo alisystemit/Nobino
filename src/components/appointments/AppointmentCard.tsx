@@ -94,7 +94,7 @@ export default function AppointmentCard({ item, timezone, role, nowMs, busy, hig
           </p>
 
           <div className="mt-1.5 flex flex-wrap items-center gap-x-2.5 gap-y-1 text-[11px] text-neutral-500 dark:text-neutral-400">
-            <a href={`tel:${item.customerPhone}`} dir="ltr" className="inline-flex items-center gap-1 font-bold text-neutral-500 transition hover:text-pink-600 dark:text-neutral-400">
+            <a href={`tel:${item.customerPhone}`} dir="ltr" className="-mx-1 -my-1 inline-flex min-h-8 items-center gap-1 rounded-lg px-1 font-bold text-neutral-500 transition hover:bg-neutral-100 hover:text-pink-600 dark:text-neutral-400 dark:hover:bg-neutral-800">
               <Phone className="h-3 w-3" />
               {toPersianDigits(item.customerPhone)}
             </a>

@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
 import { LangSwitch, useI18n } from "@/lib/i18n";
 import { ThemeToggle } from "@/lib/theme";
@@ -8,9 +9,12 @@ import SalonIcon from "@/components/icons/SalonIcon";
 
 export default function GlobalHeader() {
   const { t } = useI18n();
+  const pathname = usePathname();
   const [mobileOpen, setMobileOpen] = useState(false);
   const [scrolled, setScrolled] = useState(false);
   const [role, setRole] = useState<string | null>(null);
+  // پنل‌های داشبورد روی گوشی هدر سایت را پنهان می‌کنند تا فضای اپ‌مانند بماند
+  const inDashboard = Boolean(pathname?.startsWith("/dashboard"));
 
   useEffect(() => {
     const onScroll = () => setScrolled(window.scrollY > 12);
@@ -38,6 +42,8 @@ export default function GlobalHeader() {
   return (
     <header
       className={`sticky top-0 z-40 transition-all duration-300 dark:bg-neutral-950/85 ${
+        inDashboard ? "hidden lg:block" : ""
+      } ${
         scrolled
           ? "bg-white/90 shadow-lg shadow-black/5 backdrop-blur-xl dark:shadow-black/40"
           : "bg-white/70 backdrop-blur-xl border-b border-black/5 dark:border-white/10"

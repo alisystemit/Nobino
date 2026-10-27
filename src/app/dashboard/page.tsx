@@ -64,12 +64,12 @@ export default async function DashboardPage() {
   return (
     <DashboardShell role={user.role} title="داشبورد">
       {/* خوش‌آمد */}
-      <div className="relative mb-6 overflow-hidden rounded-2xl bg-gradient-to-l from-pink-600 via-rose-600 to-purple-700 p-6 text-white shadow-lg shadow-pink-500/15 sm:p-7">
+      <div className="relative mb-5 overflow-hidden rounded-2xl bg-gradient-to-l from-pink-600 via-rose-600 to-purple-700 p-4 text-white shadow-lg shadow-pink-500/15 sm:mb-6 sm:p-7">
         <div className="absolute inset-0 bg-hero-pattern" />
         <div className="pointer-events-none absolute -left-12 -top-12 h-44 w-44 rounded-full bg-white/10 blur-2xl" />
         <div className="relative">
-          <h1 className="text-xl font-black sm:text-2xl">سلام، {displayName} 👋</h1>
-          <p className="mt-1.5 text-sm text-white/80">
+          <h1 className="text-lg font-black sm:text-2xl">سلام، {displayName} 👋</h1>
+          <p className="mt-1.5 text-xs leading-6 text-white/80 sm:text-sm">
             نقش: {roleLabels[user.role] ?? user.role}
             <span className="mx-2 text-white/30">|</span>
             {isEmailAccount ? `ایمیل: ${user.email ?? "—"}` : `شماره: ${toPersianDigits(user.phone)}`}
@@ -80,24 +80,24 @@ export default async function DashboardPage() {
       <PanelCard
         title="دسترسی سریع"
         subtitle="بخش‌هایی که برای نقش شما فعال است"
-        bodyClassName="p-4"
+        bodyClassName="p-3 sm:p-4"
       >
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+        <div className="grid grid-cols-2 gap-3 lg:grid-cols-3">
           {cards.map((c) => {
             const Icon = c.icon;
             return (
               <Link
                 key={c.title}
                 href={c.href}
-                className="group flex items-start gap-4 rounded-2xl border border-neutral-200 p-4 transition hover:-translate-y-0.5 hover:border-pink-300 hover:shadow-md dark:border-neutral-800 dark:hover:border-pink-800"
+                className="group flex flex-col items-start gap-2.5 rounded-2xl border border-neutral-200 p-3.5 transition hover:-translate-y-0.5 hover:border-pink-300 hover:shadow-md sm:flex-row sm:items-start sm:gap-4 sm:p-4 dark:border-neutral-800 dark:hover:border-pink-800"
               >
-                <span className={`flex h-12 w-12 shrink-0 items-center justify-center rounded-xl ${c.cls}`}>
-                  <Icon className="h-6 w-6" />
+                <span className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl sm:h-12 sm:w-12 ${c.cls}`}>
+                  <Icon className="h-5 w-5 sm:h-6 sm:w-6" />
                 </span>
                 <span className="min-w-0">
-                  <span className="block font-extrabold text-neutral-900 dark:text-neutral-100">{c.title}</span>
-                  <span className="mt-0.5 block text-xs text-neutral-500 dark:text-neutral-400">{c.desc}</span>
-                  <span className="mt-1.5 inline-flex items-center gap-1 text-xs font-bold text-pink-600 transition group-hover:gap-2">
+                  <span className="block text-sm font-extrabold text-neutral-900 sm:text-base dark:text-neutral-100">{c.title}</span>
+                  <span className="mt-0.5 block text-[11px] leading-5 text-neutral-500 sm:text-xs dark:text-neutral-400">{c.desc}</span>
+                  <span className="mt-1.5 inline-flex items-center gap-1 text-[11px] font-bold text-pink-600 transition group-hover:gap-2 sm:text-xs">
                     مشاهده
                     <ArrowLeft className="h-3.5 w-3.5" />
                   </span>

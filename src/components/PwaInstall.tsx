@@ -59,7 +59,7 @@ export default function PwaInstall() {
   if (dismissed) return null;
 
   return (
-    <div className="fixed bottom-4 left-4 z-50 max-w-xs">
+    <div className="fixed inset-x-3 bottom-[calc(5.5rem+env(safe-area-inset-bottom))] z-50 sm:inset-x-auto sm:bottom-4 sm:left-4 sm:w-80">
       <div className="flex items-center gap-3 rounded-2xl border border-pink-200 bg-white/95 p-3 shadow-2xl shadow-pink-500/20 backdrop-blur dark:border-pink-900/50 dark:bg-neutral-900/95">
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img src="/icons/icon-192.png" alt="نوبینو" className="h-10 w-10 rounded-xl" />
@@ -77,7 +77,7 @@ export default function PwaInstall() {
           {!isIOS && (
             <button
               onClick={install}
-              className="rounded-xl bg-gradient-to-l from-pink-600 to-purple-600 px-3 py-1.5 text-xs font-bold text-white shadow transition hover:opacity-95"
+              className="flex h-10 items-center justify-center rounded-xl bg-gradient-to-l from-pink-600 to-purple-600 px-4 text-xs font-black text-white shadow transition hover:opacity-95 active:scale-95"
             >
               نصب
             </button>
@@ -85,7 +85,7 @@ export default function PwaInstall() {
           <button
             onClick={() => setDismissed(true)}
             aria-label="بستن"
-            className="text-xs text-neutral-400 hover:text-neutral-600 dark:hover:text-neutral-300"
+            className="flex h-9 w-9 items-center justify-center rounded-lg text-xs text-neutral-400 transition hover:bg-neutral-100 hover:text-neutral-600 dark:hover:bg-neutral-800 dark:hover:text-neutral-300"
           >
             ✕
           </button>

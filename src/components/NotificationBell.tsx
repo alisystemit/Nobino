@@ -54,7 +54,7 @@ export default function NotificationBell() {
     <div className="relative">
       <button
         onClick={toggle}
-        className="relative flex h-9 w-9 items-center justify-center rounded-lg bg-neutral-100 text-base text-neutral-600 hover:bg-neutral-200 dark:bg-neutral-800 dark:text-neutral-300"
+        className="relative flex h-10 w-10 items-center justify-center rounded-xl bg-neutral-100 text-base text-neutral-600 transition hover:bg-neutral-200 active:scale-95 dark:bg-neutral-800 dark:text-neutral-300"
         aria-label={`اعلان‌ها${unread ? ` — ${unread} خوانده‌نشده` : ""}`}
         aria-expanded={open}
       >
@@ -69,7 +69,7 @@ export default function NotificationBell() {
       {open && (
         <>
           <div className="fixed inset-0 z-40" onClick={() => setOpen(false)} aria-hidden />
-          <div className="absolute left-0 top-11 z-50 max-h-96 w-80 overflow-y-auto rounded-2xl border border-neutral-200 bg-white p-2 shadow-2xl dark:border-neutral-700 dark:bg-neutral-900">
+          <div className="fixed inset-x-3 top-[4.25rem] z-50 max-h-[70dvh] overflow-y-auto rounded-2xl border border-neutral-200 bg-white p-2 shadow-2xl dark:border-neutral-700 dark:bg-neutral-900 sm:absolute sm:inset-x-auto sm:left-0 sm:top-12 sm:max-h-96 sm:w-80">
             <div className="px-2 py-1.5 text-xs font-bold text-neutral-500">اعلان‌ها</div>
             {items.length === 0 ? (
               <p className="px-3 py-6 text-center text-sm text-neutral-400">اعلانی ندارید.</p>

@@ -174,7 +174,8 @@ export default function SalonSettings({ salon }: { salon: Salon }) {
     }
   }
 
-  const input = "w-full rounded-xl border border-neutral-300 px-4 py-3 text-sm outline-none focus:border-pink-500";
+  const input =
+    "h-11 w-full rounded-xl border border-neutral-300 bg-white px-3.5 text-sm outline-none transition focus:border-pink-500 dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-100";
 
   return (
     <div className="space-y-5">
@@ -192,7 +193,7 @@ export default function SalonSettings({ salon }: { salon: Salon }) {
                 <span className="flex h-8 w-8 items-center justify-center"><SalonIcon className="h-8 w-8 text-neutral-300" /></span>
               )}
             </div>
-            <label className="mt-2 block cursor-pointer rounded-lg bg-neutral-100 py-2 text-center text-xs font-bold text-neutral-700 hover:bg-neutral-200 dark:bg-neutral-800 dark:text-neutral-200">
+            <label className="mt-2 flex h-10 cursor-pointer items-center justify-center rounded-lg bg-neutral-100 text-center text-xs font-bold text-neutral-700 transition hover:bg-neutral-200 dark:bg-neutral-800 dark:text-neutral-200 dark:hover:bg-neutral-700">
               {uploading === "logo" ? "در حال بارگذاری..." : "انتخاب لوگو"}
               <input
                 type="file"
@@ -216,7 +217,7 @@ export default function SalonSettings({ salon }: { salon: Salon }) {
                 <span className="text-xs text-neutral-400">بدون بنر</span>
               )}
             </div>
-            <label className="mt-2 block cursor-pointer rounded-lg bg-neutral-100 py-2 text-center text-xs font-bold text-neutral-700 hover:bg-neutral-200 dark:bg-neutral-800 dark:text-neutral-200">
+            <label className="mt-2 flex h-10 cursor-pointer items-center justify-center rounded-lg bg-neutral-100 text-center text-xs font-bold text-neutral-700 transition hover:bg-neutral-200 dark:bg-neutral-800 dark:text-neutral-200 dark:hover:bg-neutral-700">
               {uploading === "banner" ? "در حال بارگذاری..." : "انتخاب بنر"}
               <input
                 type="file"
@@ -246,7 +247,7 @@ export default function SalonSettings({ salon }: { salon: Salon }) {
                 <button
                   type="button"
                   onClick={() => removeGalleryItem(g.id)}
-                  className="absolute left-1 top-1 rounded-md bg-black/60 px-1.5 py-0.5 text-[10px] font-bold text-white opacity-0 transition group-hover:opacity-100"
+                  className="absolute left-1 top-1 flex h-8 items-center justify-center rounded-lg bg-black/65 px-2 text-[10px] font-bold text-white transition sm:opacity-0 sm:group-hover:opacity-100"
                   aria-label="حذف تصویر"
                 >
                   حذف
@@ -262,7 +263,7 @@ export default function SalonSettings({ salon }: { salon: Salon }) {
               onChange={(e) => setGalleryTitle(e.target.value)}
               maxLength={80}
             />
-            <label className="cursor-pointer whitespace-nowrap rounded-xl bg-neutral-900 px-4 py-3 text-center text-sm font-bold text-white hover:bg-neutral-800 dark:bg-neutral-100 dark:text-neutral-900">
+            <label className="flex h-11 cursor-pointer items-center justify-center whitespace-nowrap rounded-xl bg-neutral-900 px-4 text-center text-sm font-bold text-white transition hover:bg-neutral-800 dark:bg-neutral-100 dark:text-neutral-900 dark:hover:bg-white">
               {uploading === "gallery" ? "در حال بارگذاری..." : "افزودن تصویر"}
               <input
                 type="file"
@@ -281,85 +282,96 @@ export default function SalonSettings({ salon }: { salon: Salon }) {
       </div>
 
       <div>
-        <label className="text-xs font-medium text-neutral-500">نام سالن</label>
+        <label className="mb-1 block text-xs font-medium text-neutral-500 dark:text-neutral-400">نام سالن</label>
         <input className={input} value={form.name} onChange={set("name")} />
       </div>
-      <div className="grid grid-cols-2 gap-3">
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
         <div>
-          <label className="text-xs font-medium text-neutral-500">تلفن</label>
+          <label className="mb-1 block text-xs font-medium text-neutral-500 dark:text-neutral-400">تلفن</label>
           <input className={input} dir="ltr" value={form.phone} onChange={set("phone")} />
         </div>
         <div>
-          <label className="text-xs font-medium text-neutral-500">شهر</label>
+          <label className="mb-1 block text-xs font-medium text-neutral-500 dark:text-neutral-400">شهر</label>
           <input className={input} value={form.city} onChange={set("city")} />
         </div>
       </div>
       <div>
-        <label className="text-xs font-medium text-neutral-500">آدرس</label>
+        <label className="mb-1 block text-xs font-medium text-neutral-500 dark:text-neutral-400">آدرس</label>
         <input className={input} value={form.address} onChange={set("address")} />
       </div>
       <div>
-        <label className="text-xs font-medium text-neutral-500">توضیحات</label>
+        <label className="mb-1 block text-xs font-medium text-neutral-500 dark:text-neutral-400">توضیحات</label>
         <textarea className={`${input} min-h-[80px]`} value={form.description} onChange={set("description")} />
       </div>
       <div>
-        <label className="text-xs font-medium text-neutral-500">رنگ زمینه</label>
+        <label className="mb-1 block text-xs font-medium text-neutral-500 dark:text-neutral-400">رنگ زمینه</label>
         <input type="color" className="h-11 w-full cursor-pointer rounded-xl border border-neutral-300" value={form.coverColor} onChange={set("coverColor")} />
       </div>
       <div>
-        <label className="text-xs font-medium text-neutral-500">منطقه زمانی</label>
+        <label className="mb-1 block text-xs font-medium text-neutral-500 dark:text-neutral-400">منطقه زمانی</label>
         <input className={input} value={form.timezone} onChange={set("timezone")} />
       </div>
-      <div className="grid grid-cols-2 gap-3">
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
         <div>
-          <label className="text-xs font-medium text-neutral-500">عرض جغرافیایی</label>
+          <label className="mb-1 block text-xs font-medium text-neutral-500 dark:text-neutral-400">عرض جغرافیایی</label>
           <input className={input} dir="ltr" value={form.latitude} onChange={set("latitude")} />
         </div>
         <div>
-          <label className="text-xs font-medium text-neutral-500">طول جغرافیایی</label>
+          <label className="mb-1 block text-xs font-medium text-neutral-500 dark:text-neutral-400">طول جغرافیایی</label>
           <input className={input} dir="ltr" value={form.longitude} onChange={set("longitude")} />
         </div>
       </div>
       <div>
-        <label className="text-xs font-medium text-neutral-500">دامنه اختصاصی (برای پلن سازمانی)</label>
+        <label className="mb-1 block text-xs font-medium text-neutral-500 dark:text-neutral-400">دامنه اختصاصی (برای پلن سازمانی)</label>
         <input className={input} dir="ltr" placeholder="salon.com" value={form.customDomain} onChange={set("customDomain")} />
         <p className="mt-1 text-[11px] text-neutral-400">باید DNS دامنه به این سرویس اشاره کند.</p>
       </div>
 
       {/* قوانین رزرو */}
-      <div className="rounded-2xl border border-neutral-200 p-4">
-        <h3 className="text-sm font-extrabold text-neutral-800">قوانین رزرو</h3>
-        <div className="mt-3 grid grid-cols-2 gap-3">
+      <div className="rounded-2xl border border-neutral-200 p-4 dark:border-neutral-800">
+        <h3 className="text-sm font-extrabold text-neutral-800 dark:text-neutral-100">قوانین رزرو</h3>
+        <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2">
           <div>
-            <label className="text-[11px] font-medium text-neutral-500">حداقل فاصله تا رزرو (دقیقه)</label>
+            <label className="mb-1 block text-[11px] font-medium text-neutral-500 dark:text-neutral-400">حداقل فاصله تا رزرو (دقیقه)</label>
             <input type="number" className={input} value={form.minNoticeMinutes} onChange={set("minNoticeMinutes")} />
           </div>
           <div>
-            <label className="text-[11px] font-medium text-neutral-500">حداکثر بازه آینده (روز)</label>
+            <label className="mb-1 block text-[11px] font-medium text-neutral-500 dark:text-neutral-400">حداکثر بازه آینده (روز)</label>
             <input type="number" className={input} value={form.maxAdvanceDays} onChange={set("maxAdvanceDays")} />
           </div>
           <div>
-            <label className="text-[11px] font-medium text-neutral-500">مهلت لغو (ساعت قبل از نوبت)</label>
+            <label className="mb-1 block text-[11px] font-medium text-neutral-500 dark:text-neutral-400">مهلت لغو (ساعت قبل از نوبت)</label>
             <input type="number" className={input} value={form.cancelDeadlineHours} onChange={set("cancelDeadlineHours")} />
           </div>
           <div>
-            <label className="text-[11px] font-medium text-neutral-500">بافر بین نوبت‌ها (دقیقه)</label>
+            <label className="mb-1 block text-[11px] font-medium text-neutral-500 dark:text-neutral-400">بافر بین نوبت‌ها (دقیقه)</label>
             <input type="number" className={input} value={form.bufferMinutes} onChange={set("bufferMinutes")} />
           </div>
         </div>
       </div>
 
       {/* ساعات کاری */}
-      <div className="rounded-2xl border border-neutral-200 p-4">
-        <h3 className="text-sm font-extrabold text-neutral-800">ساعات کاری هفتگی</h3>
+      <div className="rounded-2xl border border-neutral-200 p-4 dark:border-neutral-800">
+        <h3 className="text-sm font-extrabold text-neutral-800 dark:text-neutral-100">ساعات کاری هفتگی</h3>
         <div className="mt-3 space-y-2">
           {hours.map((h) => (
-            <div key={h.dayOfWeek} className="grid grid-cols-[80px_1fr_1fr_64px] items-center gap-2">
-              <span className="text-xs font-medium text-neutral-600">{DAY_NAMES[h.dayOfWeek]}</span>
-              <TimeField value={h.openTime} disabled={h.isClosed} onChange={(v) => setHour(h.dayOfWeek, { openTime: v })} />
-              <TimeField value={h.closeTime} disabled={h.isClosed} onChange={(v) => setHour(h.dayOfWeek, { closeTime: v })} />
-              <label className="flex items-center gap-1 text-xs text-neutral-500">
-                <input type="checkbox" checked={h.isClosed} onChange={(e) => setHour(h.dayOfWeek, { isClosed: e.target.checked })} />
+            <div
+              key={h.dayOfWeek}
+              className="rounded-xl border border-neutral-100 bg-neutral-50/60 p-2.5 sm:grid sm:grid-cols-[80px_1fr_1fr_64px] sm:items-center sm:gap-2 sm:border-0 sm:bg-transparent sm:p-0 dark:border-neutral-800 dark:bg-neutral-800/40 sm:dark:bg-transparent"
+            >
+              <div className="flex items-center justify-between gap-2 sm:block">
+                <span className="text-xs font-black text-neutral-700 dark:text-neutral-200">{DAY_NAMES[h.dayOfWeek]}</span>
+                <label className="flex items-center gap-1 text-[11px] text-neutral-500 sm:hidden">
+                  <input type="checkbox" className="h-5 w-5 shrink-0 accent-pink-600" checked={h.isClosed} onChange={(e) => setHour(h.dayOfWeek, { isClosed: e.target.checked })} />
+                  تعطیل
+                </label>
+              </div>
+              <div className="mt-2 grid grid-cols-2 gap-2 sm:mt-0 sm:contents">
+                <TimeField value={h.openTime} disabled={h.isClosed} onChange={(v) => setHour(h.dayOfWeek, { openTime: v })} />
+                <TimeField value={h.closeTime} disabled={h.isClosed} onChange={(v) => setHour(h.dayOfWeek, { closeTime: v })} />
+              </div>
+              <label className="hidden items-center gap-1 text-xs text-neutral-500 sm:flex">
+                <input type="checkbox" className="h-5 w-5 shrink-0 accent-pink-600" checked={h.isClosed} onChange={(e) => setHour(h.dayOfWeek, { isClosed: e.target.checked })} />
                 تعطیل
               </label>
             </div>
@@ -370,7 +382,7 @@ export default function SalonSettings({ salon }: { salon: Salon }) {
       <button
         onClick={save}
         disabled={saving}
-        className="w-full rounded-xl bg-pink-600 py-3.5 font-bold text-white transition hover:bg-pink-700 disabled:opacity-50"
+        className="h-12 w-full rounded-xl bg-pink-600 font-black text-white shadow-lg shadow-pink-500/20 transition hover:bg-pink-700 disabled:opacity-50"
       >
         {saving ? "در حال ذخیره..." : "ذخیره تغییرات"}
       </button>

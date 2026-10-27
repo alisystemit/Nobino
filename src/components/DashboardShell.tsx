@@ -21,6 +21,7 @@ import {
   ChevronsRight,
   HelpCircle,
   Home,
+  Search,
 } from "lucide-react";
 import { ThemeToggle } from "@/lib/theme";
 import { LangSwitch } from "@/lib/i18n";
@@ -106,6 +107,22 @@ export default function DashboardShell({ role, title, children }: { role: string
   }, []);
 
   const isActive = (href: string) => pathname === href || pathname.startsWith(href + "/");
+
+  /**
+   * ناوبری پایین گوشی — پنج مقصد اصلی هر نقش، با دکمهٔ برجستهٔ رزرو صوتی
+   * برای سالن‌دار. بقیهٔ بخش‌ها از منوی کامل (☰) در دسترس‌اند.
+   */
+  const mobileNav: { href: string; label: string; icon: React.ComponentType<{ className?: string }>; primary?: boolean }[] = [
+    { href: "/dashboard", label: "داشبورد", icon: LayoutDashboard },
+    ...(role !== "AGENT" ? [{ href: "/dashboard/appointments", label: "نوبت‌ها", icon: CalendarDays }] : []),
+    ...(role === "SALON_OWNER" || role === "ADMIN"
+      ? [{ href: "/dashboard/voice-booking", label: "رزرو صوتی", icon: Mic, primary: true }]
+      : role === "CUSTOMER"
+        ? [{ href: "/salons", label: "سالن‌ها", icon: Search }]
+        : [{ href: "/dashboard/commission", label: "کمیسیون", icon: Percent }]),
+    { href: "/dashboard/wallet", label: "کیف پول", icon: Wallet },
+    { href: "/dashboard/account", label: "حساب", icon: User },
+  ];
 
   async function logout() {
     try {
@@ -238,17 +255,17 @@ export default function DashboardShell({ role, title, children }: { role: string
       {/* محتوا */}
       <div className="min-w-0 flex-1">
         {/* هدر */}
-        <div className="sticky top-16 z-20 flex h-16 items-center justify-between border-b border-neutral-200 bg-white/85 px-4 backdrop-blur dark:border-neutral-800 dark:bg-neutral-950/85 sm:px-6">
-          <div className="flex min-w-0 items-center gap-3">
+        <div className="sticky top-0 z-30 flex h-14 items-center justify-between border-b border-neutral-200 bg-white/90 px-3 backdrop-blur dark:border-neutral-800 dark:bg-neutral-950/90 sm:px-6 lg:top-16 lg:h-16">
+          <div className="flex min-w-0 items-center gap-2.5 sm:gap-3">
             <button
               onClick={() => setOpen(true)}
-              className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-neutral-100 text-neutral-600 lg:hidden dark:bg-neutral-800 dark:text-neutral-300"
+              className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-neutral-100 text-neutral-600 transition active:scale-95 lg:hidden dark:bg-neutral-800 dark:text-neutral-300"
               aria-label="باز کردن منو"
             >
               <Menu className="h-5 w-5" />
             </button>
             <div className="min-w-0">
-              <div className="flex items-center gap-1.5 text-[11px] text-neutral-400">
+              <div className="hidden items-center gap-1.5 text-[11px] text-neutral-400 sm:flex">
                 <Link href="/" className="flex items-center gap-1 transition hover:text-pink-600">
                   <Home className="h-3 w-3" />
                   نوبینو
@@ -256,12 +273,12 @@ export default function DashboardShell({ role, title, children }: { role: string
                 <span>/</span>
                 <span className="truncate text-neutral-500 dark:text-neutral-400">{title}</span>
               </div>
-              <h1 className="truncate text-base font-black text-neutral-900 sm:text-lg dark:text-neutral-100">{title}</h1>
+              <h1 className="truncate text-base font-black text-neutral-900 dark:text-neutral-100">{title}</h1>
             </div>
           </div>
-          <div className="flex shrink-0 items-center gap-1.5 sm:gap-2">
+          <div className="flex shrink-0 items-center gap-1 sm:gap-2">
             <NotificationBell />
-            <LangSwitch />
+            <span className="hidden sm:block"><LangSwitch /></span>
             <ThemeToggle />
             <Link
               href="/help"
@@ -279,7 +296,44 @@ export default function DashboardShell({ role, title, children }: { role: string
           </div>
         </div>
 
-        <main className="p-4 sm:p-6 lg:p-8">{children}</main>
+        <main className="p-4 pb-[calc(6.5rem+env(safe-area-inset-bottom))] sm:p-6 sm:pb-[calc(6.5rem+env(safe-area-inset-bottom))] lg:p-8 lg:pb-8">{children}</main>
+
+        {/* ناوبری پایین گوشی */}
+        <nav
+          className="fixed inset-x-0 bottom-0 z-40 border-t border-neutral-200 bg-white/95 pb-[env(safe-area-inset-bottom)] backdrop-blur-xl dark:border-neutral-800 dark:bg-neutral-950/95 lg:hidden"
+          aria-label="ناوبری اصلی"
+        >
+          <div className="mx-auto flex max-w-lg items-end justify-around px-1.5">
+            {mobileNav.map((item) => {
+              const active = isActive(item.href);
+              const Icon = item.icon;
+              return (
+                <Link
+                  key={item.href}
+                  href={item.href}
+                  aria-current={active ? "page" : undefined}
+                  className={`relative flex min-w-0 flex-1 flex-col items-center gap-0.5 pb-1.5 pt-2 text-[10px] font-black transition active:scale-95 ${
+                    active ? "text-pink-600 dark:text-pink-400" : "text-neutral-400 dark:text-neutral-500"
+                  } ${item.primary ? "-mt-4" : ""}`}
+                >
+                  <span
+                    className={`flex items-center justify-center ${
+                      item.primary
+                        ? "h-12 w-12 rounded-2xl bg-gradient-to-br from-pink-600 to-purple-600 text-white shadow-lg shadow-pink-500/35"
+                        : "h-7 w-9 rounded-xl"
+                    }`}
+                  >
+                    <Icon className={item.primary ? "h-6 w-6" : "h-5 w-5"} />
+                  </span>
+                  <span className="truncate">{item.label}</span>
+                  {active && !item.primary && (
+                    <span className="absolute -top-0.5 h-1 w-6 rounded-full bg-pink-500" />
+                  )}
+                </Link>
+              );
+            })}
+          </div>
+        </nav>
       </div>
     </div>
   );

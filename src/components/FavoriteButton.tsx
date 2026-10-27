@@ -53,8 +53,14 @@ export default function FavoriteButton({ salonId }: { salonId: string }) {
 
   if (state === "guest") {
     return (
-      <a href="/login" className="rounded-xl bg-white/20 px-4 py-2 text-sm font-bold text-white backdrop-blur hover:bg-white/30">
-        ورود برای ذخیره سالن
+      <a
+        href="/login"
+        aria-label="ورود برای ذخیره سالن"
+        className="inline-flex h-10 w-10 items-center justify-center gap-1.5 rounded-xl bg-white/20 text-base font-bold text-white backdrop-blur transition hover:bg-white/30 active:scale-95 sm:w-auto sm:px-4 sm:text-sm"
+        title="ذخیره سالن"
+      >
+        <span>🤍</span>
+        <span className="hidden sm:inline">ورود برای ذخیره سالن</span>
       </a>
     );
   }
@@ -64,9 +70,11 @@ export default function FavoriteButton({ salonId }: { salonId: string }) {
       <button
         onClick={toggle}
         disabled={state === "loading" || busy}
-        className="rounded-xl bg-white/20 px-4 py-2 text-sm font-bold text-white backdrop-blur transition hover:bg-white/30 disabled:opacity-60"
+        className="inline-flex h-10 w-10 items-center justify-center gap-1.5 rounded-xl bg-white/20 text-base font-bold text-white backdrop-blur transition hover:bg-white/30 active:scale-95 disabled:opacity-60 sm:w-auto sm:px-4 sm:text-sm"
+        title={state === "on" ? "ذخیره شده" : "ذخیره سالن"}
       >
-        {state === "on" ? "❤️ ذخیره شده" : "🤍 افزودن به علاقه‌مندی‌ها"}
+        <span className="sm:hidden">{state === "on" ? "❤️" : "🤍"}</span>
+        <span className="hidden sm:inline">{state === "on" ? "❤️ ذخیره شده" : "🤍 افزودن به علاقه‌مندی‌ها"}</span>
       </button>
       {hint && <span className="text-[11px] text-white/80">{hint}</span>}
     </div>

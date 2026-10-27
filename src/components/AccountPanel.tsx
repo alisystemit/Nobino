@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { LogOut } from "lucide-react";
 import RescheduleModal from "@/components/RescheduleModal";
 import { toJalali, toPersianDigits } from "@/lib/utils";
 
@@ -247,20 +248,30 @@ export default function AccountPanel({ initialMe }: { initialMe: Me }) {
 
   return (
     <div>
-      <div className="flex flex-wrap items-center gap-2 border-b border-neutral-200 pb-3">
-        {tabs.map((t) => (
-          <button
-            key={t.id}
-            onClick={() => setTab(t.id)}
-            className={`rounded-xl px-4 py-2 text-sm font-bold transition ${
-              tab === t.id ? "bg-pink-600 text-white" : "bg-neutral-100 text-neutral-600 hover:bg-pink-50 hover:text-pink-700"
-            }`}
-          >
-            <span className="mr-1">{t.icon}</span> {t.label}
-          </button>
-        ))}
-        <button onClick={logout} className="ms-auto rounded-xl bg-neutral-900 px-4 py-2 text-sm font-bold text-white hover:bg-neutral-800">
-          خروج
+      <div className="flex items-center gap-2 border-b border-neutral-200 pb-3 dark:border-neutral-800">
+        <div className="-mx-1 flex flex-1 gap-2 overflow-x-auto px-1 pb-1 [mask-image:linear-gradient(to_left,black_88%,transparent)] [scrollbar-width:none] sm:[mask-image:none] [&::-webkit-scrollbar]:hidden">
+          {tabs.map((t) => (
+            <button
+              key={t.id}
+              onClick={() => setTab(t.id)}
+              aria-current={tab === t.id ? "page" : undefined}
+              className={`flex h-10 shrink-0 items-center gap-1.5 rounded-xl px-3 text-xs font-bold transition sm:px-4 sm:text-sm ${
+                tab === t.id
+                  ? "bg-pink-600 text-white shadow-sm shadow-pink-500/25"
+                  : "bg-neutral-100 text-neutral-600 hover:bg-pink-50 hover:text-pink-700 dark:bg-neutral-800 dark:text-neutral-300"
+              }`}
+            >
+              <span>{t.icon}</span> {t.label}
+            </button>
+          ))}
+        </div>
+        <button
+          onClick={logout}
+          className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-neutral-900 text-xs font-bold text-white transition hover:bg-neutral-800 sm:w-auto sm:gap-1.5 sm:px-4 sm:text-sm"
+          aria-label="خروج از حساب"
+        >
+          <LogOut className="h-4 w-4" />
+          <span className="hidden sm:inline">خروج</span>
         </button>
       </div>
 
@@ -307,7 +318,7 @@ export default function AccountPanel({ initialMe }: { initialMe: Me }) {
                         </div>
                         <div className="mt-3 flex flex-wrap gap-2">
                           {a.salonSlug && (
-                            <Link href={`/s/${a.salonSlug}`} className="rounded-lg bg-pink-50 px-3 py-1.5 text-xs font-bold text-pink-700 hover:bg-pink-100">
+                            <Link href={`/s/${a.salonSlug}`} className="flex h-10 items-center rounded-lg bg-pink-50 px-3 text-xs font-bold text-pink-700 hover:bg-pink-100">
                               رزرو مجدد
                             </Link>
                           )}
@@ -344,10 +355,10 @@ export default function AccountPanel({ initialMe }: { initialMe: Me }) {
                         </div>
                       </div>
                       <div className="mt-4 flex gap-2">
-                        <Link href={`/s/${f.salon.slug}`} className="flex-1 rounded-lg bg-pink-600 px-3 py-2 text-center text-xs font-bold text-white">
+                        <Link href={`/s/${f.salon.slug}`} className="flex h-10 flex-1 items-center justify-center rounded-lg bg-pink-600 px-3 text-xs font-bold text-white">
                           مشاهده و رزرو
                         </Link>
-                        <button onClick={() => removeFavorite(f.salon.id)} className="rounded-lg bg-neutral-100 px-3 py-2 text-xs font-bold text-neutral-600 hover:bg-red-50 hover:text-red-600">
+                        <button onClick={() => removeFavorite(f.salon.id)} className="h-10 rounded-lg bg-neutral-100 px-3 text-xs font-bold text-neutral-600 hover:bg-red-50 hover:text-red-600 dark:bg-neutral-800 dark:text-neutral-300">
                           حذف
                         </button>
                       </div>
@@ -398,7 +409,7 @@ export default function AccountPanel({ initialMe }: { initialMe: Me }) {
                       <div className="text-xs text-neutral-500" dir="ltr">{s.ip ?? "—"}</div>
                       <div className="text-xs text-neutral-400">ورود: {toJalali(s.createdAt)}</div>
                     </div>
-                    <button onClick={() => revokeSession(s.id)} className="rounded-lg bg-red-50 px-3 py-1.5 text-xs font-bold text-red-600 hover:bg-red-100">
+                    <button onClick={() => revokeSession(s.id)} className="h-10 rounded-lg bg-red-50 px-3 text-xs font-bold text-red-600 hover:bg-red-100 dark:bg-red-900/30 dark:text-red-300">
                       خروج از این دستگاه
                     </button>
                   </div>
@@ -488,7 +499,7 @@ function SupportView({
           <button
             onClick={send}
             disabled={sending || subject.trim().length < 3 || message.trim().length < 10}
-            className="rounded-xl bg-pink-600 px-5 py-2.5 text-sm font-bold text-white hover:bg-pink-700 disabled:opacity-50"
+            className="h-11 w-full rounded-xl bg-pink-600 px-5 text-sm font-bold text-white hover:bg-pink-700 disabled:opacity-50 sm:w-auto"
           >
             {sending ? "در حال ارسال..." : "ارسال درخواست"}
           </button>
@@ -565,13 +576,13 @@ function AppointmentList({
                 </span>
               </div>
               <div className="mt-3 flex flex-wrap gap-2">
-                <button onClick={() => onReschedule(a)} className="rounded-lg bg-amber-500 px-3 py-1.5 text-xs font-bold text-white hover:bg-amber-600">
+                <button onClick={() => onReschedule(a)} className="h-10 rounded-lg bg-amber-500 px-3.5 text-xs font-bold text-white hover:bg-amber-600">
                   تغییر زمان
                 </button>
-                <button onClick={() => onCancel(a.id)} className="rounded-lg bg-neutral-200 px-3 py-1.5 text-xs font-bold text-neutral-700 hover:bg-neutral-300">
+                <button onClick={() => onCancel(a.id)} className="h-10 rounded-lg bg-neutral-200 px-3.5 text-xs font-bold text-neutral-700 hover:bg-neutral-300 dark:bg-neutral-700 dark:text-neutral-200">
                   لغو نوبت
                 </button>
-                <span className="text-xs text-neutral-400">شماره: <span dir="ltr">{toPersianDigits(a.customerPhone)}</span></span>
+                <span className="self-center text-xs text-neutral-400">شماره: <span dir="ltr">{toPersianDigits(a.customerPhone)}</span></span>
               </div>
             </div>
           ))}
@@ -585,10 +596,10 @@ function ReviewForm({ onSubmit }: { onSubmit: (rating: number, comment: string) 
   const [rating, setRating] = useState(5);
   const [comment, setComment] = useState("");
   return (
-    <div className="flex w-full flex-wrap items-center gap-2 rounded-xl bg-neutral-50 p-2">
+    <div className="flex w-full flex-wrap items-center gap-2 rounded-xl bg-neutral-50 p-2 dark:bg-neutral-800">
       <div className="flex">
         {[1, 2, 3, 4, 5].map((n) => (
-          <button key={n} type="button" onClick={() => setRating(n)} className={`text-lg ${n <= rating ? "text-amber-500" : "text-neutral-300"}`}>
+          <button key={n} type="button" onClick={() => setRating(n)} aria-label={`${n} ستاره`} className={`flex h-10 w-10 items-center justify-center rounded-lg text-xl transition active:scale-95 ${n <= rating ? "text-amber-500" : "text-neutral-300 hover:text-amber-300 dark:text-neutral-600"}`}>
             ★
           </button>
         ))}
@@ -597,9 +608,9 @@ function ReviewForm({ onSubmit }: { onSubmit: (rating: number, comment: string) 
         value={comment}
         onChange={(e) => setComment(e.target.value)}
         placeholder="نظر شما (اختیاری)"
-        className="min-w-[160px] flex-1 rounded-lg border border-neutral-200 px-3 py-1.5 text-xs outline-none focus:border-pink-400"
+        className="h-10 min-w-[150px] flex-1 rounded-lg border border-neutral-200 px-3 text-xs outline-none focus:border-pink-400 dark:border-neutral-700 dark:bg-neutral-900"
       />
-      <button onClick={() => onSubmit(rating, comment)} className="rounded-lg bg-pink-600 px-3 py-1.5 text-xs font-bold text-white hover:bg-pink-700">
+      <button onClick={() => onSubmit(rating, comment)} className="h-10 rounded-lg bg-pink-600 px-3.5 text-xs font-bold text-white hover:bg-pink-700">
         ثبت نظر
       </button>
     </div>
@@ -632,7 +643,7 @@ function ProfileForm({ me, onSave }: { me: Me; onSave: (form: { name: string; em
   }
 
   return (
-    <div className="max-w-lg space-y-4 rounded-2xl border border-neutral-200 bg-white p-5">
+    <div className="max-w-lg space-y-4 rounded-2xl border border-neutral-200 bg-white p-4 sm:p-5 dark:border-neutral-800 dark:bg-neutral-900">
       <div className="flex items-center gap-4">
         <div className="flex h-16 w-16 items-center justify-center overflow-hidden rounded-full bg-gradient-to-br from-pink-100 to-purple-100 text-2xl font-black text-pink-600">
           {avatar ? (
@@ -643,8 +654,8 @@ function ProfileForm({ me, onSave }: { me: Me; onSave: (form: { name: string; em
           )}
         </div>
         <div className="flex-1">
-          <p className="text-sm font-bold text-neutral-800">تصویر پروفایل</p>
-          <label className={`mt-1 inline-block cursor-pointer rounded-lg bg-neutral-100 px-3 py-1.5 text-xs font-bold text-neutral-700 hover:bg-neutral-200 ${uploading ? "opacity-60" : ""}`}>
+          <p className="text-sm font-bold text-neutral-800 dark:text-neutral-100">تصویر پروفایل</p>
+          <label className={`mt-1 inline-flex h-10 cursor-pointer items-center rounded-lg bg-neutral-100 px-3 text-xs font-bold text-neutral-700 hover:bg-neutral-200 dark:bg-neutral-800 dark:text-neutral-200 ${uploading ? "opacity-60" : ""}`}>
             {uploading ? "در حال بارگذاری..." : "انتخاب تصویر"}
             <input
               type="file"
@@ -662,18 +673,18 @@ function ProfileForm({ me, onSave }: { me: Me; onSave: (form: { name: string; em
       </div>
       {msg && <p className={`rounded-lg px-3 py-2 text-xs ${msg.ok ? "bg-emerald-50 text-emerald-700" : "bg-red-50 text-red-600"}`}>{msg.text}</p>}
       <div>
-        <label className="text-xs font-bold text-neutral-500">شماره موبایل</label>
-        <input value={me.phone} disabled dir="ltr" className="mt-1 w-full rounded-xl border border-neutral-200 bg-neutral-50 px-3 py-2 text-sm text-neutral-500" />
+        <label className="text-xs font-bold text-neutral-500 dark:text-neutral-400">شماره موبایل</label>
+        <input value={me.phone} disabled dir="ltr" className="mt-1 h-11 w-full rounded-xl border border-neutral-200 bg-neutral-50 px-3 text-sm text-neutral-500 dark:border-neutral-700 dark:bg-neutral-800" />
       </div>
       <div>
-        <label className="text-xs font-bold text-neutral-500">نام</label>
-        <input value={name} onChange={(e) => setName(e.target.value)} className="mt-1 w-full rounded-xl border border-neutral-200 px-3 py-2 text-sm outline-none focus:border-pink-400" />
+        <label className="text-xs font-bold text-neutral-500 dark:text-neutral-400">نام</label>
+        <input value={name} onChange={(e) => setName(e.target.value)} className="mt-1 h-11 w-full rounded-xl border border-neutral-200 px-3 text-sm outline-none focus:border-pink-400 dark:border-neutral-700 dark:bg-neutral-800" />
       </div>
       <div>
-        <label className="text-xs font-bold text-neutral-500">ایمیل</label>
-        <input value={email} onChange={(e) => setEmail(e.target.value)} dir="ltr" className="mt-1 w-full rounded-xl border border-neutral-200 px-3 py-2 text-sm outline-none focus:border-pink-400" />
+        <label className="text-xs font-bold text-neutral-500 dark:text-neutral-400">ایمیل</label>
+        <input value={email} onChange={(e) => setEmail(e.target.value)} dir="ltr" className="mt-1 h-11 w-full rounded-xl border border-neutral-200 px-3 text-sm outline-none focus:border-pink-400 dark:border-neutral-700 dark:bg-neutral-800" />
       </div>
-      <button onClick={() => onSave({ name, email, avatarUrl: avatar || null })} className="rounded-xl bg-pink-600 px-5 py-2.5 text-sm font-bold text-white hover:bg-pink-700">
+      <button onClick={() => onSave({ name, email, avatarUrl: avatar || null })} className="h-11 w-full rounded-xl bg-pink-600 px-5 text-sm font-bold text-white hover:bg-pink-700 sm:w-auto">
         ذخیره تغییرات
       </button>
     </div>

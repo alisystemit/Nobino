@@ -1,5 +1,6 @@
 "use client";
 
+import { ChevronDown, Clock } from "lucide-react";
 import { toPersianDigits } from "@/lib/time/jalali";
 
 type Props = {
@@ -16,12 +17,13 @@ type Props = {
   label?: string;
 };
 
-const fieldCls =
-  "rounded-xl border border-neutral-200 bg-neutral-50/60 px-2 py-2.5 text-center text-sm text-neutral-800 outline-none transition focus:border-pink-400 focus:bg-white disabled:opacity-60 dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-100";
+const selectCls =
+  "h-11 w-full min-w-0 appearance-none rounded-xl border border-neutral-200 bg-white px-3 text-center text-sm font-bold text-neutral-800 shadow-sm outline-none transition focus:border-pink-400 focus:ring-2 focus:ring-pink-100 disabled:opacity-60 dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-100 dark:focus:border-pink-600 dark:focus:ring-pink-900/40";
 
 /**
  * انتخاب ساعت با ارقام فارسی — جایگزین `<input type="time">` که ساعت را با ارقام
  * لاتین نشان می‌داد. مقدار خروجی "HH:MM" لاتین است تا همان قرارداد قبلی حفظ شود.
+ * ارتفاع هر انتخابگر ۴۴px است تا روی گوشی راحت لمس شود و با تقویم شمسی هم‌اندازه بماند.
  */
 export default function TimeField({
   value,
@@ -52,37 +54,48 @@ export default function TimeField({
 
   return (
     <div className={className}>
-      {label && <span className="mb-1 block text-[11px] font-black text-neutral-500 dark:text-neutral-400">{label}</span>}
-      <div className="flex items-center justify-center gap-1" dir="ltr">
-        <select
-          value={hourPart}
-          onChange={(e) => setHour(e.target.value)}
-          disabled={disabled}
-          aria-label="ساعت"
-          className={`${fieldCls} min-w-0 flex-1`}
-        >
-          <option value="">ساعت</option>
-          {hours.map((h) => (
-            <option key={h} value={String(h).padStart(2, "0")}>
-              {toPersianDigits(String(h).padStart(2, "0"))}
-            </option>
-          ))}
-        </select>
-        <span className="text-sm font-black text-neutral-400">:</span>
-        <select
-          value={minutePart}
-          onChange={(e) => setMinute(e.target.value)}
-          disabled={disabled}
-          aria-label="دقیقه"
-          className={`${fieldCls} min-w-0 flex-1`}
-        >
-          <option value="">دقیقه</option>
-          {minutes.map((m) => (
-            <option key={m} value={String(m).padStart(2, "0")}>
-              {toPersianDigits(String(m).padStart(2, "0"))}
-            </option>
-          ))}
-        </select>
+      {label && (
+        <span className="mb-1 flex items-center gap-1 text-[11px] font-black text-neutral-500 dark:text-neutral-400">
+          <Clock className="h-3.5 w-3.5 text-pink-500" />
+          {label}
+        </span>
+      )}
+      <div className="flex items-center gap-1.5" dir="ltr">
+        <div className="relative min-w-0 flex-1">
+          <select
+            value={hourPart}
+            onChange={(e) => setHour(e.target.value)}
+            disabled={disabled}
+            aria-label="ساعت"
+            className={selectCls}
+          >
+            <option value="">ساعت</option>
+            {hours.map((h) => (
+              <option key={h} value={String(h).padStart(2, "0")}>
+                {toPersianDigits(String(h).padStart(2, "0"))}
+              </option>
+            ))}
+          </select>
+          <ChevronDown className="pointer-events-none absolute right-2 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-neutral-400" />
+        </div>
+        <span className="flex h-11 w-4 shrink-0 items-center justify-center text-lg font-black text-neutral-300 dark:text-neutral-600">:</span>
+        <div className="relative min-w-0 flex-1">
+          <select
+            value={minutePart}
+            onChange={(e) => setMinute(e.target.value)}
+            disabled={disabled}
+            aria-label="دقیقه"
+            className={selectCls}
+          >
+            <option value="">دقیقه</option>
+            {minutes.map((m) => (
+              <option key={m} value={String(m).padStart(2, "0")}>
+                {toPersianDigits(String(m).padStart(2, "0"))}
+              </option>
+            ))}
+          </select>
+          <ChevronDown className="pointer-events-none absolute right-2 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-neutral-400" />
+        </div>
       </div>
     </div>
   );

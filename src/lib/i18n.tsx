@@ -137,7 +137,7 @@ export function LangSwitch() {
   return (
     <button
       onClick={() => setLang(lang === "fa" ? "en" : "fa")}
-      className="rounded-xl border border-neutral-200 bg-white/60 px-3 py-1.5 text-xs font-bold text-neutral-700 transition hover:bg-neutral-100 dark:border-white/15 dark:bg-white/10 dark:text-neutral-200 dark:hover:bg-white/15"
+      className="flex h-10 items-center justify-center rounded-xl border border-neutral-200 bg-white/60 px-3 text-xs font-bold text-neutral-700 transition hover:bg-neutral-100 dark:border-white/15 dark:bg-white/10 dark:text-neutral-200 dark:hover:bg-white/15"
     >
       {lang === "fa" ? "EN" : "فا"}
     </button>

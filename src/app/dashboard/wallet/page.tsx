@@ -90,12 +90,12 @@ export default function WalletPage() {
 
   if (loading) return <DashboardShell role={role} title="کیف پول"><p className="py-10 text-center text-neutral-400">در حال بارگیری...</p></DashboardShell>;
 
-  const input = "w-full rounded-xl border border-neutral-200 bg-neutral-50/60 px-4 py-2.5 text-sm outline-none focus:border-pink-400 focus:bg-white dark:border-neutral-700 dark:bg-neutral-800";
+  const input = "h-11 w-full rounded-xl border border-neutral-200 bg-neutral-50/60 px-4 text-sm outline-none focus:border-pink-400 focus:bg-white dark:border-neutral-700 dark:bg-neutral-800";
 
   return (
     <DashboardShell role={role} title="کیف پول">
       {/* آمار */}
-      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+      <div className="grid grid-cols-2 gap-3 sm:gap-4 xl:grid-cols-3">
         <StatCard
           label="موجودی قابل تسویه"
           value={formatToman(balance)}
@@ -110,6 +110,7 @@ export default function WalletPage() {
           iconClass="bg-pink-100 text-pink-600 dark:bg-pink-900/40 dark:text-pink-300"
           sub={`در ${toPersianDigits(transactions.length)} تراکنش ثبت‌شده`}
         />
+        <div className="col-span-2 sm:col-span-1">
         <StatCard
           label="تراکنش‌ها"
           value={toPersianDigits(transactions.length)}
@@ -117,6 +118,7 @@ export default function WalletPage() {
           iconClass="bg-sky-100 text-sky-600 dark:bg-sky-900/40 dark:text-sky-300"
           sub="تاریخچه کامل واریز و برداشت کیف پول"
         />
+        </div>
       </div>
 
       <div className="mt-5 grid gap-5 lg:grid-cols-[340px_1fr]">
@@ -157,7 +159,7 @@ export default function WalletPage() {
             <button
               onClick={requestPayout}
               disabled={submitting || !amount || Number(amount) <= 0 || Number(amount) > balance || bankInfo.trim().length < 5}
-              className="w-full rounded-xl bg-gradient-to-l from-pink-600 to-purple-600 py-3 font-black text-white shadow-lg shadow-pink-500/25 transition hover:scale-[1.01] disabled:opacity-50"
+              className="h-12 w-full rounded-xl bg-gradient-to-l from-pink-600 to-purple-600 font-black text-white shadow-lg shadow-pink-500/25 transition hover:scale-[1.01] disabled:opacity-50"
             >
               {submitting ? "در حال ثبت..." : "درخواست تسویه"}
             </button>
@@ -177,14 +179,14 @@ export default function WalletPage() {
           action={<Badge tone="brand">{toPersianDigits(transactions.length)} مورد</Badge>}
           bodyClassName="p-0"
         >
-          <div className="max-h-[560px] overflow-y-auto">
+          <div className="max-h-[60dvh] overflow-y-auto sm:max-h-[560px]">
             {transactions.length === 0 && (
               <p className="py-14 text-center text-sm text-neutral-400">تراکنشی ثبت نشده است.</p>
             )}
             {transactions.map((t, i) => (
               <div
                 key={t.id}
-                className={`flex items-center justify-between gap-3 px-5 py-3.5 ${i > 0 ? "border-t border-neutral-100 dark:border-neutral-800" : ""}`}
+                className={`flex items-center justify-between gap-3 px-4 py-3.5 sm:px-5 ${i > 0 ? "border-t border-neutral-100 dark:border-neutral-800" : ""}`}
               >
                 <div className="min-w-0">
                   <div className="flex flex-wrap items-center gap-2">

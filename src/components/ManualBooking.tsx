@@ -57,7 +57,7 @@ export default function ManualBooking({ salonId, timezone }: { salonId: string; 
   const picked = services.find((s) => s.id === serviceId);
 
   const input =
-    "w-full rounded-xl border border-neutral-200 bg-neutral-50/60 px-3 py-2.5 text-sm outline-none focus:border-pink-400 focus:bg-white dark:border-neutral-700 dark:bg-neutral-800 dark:focus:bg-neutral-900";
+    "h-11 w-full rounded-xl border border-neutral-200 bg-neutral-50/60 px-3 text-sm outline-none transition focus:border-pink-400 focus:bg-white dark:border-neutral-700 dark:bg-neutral-800 dark:focus:bg-neutral-900";
   const label = "mb-1 block text-[11px] font-black text-neutral-500 dark:text-neutral-400";
 
   async function submit() {
@@ -173,7 +173,7 @@ export default function ManualBooking({ salonId, timezone }: { salonId: string; 
           <button
             onClick={submit}
             disabled={processing}
-            className="flex w-full items-center justify-center gap-2 rounded-xl bg-[#1c2434] py-3 font-black text-white shadow-lg transition hover:bg-[#2a3450] disabled:opacity-50"
+            className="flex h-12 w-full items-center justify-center gap-2 rounded-xl bg-[#1c2434] font-black text-white shadow-lg transition hover:bg-[#2a3450] disabled:opacity-50"
           >
             <CalendarPlus className="h-4 w-4" />
             {processing ? "در حال ثبت..." : "ثبت نوبت دستی"}
@@ -220,7 +220,7 @@ export default function ManualBooking({ salonId, timezone }: { salonId: string; 
 
         <Link
           href="/dashboard/voice-booking"
-          className="mt-4 flex items-center justify-center gap-2 rounded-xl bg-gradient-to-l from-pink-600 to-purple-600 py-3 text-sm font-black text-white shadow-lg shadow-pink-500/25 transition hover:scale-[1.01]"
+          className="mt-4 flex h-12 items-center justify-center gap-2 rounded-xl bg-gradient-to-l from-pink-600 to-purple-600 text-sm font-black text-white shadow-lg shadow-pink-500/25 transition hover:scale-[1.01]"
         >
           <Mic className="h-4 w-4" />
           رفتن به رزرو صوتی هوشمند

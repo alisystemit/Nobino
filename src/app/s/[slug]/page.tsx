@@ -148,39 +148,35 @@ export default async function SalonPage({ params }: { params: Promise<{ slug: st
       />
       <AssistantChat salonId={salon.id} />
       {/* Header */}
-      <header className="relative h-80 w-full">
+      <header className="relative h-[18rem] w-full sm:h-80">
         <div
           className="absolute inset-0 animate-gradient"
-          style={
-            salon.bannerUrl
-              ? undefined
-              : { background: `linear-gradient(135deg, ${salon.coverColor}, #7c3aed)` }
-          }
+          style={{ background: `linear-gradient(135deg, ${salon.coverColor}, #7c3aed)` }}
         />
         {/* بنر سالن؛ اگر سالن بنری آپلود نکرده، تصویر نمونهٔ برداری نمایش داده می‌شود */}
         <SafeImage
           src={salon.bannerUrl ?? "/seed/hero.svg"}
           alt={`بنر ${salon.name}`}
-          className="absolute inset-0 h-full w-full object-cover"
+          className="absolute inset-0 hidden h-full w-full object-cover sm:block"
           fallback=""
           fallbackClassName="absolute inset-0 !bg-gradient-to-br !from-pink-500 !to-purple-700"
         />
         <div className="absolute inset-0 bg-hero-pattern" />
         <div className="absolute inset-0 bg-black/40" />
-        <div className="absolute bottom-0 left-0 right-0 mx-auto max-w-6xl px-6 pb-8">
-          <div className="flex flex-wrap items-end gap-5">
-            <div className="flex h-28 w-28 items-center justify-center overflow-hidden rounded-3xl border-4 border-white/70 bg-white/90 text-5xl shadow-2xl backdrop-blur">
+        <div className="absolute bottom-0 left-0 right-0 mx-auto max-w-6xl px-4 pb-6 sm:px-6 sm:pb-8">
+          <div className="flex items-end gap-3 sm:gap-5">
+            <div className="flex h-20 w-20 shrink-0 items-center justify-center overflow-hidden rounded-2xl border-4 border-white/70 bg-white/90 text-5xl shadow-2xl backdrop-blur sm:h-28 sm:w-28 sm:rounded-3xl">
               <SafeImage
                 src={salon.logoUrl}
                 alt={salon.name}
-                className="h-full w-full rounded-2xl object-cover"
-                fallback={<SalonIcon className="h-14 w-14" />}
-                fallbackClassName="h-full w-full rounded-2xl"
+                className="h-full w-full rounded-xl object-contain sm:rounded-2xl"
+                fallback={<SalonIcon className="h-10 w-10 sm:h-14 sm:w-14" />}
+                fallbackClassName="h-full w-full rounded-xl sm:rounded-2xl"
               />
             </div>
             <div className="min-w-0 flex-1 text-white">
-              <h1 className="text-3xl font-black drop-shadow sm:text-4xl">{salon.name}</h1>
-              <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-white/85">
+              <h1 className="text-2xl font-black leading-tight drop-shadow sm:text-4xl">{salon.name}</h1>
+              <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-white/85 sm:gap-x-4 sm:text-sm">
                 <span className="inline-flex items-center gap-1.5">📍 {salon.city} {salon.address}</span>
                 <span className="inline-flex items-center gap-1.5" dir="ltr">📞 {toPersianDigits(salon.phone)}</span>
                 {reviewCount > 0 && (
@@ -190,21 +186,16 @@ export default async function SalonPage({ params }: { params: Promise<{ slug: st
                 )}
               </div>
             </div>
-            <div className="ms-auto flex flex-col items-end gap-2">
+            <div className="ms-auto flex shrink-0 flex-col items-end gap-2">
               <FavoriteButton salonId={salon.id} />
-              {reviewCount > 0 && (
-                <span className="rounded-full border border-white/30 bg-white/10 px-3 py-1 text-xs font-semibold text-white backdrop-blur">
-                  ★ {toPersianDigits(averageRating)} / ۵
-                </span>
-              )}
             </div>
           </div>
         </div>
       </header>
 
-      <div className="mx-auto grid max-w-5xl gap-8 px-6 py-10 lg:grid-cols-[1fr_380px]">
+      <div className="mx-auto grid max-w-5xl gap-6 px-4 py-6 sm:gap-8 sm:px-6 sm:py-10 lg:grid-cols-[1fr_380px]">
         {/* Main column */}
-        <div className="space-y-10">
+        <div className="order-2 space-y-8 sm:space-y-10 lg:order-1">
           <section>
             <h2 className="text-xl font-extrabold text-neutral-900">درباره سالن</h2>
             <p className="mt-3 leading-relaxed text-neutral-600">{salon.description ?? "توضیحی ثبت نشده است."}</p>
@@ -367,7 +358,7 @@ export default async function SalonPage({ params }: { params: Promise<{ slug: st
         </div>
 
         {/* Booking widget */}
-        <aside className="lg:sticky lg:top-6 lg:self-start">
+        <aside className="order-1 lg:order-2 lg:sticky lg:top-6 lg:self-start">
           <SalonBooking
             salonId={salon.id}
             slug={salon.slug}
