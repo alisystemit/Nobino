@@ -4,6 +4,7 @@ import { I18nProvider } from "@/lib/i18n";
 import { ThemeProvider } from "@/lib/theme";
 import GlobalHeader from "@/components/GlobalHeader";
 import PwaInstall from "@/components/PwaInstall";
+import { SITE_URL } from "@/lib/site";
 import "./globals.css";
 
 const vazir = Vazirmatn({
@@ -22,7 +23,7 @@ export const viewport: Viewport = {
 };
 
 export const metadata: Metadata = {
-  metadataBase: new URL(process.env.NEXT_PUBLIC_SITE_URL ?? "https://nobino.ir"),
+  metadataBase: new URL(SITE_URL),
   title: {
     default: "نوبینو | نوبت‌دهی هوشمند آرایشگاه",
     template: "%s | نوبینو",

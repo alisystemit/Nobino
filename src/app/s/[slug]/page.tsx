@@ -6,6 +6,7 @@ import AssistantChat from "@/components/AssistantChat";
 import FavoriteButton from "@/components/FavoriteButton";
 import SafeImage from "@/components/SafeImage";
 import SalonIcon from "@/components/icons/SalonIcon";
+import { SITE_URL } from "@/lib/site";
 import type { Metadata } from "next";
 
 export const instant = false;
@@ -84,7 +85,7 @@ export default async function SalonPage({ params }: { params: Promise<{ slug: st
 
   const days = ["شنبه", "یکشنبه", "دوشنبه", "سه‌شنبه", "چهارشنبه", "پنجشنبه", "جمعه"];
   const schemaDays = ["Saturday", "Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday"];
-  const siteUrl = process.env.NEXT_PUBLIC_SITE_URL ?? "https://nobino.ir";
+  const siteUrl = SITE_URL;
   const salonUrl = `${siteUrl.replace(/\/$/, "")}/s/${salon.slug}`;
 
   const jsonLd = {

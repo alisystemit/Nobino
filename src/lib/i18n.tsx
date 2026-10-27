@@ -7,6 +7,7 @@ export type Lang = "fa" | "en";
 const translations: Record<string, { fa: string; en: string }> = {
   "nav.home": { fa: "خانه", en: "Home" },
   "nav.login": { fa: "ورود", en: "Login" },
+  "nav.dashboard": { fa: "داشبورد", en: "Dashboard" },
   "nav.packages": { fa: "پکیج‌ها", en: "Packages" },
   "nav.salons": { fa: "جستجوی آرایشگاه‌ها", en: "Find Salons" },
   "nav.help": { fa: "راهنما", en: "Help" },

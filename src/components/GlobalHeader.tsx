@@ -12,7 +12,7 @@ export default function GlobalHeader() {
   const pathname = usePathname();
   const [mobileOpen, setMobileOpen] = useState(false);
   const [scrolled, setScrolled] = useState(false);
-  const [role, setRole] = useState<string | null>(null);
+  const [user, setUser] = useState<{ role: string } | null>(null);
   // پنل‌های داشبورد روی گوشی هدر سایت را پنهان می‌کنند تا فضای اپ‌مانند بماند
   const inDashboard = Boolean(pathname?.startsWith("/dashboard"));
 
@@ -23,21 +23,33 @@ export default function GlobalHeader() {
     return () => window.removeEventListener("scroll", onScroll);
   }, []);
 
-  // اگر مشتری وارد شده باشد، پکیج‌ها را در منو نشان نده
+  // وضعیت ورود — پس از هر جابه‌جایی دوباره خوانده می‌شود تا بعد از ورود/خروج به‌روز باشد
   useEffect(() => {
+    let alive = true;
     (async () => {
       try {
-        const me = await (await fetch("/api/auth/me")).json();
-        if (me.user?.role) setRole(me.user.role);
-      } catch {}
+        const res = await fetch("/api/auth/me", { cache: "no-store" });
+        const me = await res.json();
+        if (alive) setUser(me.user ?? null);
+      } catch {
+        if (alive) setUser(null);
+      }
     })();
-  }, []);
+    return () => {
+      alive = false;
+    };
+  }, [pathname]);
 
+  const isCustomer = user?.role === "CUSTOMER";
   const links = [
     { href: "/salons", label: t("nav.salons") },
-    ...(role === "CUSTOMER" ? [] : [{ href: "/packages", label: t("nav.packages") }]),
+    ...(isCustomer ? [] : [{ href: "/packages", label: t("nav.packages") }]),
     { href: "/help", label: t("nav.help") },
   ];
+  // کاربر واردشده به‌جای «ورود» دکمه «داشبورد» می‌بیند
+  const cta = user
+    ? { href: "/dashboard", label: t("nav.dashboard") }
+    : { href: "/login", label: t("nav.login") };
 
   return (
     <header
@@ -66,8 +78,8 @@ export default function GlobalHeader() {
               {l.label}
             </Link>
           ))}
-          <Link href="/login" className="mr-2 rounded-xl bg-gradient-to-l from-pink-600 to-purple-600 px-5 py-2.5 text-sm font-bold text-white shadow-lg shadow-pink-500/25 transition hover:scale-[1.03] hover:shadow-pink-500/40">
-            {t("nav.login")}
+          <Link href={cta.href} className="mr-2 rounded-xl bg-gradient-to-l from-pink-600 to-purple-600 px-5 py-2.5 text-sm font-bold text-white shadow-lg shadow-pink-500/25 transition hover:scale-[1.03] hover:shadow-pink-500/40">
+            {cta.label}
           </Link>
           <span className="mr-2"><LangSwitch /></span>
           <span className="mr-1"><ThemeToggle /></span>
@@ -91,8 +103,8 @@ export default function GlobalHeader() {
                 {l.label}
               </Link>
             ))}
-            <Link href="/login" onClick={() => setMobileOpen(false)} className="mt-1 rounded-xl bg-gradient-to-l from-pink-600 to-purple-600 px-3 py-2.5 text-center text-sm font-bold text-white">
-              {t("nav.login")}
+            <Link href={cta.href} onClick={() => setMobileOpen(false)} className="mt-1 rounded-xl bg-gradient-to-l from-pink-600 to-purple-600 px-3 py-2.5 text-center text-sm font-bold text-white">
+              {cta.label}
             </Link>
           </div>
         </div>

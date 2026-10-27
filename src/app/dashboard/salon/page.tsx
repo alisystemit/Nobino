@@ -5,6 +5,7 @@ import { toPersianDigits } from "@/lib/utils";
 import { listOwnerSalons, resolveDashboardSalonId } from "@/lib/salons";
 import { UNLIMITED_FROM } from "@/lib/plans/limit-defs";
 import { limitSnapshot } from "@/lib/plans/limits";
+import { SITE_URL, displayUrl } from "@/lib/site";
 import SalonSettings from "@/components/SalonSettings";
 import CreateSalon from "@/components/CreateSalon";
 import SalonManager from "@/components/SalonManager";
@@ -81,6 +82,12 @@ export default async function SalonDashboardPage({ searchParams }: { searchParam
   const subActive = salon.subscriptionEndsAt ? salon.subscriptionEndsAt > today : false;
   // وضعیت مصرف سقف‌ها — همه از کاتالوگ محدودیت‌ها و تنظیمات سوپرادمین می‌آید
   const snap = await limitSnapshot(salon.id);
+  // آدرس عمومی سالن: دامنه اختصاصیِ تأییدشده مقدم است، وگرنه دامنه اصلی نصب
+  const publicBase =
+    salon.customDomain && salon.domainStatus === "VERIFIED"
+      ? `https://${salon.customDomain}`
+      : SITE_URL;
+  const publicUrl = `${publicBase.replace(/\/+$/, "")}/s/${salon.slug}`;
 
   return (
     <DashboardShell role={user.role} title="سالن من">
@@ -98,7 +105,7 @@ export default async function SalonDashboardPage({ searchParams }: { searchParam
               {subActive && <Badge tone="success">اشتراک فعال</Badge>}
             </div>
             <p className="mt-2 break-all text-xs text-neutral-300 sm:text-sm">
-              صفحه: <span dir="ltr" className="font-mono">nobino.ir/s/{salon.slug}</span>
+              صفحه: <span dir="ltr" className="font-mono">{displayUrl(publicUrl)}</span>
               <span className="mx-2 text-neutral-500">|</span>
               تلفن: {toPersianDigits(salon.phone)}
             </p>
