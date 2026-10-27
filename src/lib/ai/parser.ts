@@ -1,5 +1,6 @@
 import { env } from "@/lib/env";
 import { extractNameFromText } from "./text-fields";
+import { extractPhone, extractTime } from "./voice-text";
 
 /**
  * استخراج اطلاعات نوبت از متن فارسی.
@@ -21,16 +22,6 @@ const DAY_NAMES = ["شنبه", "یکشنبه", "دوشنبه", "سه‌شنبه"
 /** تبدیل ارقام فارسی به لاتین */
 function normalizeDigits(text: string): string {
   return text.replace(/[۰-۹]/g, (d) => String("۰۱۲۳۴۵۶۷۸۹".indexOf(d)));
-}
-
-/** تبدیل ارقام فارسی/عربی به لاتین */
-export function normalizePersianDigits(text: string): string {
-  return text.replace(/[۰-۹٠-٩]/g, (d) => {
-    const fa = "۰۱۲۳۴۵۶۷۸۹".indexOf(d);
-    if (fa >= 0) return String(fa);
-    const ar = "٠١٢٣٤٥٦٧٨٩".indexOf(d);
-    return String(ar);
-  });
 }
 
 const WEEKDAY_TARGET: Record<string, number> = {
@@ -125,17 +116,6 @@ const FIELD_HINTS: Record<ExtractedField, string> = {
   time: "ساعت نوبت به شکل HH:MM",
 };
 
-/** تبدیل ارقامِ گفته‌شده با کلمه («نه یک دو سه…») به رقم لاتین */
-function digitsFromSpoken(text: string): string {
-  const words: Record<string, string> = {
-    صفر: "0", یک: "1", دو: "2", سه: "3", چهار: "4", پنج: "5",
-    شش: "6", هفت: "7", هشت: "8", نه: "9",
-  };
-  let t = normalizePersianDigits(text);
-  for (const [w, d] of Object.entries(words)) t = t.replace(new RegExp(w, "g"), d);
-  return t.replace(/\s+/g, "").replace(/[^\d+]/g, "");
-}
-
 /**
  * استخراج فقط یک فیلد از یک صوت کوتاه (پاسخ تکمیلی مشتری).
  * وقتی ربات فیلدی را نفهمیده، مشتری فقط همان را می‌گوید؛
@@ -191,10 +171,7 @@ export async function extractSingleField(
   // قاعده‌محور
   switch (field) {
     case "phone": {
-      // ارقام با فاصله یا به‌صورت کلمه‌ای («نه یک دو…»)
-      const digits = digitsFromSpoken(text);
-      const m = digits.match(/9\d{9}/);
-      if (m) return { ...base, phone: `0${m[0]}` };
+      // ارقام پیوسته/با فاصله یا کلمه‌ای («صفر نه یک دو…»)
       const p = extractPhone(text);
       if (p) return { ...base, phone: p };
       break;
@@ -267,44 +244,6 @@ async function extractWithLLM(
   } catch {
     return null;
   }
-}
-
-// ─── توابع قاعده‌محور فارسی ────────────────────────────────────────────
-
-const PHONE_RE = /(?:0|\+98)?9\d{9}/g;
-
-function extractPhone(text: string): string | undefined {
-  const normalized = normalizePersianDigits(text);
-  const m = normalized.match(PHONE_RE);
-  if (!m) return undefined;
-  const raw = m[0].replace(/\s/g, "");
-  return (raw.startsWith("0") ? raw : `0${raw}`).replace("+98", "0");
-}
-
-function extractTime(text: string): string | undefined {
-  const t = normalizeDigits(text);
-  // الگوی ساعت:دقیقه (مثلاً 10:30)
-  const hm = t.match(/(\d{1,2}):(\d{2})/);
-  if (hm) {
-    const h = parseInt(hm[1], 10);
-    const mm = parseInt(hm[2], 10);
-    if (h >= 0 && h <= 23 && mm >= 0 && mm <= 59) {
-      return `${String(h).padStart(2, "0")}:${String(mm).padStart(2, "0")}`;
-    }
-  }
-  // الگوی «ساعت ۱۰» یا «۱۰ صبح/عصر/شب/ظهر/بعدازظهر»
-  const m = t.match(/(?:ساعت\s*)?(\d{1,2})\s*(صبح|ظهر|عصر|شب|بعدازظهر|بعد از ظهر)?/);
-  if (!m || m[1] === undefined) return undefined;
-  let hour = parseInt(m[1], 10);
-  if (hour >= 13 && hour <= 23) return `${String(hour).padStart(2, "0")}:00`;
-  if (hour < 1 || hour > 12) return undefined;
-  const part = m[2];
-  if (part === "عصر" || part === "شب" || part === "بعدازظهر" || part === "بعد از ظهر") {
-    if (hour < 12) hour += 12;
-  } else if (part === "ظهر") {
-    if (hour < 12) hour += 12;
-  }
-  return `${String(hour).padStart(2, "0")}:00`;
 }
 
 function extractName(text: string): string | undefined {

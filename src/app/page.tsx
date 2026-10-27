@@ -208,7 +208,7 @@ export default async function HomePage() {
               </div>
               <div className="space-y-3 p-5">
                 <div className="rounded-2xl rounded-tr-sm bg-pink-50 px-4 py-3 text-sm leading-relaxed text-neutral-700 dark:bg-pink-950/30 dark:text-neutral-200">
-                  «سلام، می‌خوام نوبت رزرو کنم: برای فردا ساعت ده صبح، خدمت کوتاهی مو، به نام سارا احمدی، شماره موبایل ۰۹۱۲۳۴۵۶۷۸»
+                  «سلام، می‌خوام نوبت رزرو کنم: برای فردا ساعت ده صبح، خدمت کوتاهی مو، به نام سارا احمدی، شماره موبایل ۰۹۱۲۳۴۵۶۷۸۹»
                 </div>
                 <div className="flex items-center gap-2 text-[11px] font-bold text-neutral-400">
                   <span className="h-px flex-1 bg-neutral-200 dark:bg-neutral-800" /> تبدیل و استخراج هوش مصنوعی <span className="h-px flex-1 bg-neutral-200 dark:bg-neutral-800" />
@@ -216,7 +216,7 @@ export default async function HomePage() {
                 <div className="grid grid-cols-2 gap-2 text-[11px]">
                   {[
                     ["نام", "سارا احمدی", "bg-emerald-50 text-emerald-700"],
-                    ["شماره", "۰۹۱۲۳۴۵۶۷۸", "bg-emerald-50 text-emerald-700"],
+                    ["شماره", "۰۹۱۲۳۴۵۶۷۸۹", "bg-emerald-50 text-emerald-700"],
                     ["خدمت", "کوتاهی مو", "bg-emerald-50 text-emerald-700"],
                     ["تاریخ", "فردا", "bg-emerald-50 text-emerald-700"],
                     ["ساعت", "۱۰:۰۰", "bg-emerald-50 text-emerald-700"],
