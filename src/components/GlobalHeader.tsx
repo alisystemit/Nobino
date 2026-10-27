@@ -13,13 +13,8 @@ export default function GlobalHeader() {
   const [mobileOpen, setMobileOpen] = useState(false);
   const [scrolled, setScrolled] = useState(false);
   const [user, setUser] = useState<{ role: string } | null>(null);
-  // پنل‌ها (داشبورد کاربر و مدیریت پلتفرم) قاب، منو، زنگ و دکمهٔ بازگشت به سایتِ خودشان را
-  // دارند؛ هدر سایت روی آن‌ها تکراری می‌افتد و روی گوشی منوی دو‌دانه می‌سازد.
-  // صفحهٔ ورود ادمین مستثناست چون لینک بازگشت خودش را ندارد.
-  const inPanel = Boolean(
-    pathname &&
-      (/^\/dashboard(\/|$)/.test(pathname) || (/^\/admin(\/|$)/.test(pathname) && !pathname.startsWith("/admin/login")))
-  );
+  // پنل‌های داشبورد روی گوشی هدر سایت را پنهان می‌کنند تا فضای اپ‌مانند بماند
+  const inDashboard = Boolean(pathname?.startsWith("/dashboard"));
 
   useEffect(() => {
     const onScroll = () => setScrolled(window.scrollY > 12);
@@ -51,17 +46,16 @@ export default function GlobalHeader() {
     ...(isCustomer ? [] : [{ href: "/packages", label: t("nav.packages") }]),
     { href: "/help", label: t("nav.help") },
   ];
-  // کاربر واردشده به‌جای «ورود» دکمهٔ پنل خود را می‌بیند
+  // کاربر واردشده به‌جای «ورود» دکمه «داشبورد» می‌بیند
   const cta = user
-    ? { href: user.role === "ADMIN" ? "/admin" : "/dashboard", label: t("nav.dashboard") }
+    ? { href: "/dashboard", label: t("nav.dashboard") }
     : { href: "/login", label: t("nav.login") };
-
-  // داخل پنل‌ها هدر سایت اصلاً رندر نمی‌شود
-  if (inPanel) return null;
 
   return (
     <header
       className={`sticky top-0 z-40 transition-all duration-300 dark:bg-neutral-950/85 ${
+        inDashboard ? "hidden lg:block" : ""
+      } ${
         scrolled
           ? "bg-white/90 shadow-lg shadow-black/5 backdrop-blur-xl dark:shadow-black/40"
           : "bg-white/70 backdrop-blur-xl border-b border-black/5 dark:border-white/10"
