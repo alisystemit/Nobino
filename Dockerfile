@@ -6,9 +6,10 @@
 FROM node:22-bookworm-slim AS deps
 WORKDIR /app
 ENV NEXT_TELEMETRY_DISABLED=1
-# prisma generate در postinstall به فایل اسکیم نیاز دارد
+# prisma generate در postinstall به فایل اسکیم و خود اسکریپت نیاز دارد
 COPY package.json package-lock.json ./
 COPY prisma ./prisma
+COPY scripts/prisma-generate.mjs ./scripts/prisma-generate.mjs
 RUN npm ci
 
 # ── ۲) بیلد (بدون DATABASE_URL هم موفق است — env.ts در فاز بیلد placeholder می‌گذارد) ──
