@@ -255,6 +255,54 @@ sudo bash /var/www/nobino/scripts/uninstall-ubuntu.sh
 
 ---
 
+## 📦 استقرار روی PaaS (Render / Railway / Koyeb / Fly.io / Docker)
+
+پروژه برای پلتفرم‌هایی که مستقیم از ریپو یا Dockerfile بیلد می‌کنند آماده است:
+`Dockerfile` + `.dockerignore` + `Procfile` + اسکریپت `start:paas`.
+
+### راه‌اندازی سریع (Render/Railway با Node.js)
+
+1. **Build command:** `npm run build` — در فاز بیلد نبودِ `DATABASE_URL` خطا نمی‌دهد
+   (ماژول `src/lib/env.ts` در زمان بیلد placeholder می‌گذارد).
+2. **Start command:** `npm run start:paas` — این اسکریپت اول اسکیمای دیتابیس را با
+   `prisma db push` هم‌راستا می‌کند (تا ۶ بار تلاش دوباره برای گرم شدن دیتابیس)،
+   سپس `next start` را روی پورتی که پلتفرم در `PORT` می‌دهد بالا می‌آورد.
+   ماژول `postinstall` هم به‌طور خودکار `prisma generate` را اجرا می‌کند.
+3. **Health check path:** `/api/health` — پاسخ `200 {"ok":true,"db":"up"}` وقتی
+   دیتابیس در دسترس است و `503` وقتی نیست.
+
+### متغیرهای محیطی لازم
+
+| متغیر | مقدار |
+|---|---|
+| `DATABASE_URL` | رشته اتصال PostgreSQL (اجباری در زمان اجرا) |
+| `JWT_SECRET` | حداقل ۱۶ نویسه — در پروداکشن حتماً تصادفی |
+| `NEXT_PUBLIC_APP_URL` | آدرس کامل سایت، مثلاً `https://nobino.onrender.com` |
+| `NEXT_PUBLIC_ROOT_DOMAIN` | فقط اگر ساب‌دامین سالن می‌خواهید (مثل `nobino.ir`) |
+| `CRON_SECRET` | برای endpoint های `/api/cron/*` |
+| `SENTRY_DSN` | اختیاری |
+
+بقیه (پیامک، درگاه‌ها، OpenAI) اختیاری‌اند و با پیش‌فرض mock/sandbox کار می‌کنند —
+کل فهرست در `.env.example`.
+
+### با Docker
+
+```bash
+docker build -t nobino .
+docker run -p 3000:3000 --env-file .env nobino
+```
+
+اگر دیتابیس دیرتر از کانتینر آماده می‌شود، تلاش‌های `db push` را با
+`PAAS_DB_PUSH_ATTEMPTS` و `PAAS_DB_PUSH_DELAY_MS` تنظیم کنید؛ با
+`PAAS_SKIP_DB_PUSH=true` هم می‌توانید این مرحله را کلاً خاموش کنید (مثلاً وقتی
+اسکیمای دیتابیس را دستی اعمال کرده‌اید).
+
+> نکته: سرویس‌های رایگان مثل Render پس از بی‌کاری sleep می‌کنند؛ اولین
+> درخواست چند ثانیه طول می‌کشد (cold start) و `db push` هنگام استارت فقط در
+> اولین راه‌اندازی واقعی وقت‌گیر است.
+
+---
+
 ## 📁 ساختار
 
 ```
