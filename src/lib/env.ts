@@ -94,7 +94,30 @@ const envSchema = z.object({
   BLOB_STORE_ID: z.string().default(""),
 });
 
-export const env = envSchema.parse(process.env);
+export type Env = z.infer<typeof envSchema>;
+
+/**
+ * فاز بیلد (next build → Collecting page data) ماژول‌ها را بدون env واقعی evaluate می‌کند.
+ * در آن فاز DATABASE_URL جانشین صوری می‌گیرد تا بیلد در کانتینر/پلتفرم بدون .env نشکند؛
+ * در زمان اجرا (dev/start) همان‌طور سخت‌گیرانه throw می‌شود.
+ */
+const isBuildPhase = process.env.NEXT_PHASE === "phase-production-build";
+
+function loadEnv(): Env {
+  try {
+    return envSchema.parse(process.env);
+  } catch (err) {
+    if (isBuildPhase) {
+      return envSchema.parse({
+        ...process.env,
+        DATABASE_URL: process.env.DATABASE_URL || "postgresql://build:build@localhost:5432/build_placeholder",
+      });
+    }
+    throw err;
+  }
+}
+
+export const env = loadEnv();
 
 export const isSandbox = (key?: string) =>
   (key ?? "true").toLowerCase() === "true";
